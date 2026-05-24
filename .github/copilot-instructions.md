@@ -1,5 +1,9 @@
 # Day Coordinator — Copilot Context
 
+## Product Vision
+Full product vision, data model, phase strategy, and UX principles are documented in `docs/VISION.md`.
+Read it before making architectural decisions or adding new models/screens.
+
 ## System Overview
 Day Coordinator is a day-of coordination and scheduling platform for weddings and events.
 It provides real-time task management, timeline visualization, vendor coordination,
