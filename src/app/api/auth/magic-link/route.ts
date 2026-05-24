@@ -17,10 +17,13 @@ export async function POST(request: NextRequest) {
   const { email } = parsed.data;
   const supabase = await createSupabaseServerClient();
 
+  // Use the request origin so magic links work on any local port or deploy URL
+  const origin = request.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL!;
+
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`,
+      emailRedirectTo: `${origin}/api/auth/callback`,
     },
   });
 
