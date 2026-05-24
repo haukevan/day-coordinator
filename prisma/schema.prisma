@@ -1,0 +1,173 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Core Models ────────────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  events    Event[]
+  users     User[]
+}
+
+model User {
+  id             String       @id @default(cuid())
+  email          String       @unique
+  name           String?
+  role           UserRole     @default(COORDINATOR)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  assignedTasks  Task[]       @relation("AssignedTo")
+  activityLogs   ActivityLog[]
+}
+
+enum UserRole {
+  ADMIN
+  COORDINATOR
+  VENDOR
+  VIEWER
+}
+
+// ─── Event ───────────────────────────────────────────────────────────────────
+
+model Event {
+  id             String      @id @default(cuid())
+  name           String
+  date           DateTime
+  venue          String?
+  status         EventStatus @default(DRAFT)
+  liveStartedAt  DateTime?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  tasks        Task[]
+  timeline     TimelineBlock[]
+  notifications Notification[]
+  activityLogs ActivityLog[]
+}
+
+enum EventStatus {
+  DRAFT
+  CONFIRMED
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+// ─── Task ────────────────────────────────────────────────────────────────────
+
+model Task {
+  id             String     @id @default(cuid())
+  eventId        String
+  event          Event      @relation(fields: [eventId], references: [id])
+  title          String
+  description    String?
+  status         TaskStatus @default(PENDING)
+  scheduledStart DateTime?
+  scheduledEnd   DateTime?
+  actualStart    DateTime?
+  actualEnd      DateTime?
+  durationMins   Int?
+  manualOverride Boolean    @default(false)
+  parentTaskId   String?    // single-parent DAG rule
+  parentTask     Task?      @relation("TaskDependency", fields: [parentTaskId], references: [id])
+  childTasks     Task[]     @relation("TaskDependency")
+  assignedToId   String?
+  assignedTo     User?      @relation("AssignedTo", fields: [assignedToId], references: [id])
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  activityLogs   ActivityLog[]
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  DELAYED
+  SKIPPED
+}
+
+// ─── Timeline ────────────────────────────────────────────────────────────────
+
+model TimelineBlock {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  title     String
+  startTime DateTime
+  endTime   DateTime
+  color     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+  id          String             @id @default(cuid())
+  eventId     String
+  event       Event              @relation(fields: [eventId], references: [id])
+  type        NotificationType
+  channel     NotificationChannel
+  recipient   String             // email or phone
+  payload     Json
+  status      NotificationStatus @default(PENDING)
+  idempotencyKey String          @unique
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+enum NotificationType {
+  TASK_REMINDER
+  TASK_DELAYED
+  EVENT_STARTED
+  CUSTOM
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+// ─── Activity Log ─────────────────────────────────────────────────────────────
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id])
+  action    String   // e.g. "task.started", "task.delayed"
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
