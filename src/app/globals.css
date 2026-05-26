@@ -1,34 +1,264 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --bg: #0b0f14;
-  --panel: #111826;
-  --primary: #4f7cff;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --text: #e5e7eb;
+@custom-variant dark (&:is(.dark *));
 
-  /* Legacy / Tailwind compat */
-  --background: var(--bg);
-  --foreground: var(--text);
+@layer base {
+  :root {
+    /* =========================================================
+       BACKGROUNDS & SURFACES
+    ========================================================= */
+    --background: 24 33% 98%;
+    --foreground: 340 18% 18%;
+    --card: 0 0% 100%;
+    --card-foreground: 340 18% 18%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 340 18% 18%;
+
+    /* =========================================================
+       BRAND COLORS
+    ========================================================= */
+    --primary: 344 42% 63%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 18 24% 90%;
+    --secondary-foreground: 340 18% 18%;
+    --accent: 8 72% 68%;
+    --accent-foreground: 0 0% 100%;
+    --muted: 12 28% 94%;
+    --muted-foreground: 340 10% 45%;
+
+    /* =========================================================
+       UI ELEMENTS
+    ========================================================= */
+    --border: 18 18% 86%;
+    --input: 18 18% 86%;
+    --ring: 344 42% 63%;
+    --radius: 0.5rem;
+
+    /* =========================================================
+       STATUS COLORS
+    ========================================================= */
+    --success: 142 28% 52%;
+    --success-foreground: 0 0% 100%;
+    --warning: 36 88% 62%;
+    --warning-foreground: 340 18% 18%;
+    --destructive: 0 65% 58%;
+    --destructive-foreground: 0 0% 100%;
+    --info: 204 62% 60%;
+    --info-foreground: 0 0% 100%;
+
+    /* =========================================================
+       INTERACTION STATES
+    ========================================================= */
+    --hover: 344 32% 92%;
+    --active: 344 42% 56%;
+    --disabled: 20 14% 92%;
+    --disabled-foreground: 340 8% 60%;
+
+    /* =========================================================
+       SCHEDULING / CALENDAR COLORS
+    ========================================================= */
+    --event-personal: 278 38% 64%;
+    --event-client: 344 42% 63%;
+    --event-vendor: 142 28% 52%;
+    --event-deadline: 0 65% 58%;
+    --event-travel: 30 82% 64%;
+    --event-blocked: 340 8% 55%;
+
+    /* =========================================================
+       SIDEBAR (maps to card surface)
+    ========================================================= */
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 340 18% 18%;
+    --sidebar-primary: 344 42% 63%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 8 72% 68%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 18 18% 86%;
+    --sidebar-ring: 344 42% 63%;
+
+    /* =========================================================
+       CHART COLORS (mapped to event palette)
+    ========================================================= */
+    --chart-1: 344 42% 63%;
+    --chart-2: 142 28% 52%;
+    --chart-3: 278 38% 64%;
+    --chart-4: 30 82% 64%;
+    --chart-5: 204 62% 60%;
+  }
+
+  .dark {
+    /* =========================================================
+       BACKGROUNDS & SURFACES
+    ========================================================= */
+    --background: 330 16% 10%;
+    --foreground: 24 30% 96%;
+    --card: 330 14% 14%;
+    --card-foreground: 24 30% 96%;
+    --popover: 330 14% 14%;
+    --popover-foreground: 24 30% 96%;
+
+    /* =========================================================
+       BRAND COLORS
+    ========================================================= */
+    --primary: 344 52% 70%;
+    --primary-foreground: 330 16% 10%;
+    --secondary: 330 10% 22%;
+    --secondary-foreground: 24 30% 96%;
+    --accent: 8 78% 70%;
+    --accent-foreground: 330 16% 10%;
+    --muted: 330 10% 20%;
+    --muted-foreground: 24 12% 72%;
+
+    /* =========================================================
+       UI ELEMENTS
+    ========================================================= */
+    --border: 330 10% 24%;
+    --input: 330 10% 24%;
+    --ring: 344 52% 70%;
+
+    /* =========================================================
+       STATUS COLORS
+    ========================================================= */
+    --success: 142 34% 58%;
+    --success-foreground: 330 16% 10%;
+    --warning: 36 90% 66%;
+    --warning-foreground: 330 16% 10%;
+    --destructive: 0 72% 64%;
+    --destructive-foreground: 330 16% 10%;
+    --info: 204 72% 66%;
+    --info-foreground: 330 16% 10%;
+
+    /* =========================================================
+       INTERACTION STATES
+    ========================================================= */
+    --hover: 330 10% 18%;
+    --active: 344 52% 62%;
+    --disabled: 330 8% 18%;
+    --disabled-foreground: 24 8% 52%;
+
+    /* =========================================================
+       SCHEDULING / CALENDAR COLORS
+    ========================================================= */
+    --event-personal: 278 48% 70%;
+    --event-client: 344 52% 70%;
+    --event-vendor: 142 34% 58%;
+    --event-deadline: 0 72% 64%;
+    --event-travel: 30 86% 68%;
+    --event-blocked: 24 10% 58%;
+
+    /* =========================================================
+       SIDEBAR (maps to card surface)
+    ========================================================= */
+    --sidebar: 330 14% 14%;
+    --sidebar-foreground: 24 30% 96%;
+    --sidebar-primary: 344 52% 70%;
+    --sidebar-primary-foreground: 330 16% 10%;
+    --sidebar-accent: 8 78% 70%;
+    --sidebar-accent-foreground: 330 16% 10%;
+    --sidebar-border: 330 10% 24%;
+    --sidebar-ring: 344 52% 70%;
+
+    /* =========================================================
+       CHART COLORS (mapped to event palette dark)
+    ========================================================= */
+    --chart-1: 344 52% 70%;
+    --chart-2: 142 34% 58%;
+    --chart-3: 278 48% 70%;
+    --chart-4: 30 86% 68%;
+    --chart-5: 204 72% 66%;
+  }
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-bg: var(--bg);
-  --color-panel: var(--panel);
-  --color-primary: var(--primary);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-danger: var(--danger);
+  /* SURFACES */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  /* BRAND */
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  /* UI ELEMENTS */
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  /* STATUS */
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
+
+  /* INTERACTION */
+  --color-hover: hsl(var(--hover));
+  --color-active: hsl(var(--active));
+  --color-disabled: hsl(var(--disabled));
+  --color-disabled-foreground: hsl(var(--disabled-foreground));
+
+  /* SCHEDULING */
+  --color-event-personal: hsl(var(--event-personal));
+  --color-event-client: hsl(var(--event-client));
+  --color-event-vendor: hsl(var(--event-vendor));
+  --color-event-deadline: hsl(var(--event-deadline));
+  --color-event-travel: hsl(var(--event-travel));
+  --color-event-blocked: hsl(var(--event-blocked));
+
+  /* SIDEBAR */
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  /* CHARTS */
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  /* RADIUS */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* FONTS */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-geist-sans);
 }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }

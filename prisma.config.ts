@@ -1,5 +1,7 @@
-
-import "dotenv/config";
+import * as dotenv from "dotenv";
+// Load .env first, then let .env.local override (mirrors Next.js env resolution)
+dotenv.config();
+dotenv.config({ path: ".env.local", override: true });
 import { defineConfig } from "prisma/config";
 
 export default defineConfig({

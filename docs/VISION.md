@@ -2,19 +2,39 @@
 
 ---
 
+# Mobile-First Development Mandate
+
+**All new features must be designed and built mobile-first.**
+
+Rules:
+
+- Write default (no breakpoint prefix) Tailwind styles for the smallest viewport first, then layer `sm:`, `md:`, `lg:` overrides on top.
+- Every screen must be usable one-handed on a 375px-wide phone before considering desktop.
+- Navigation: bottom tab bar on mobile (`sm:hidden`), sidebar on desktop (`hidden sm:flex`).
+- Touch targets must be at minimum 44×44px.
+- Prefer stacked single-column layouts on mobile; expand to grid/flex-row at `sm:` or `md:`.
+- Use `px-4 py-5` mobile padding, `sm:p-6` desktop padding as the baseline content spacing.
+- Never design a feature desktop-only and "port" to mobile later — mobile is the primary surface.
+- Live Mode is primarily a mobile use case: coordinators hold their phones during events.
+
+---
+
 # 1. Product Vision
+
 A mobile-first realtime coordination system for small private events such as weddings, birthdays, anniversaries, and reunions.
 The system replaces:
+
 - printed schedules
 - spreadsheets
 - group messaging chaos
 - manual vendor coordination
-Core idea:
+  Core idea:
 - a live operational timeline for real-world events
 
 ---
 
 # 2. Core Product Goals
+
 - fast event creation
 - simple timeline building
 - easy vendor invitations
@@ -25,7 +45,9 @@ Core idea:
 ---
 
 # 3. Technology Stack
+
 Frontend:
+
 - Next.js (App Router)
 - TypeScript
 - TailwindCSS
@@ -34,33 +56,42 @@ Frontend:
 - TanStack Query
 
 Backend:
+
 - Next.js API routes (Phase 1)
 - Prisma ORM
 
 Database:
+
 - PostgreSQL
 
 Realtime:
-- Supabase Realtime (current implementation)
-- Pusher / Ably (alternative options)
+
+- Supabase Realtime
 
 Storage:
+
 - Cloudflare R2
 
 Payments:
+
 - Stripe
 
 Notifications:
-- Twilio SMS
+
+- Resend (transactional email — magic link auth)
+- Twilio SMS (post-event notifications only, not auth)
 - Web Push (PWA)
 
 Jobs:
-- BullMQ + Redis or Trigger.dev (Phase 2)
+
+- Trigger.dev (Phase 2)
 
 ---
 
 # 4. Application Modes
+
 Planning Mode:
+
 - event setup
 - task creation
 - vendor assignment
@@ -68,6 +99,7 @@ Planning Mode:
 - file uploads
 
 Live Mode:
+
 - auto activates at first task start
 - optional pre-start trigger (15, 30, 60 minutes)
 - realtime coordination dashboard
@@ -76,12 +108,15 @@ Live Mode:
 ---
 
 # 5. Roles (Event Scoped)
+
 Owner:
+
 - single per event
 - billing control
 - full admin permissions
 
 Admin:
+
 - manage event timeline
 - create and edit tasks
 - manage vendors
@@ -89,6 +124,7 @@ Admin:
 - control live mode
 
 User (Vendor or participant):
+
 - view timeline
 - update task status
 - add notes
@@ -98,6 +134,7 @@ User (Vendor or participant):
 ---
 
 # 6. Event Lifecycle
+
 - Draft
 - Scheduled
 - Live
@@ -105,33 +142,41 @@ User (Vendor or participant):
 - Archived
 
 Event start definition:
+
 - first task start time
 
 Event lock:
+
 - event date becomes immutable once live begins
 
 ---
 
 # 7. Core Scheduling Model
+
 Task structure:
+
 - start time
 - duration
 - optional dependency (single only)
 - optional offset minutes
 
 Rules:
+
 - only one dependency per task
 - dependency optional
 - no circular dependencies
 - dependency must be within same event
 
 Scheduling rule:
+
 - task start equals dependency end plus offset
 
 ---
 
 # 8. Task Timing Fields
+
 Each task includes:
+
 - scheduled start
 - scheduled end
 - actual start
@@ -140,7 +185,9 @@ Each task includes:
 ---
 
 # 9. Task States
+
 Schedule states:
+
 - upcoming
 - active
 - completed
@@ -148,6 +195,7 @@ Schedule states:
 - delayed
 
 Operational states:
+
 - on track
 - ahead
 - behind
@@ -155,19 +203,24 @@ Operational states:
 ---
 
 # 10. Manual Overrides
+
 If admin manually changes:
+
 - start time
 - duration
 - dependency
 
 Then:
+
 - task becomes manually overridden
 - automatic scheduling stops for that task
 
 ---
 
 # 11. Dependency Engine
+
 Rules:
+
 - one dependency maximum
 - same event only
 - no cycles allowed
@@ -175,17 +228,21 @@ Rules:
 - only future tasks are affected by changes
 
 Propagation:
+
 - delay in parent task shifts dependent tasks forward
 - notifications triggered automatically on changes
 
 ---
 
 # 12. Live Mode System
+
 Activation:
+
 - automatic at first task start
 - or pre-triggered before event start
 
 Live Mode includes:
+
 - active task highlighting
 - next task preview
 - delay indicators
@@ -196,11 +253,14 @@ Live Mode includes:
 ---
 
 # 13. Notification System
+
 Channels:
+
 - SMS (primary)
 - PWA push notifications
 
 Types:
+
 - task starting soon
 - task delayed
 - task completed
@@ -209,6 +269,7 @@ Types:
 - schedule updates
 
 Preferences:
+
 - SMS on/off
 - push on/off
 - task notifications toggle
@@ -216,50 +277,62 @@ Preferences:
 - broadcast messages toggle
 
 Safety:
+
 - confirmation required for sensitive event broadcasts
 
 ---
 
 # 14. Vendor Check-in System
+
 Flow:
+
 - vendor invited via link
-- phone number verification required
-- account created or restored
+- signs in via email magic link
+- phone number added to profile for SMS notifications
 - event access granted
 - check-in action ("I'm here")
 
 Optional:
+
 - selfie capture during check-in
 
 ---
 
 # 15. Messaging System
+
 Scope:
+
 - event-level group chat only
 
 Features:
+
 - realtime messaging
 - attachments allowed
 - timestamps
 - sender identity
 
 Retention:
+
 - archived 30 days after event ends
 
 ---
 
 # 16. Public Timeline (QR View)
+
 Features:
+
 - read-only access
 - realtime schedule updates allowed
 - mobile optimized
 
 Visible:
+
 - task title
 - description
 - timing information
 
 Hidden:
+
 - vendors
 - internal notes
 - operational states
@@ -268,13 +341,17 @@ Hidden:
 ---
 
 # 17. Payments
+
 Model:
+
 - per-event payment
 
 Free mode:
+
 - planning allowed only
 
 Paid unlock:
+
 - vendor invitations
 - live mode
 - notifications
@@ -285,35 +362,44 @@ Paid unlock:
 ---
 
 # 18. File Upload System
+
 Storage:
+
 - Cloudflare R2
 
 Supported types:
+
 - images
 - PDFs
 - spreadsheets
 - videos
 
 Upload flow:
+
 - client requests signed URL
 - uploads directly to storage
 - backend stores metadata record
 
 Limits:
+
 - per-event storage quota
 - quota increases with payment
 
 ---
 
 # 19. Offline PWA Mode
+
 Supports:
+
 - timeline viewing only
 
 Cached data:
+
 - event timeline
 - task schedules
 
 Not supported offline:
+
 - messaging
 - edits
 - uploads
@@ -322,7 +408,9 @@ Not supported offline:
 ---
 
 # 20. Data Model (PostgreSQL)
+
 User:
+
 - id
 - email
 - phone
@@ -331,6 +419,7 @@ User:
 - avatar
 
 Event:
+
 - id
 - owner id
 - title
@@ -344,6 +433,7 @@ Event:
 - payment status
 
 EventMember:
+
 - id
 - event id
 - user id
@@ -353,6 +443,7 @@ EventMember:
 - notification preferences
 
 Task:
+
 - id
 - event id
 - title
@@ -369,6 +460,7 @@ Task:
 - public visibility flag
 
 TaskAssignment:
+
 - id
 - task id
 - user id
@@ -377,12 +469,14 @@ TaskAssignment:
 - readiness status
 
 Subtask:
+
 - id
 - task id
 - title
 - completion status
 
 Attachment:
+
 - id
 - event id
 - task id (optional)
@@ -391,6 +485,7 @@ Attachment:
 - file size
 
 Message:
+
 - id
 - event id
 - sender id
@@ -398,6 +493,7 @@ Message:
 - created timestamp
 
 Notification:
+
 - id
 - event id
 - task id
@@ -409,6 +505,7 @@ Notification:
 - status
 
 ActivityLog:
+
 - id
 - event id
 - actor id
@@ -421,14 +518,17 @@ ActivityLog:
 ---
 
 # 21. Realtime Architecture
+
 Provider:
-- Supabase Realtime (current)
-- Pusher or Ably (alternative)
+
+- Supabase Realtime
 
 Channel structure:
+
 - private-event-{eventId}
 
 Events:
+
 - task created
 - task updated
 - task started
@@ -445,7 +545,9 @@ Events:
 ---
 
 # 22. Scheduling Engine
+
 Responsibilities:
+
 - calculate task timing
 - apply dependency rules
 - propagate delays
@@ -453,6 +555,7 @@ Responsibilities:
 - update realtime clients
 
 Rules:
+
 - single dependency only
 - no circular dependencies
 - same event only
@@ -460,13 +563,16 @@ Rules:
 - manual overrides stop propagation
 
 Propagation:
+
 - only future tasks update
 - downstream recalculation automatic
 
 ---
 
 # 23. Notification Engine
+
 Pipeline:
+
 - event action triggers job
 - job queued
 - worker processes job
@@ -474,15 +580,18 @@ Pipeline:
 - delivery status recorded
 
 Queue system:
+
 - BullMQ with Redis (Phase 2)
 
 Providers:
+
 - Twilio SMS
 - PWA push notifications
 
 ---
 
 # 24. File Upload System
+
 - signed upload URLs used
 - direct upload to R2
 - metadata stored in database
@@ -491,6 +600,7 @@ Providers:
 ---
 
 # 25. UI / UX Design Principles
+
 - mobile-first design
 - operational simplicity
 - low cognitive load
@@ -499,34 +609,41 @@ Providers:
 ---
 
 # 26. Primary Screens
+
 Event Dashboard:
+
 - list of events
 - live indicators
 - payment status
 
 Timeline Screen:
+
 - chronological task view
 - assignments
 - status indicators
 
 Live Mode Screen:
+
 - active task highlight
 - next task preview
 - delay visibility
 - check-in summary
 
 Task Detail Screen:
+
 - full task info
 - notes
 - attachments
 - checklist
 
 Vendor View:
+
 - assigned tasks only
 - check-in actions
 - simplified UI
 
 Public Timeline:
+
 - read-only schedule
 - realtime updates
 - minimal data
@@ -534,6 +651,7 @@ Public Timeline:
 ---
 
 # 27. Mobile UX Patterns
+
 - bottom navigation
 - floating action button for admins
 - swipe actions on tasks
@@ -546,7 +664,9 @@ Public Timeline:
 ---
 
 # 28. Event Flows
+
 Event creation flow:
+
 - create event
 - define details
 - build timeline
@@ -557,6 +677,7 @@ Event creation flow:
 - go live
 
 Vendor flow:
+
 - receive invite
 - verify phone
 - join event
@@ -565,6 +686,7 @@ Vendor flow:
 - participate in live event
 
 Live event flow:
+
 - live mode activates
 - tasks begin
 - notifications triggered
@@ -575,21 +697,27 @@ Live event flow:
 ---
 
 # 29. Security Model
+
 Authentication:
-- magic link email login
-- OTP phone verification
+
+- magic link email (only sign-in method)
+- phone number collected post-login for SMS notifications (not used for auth)
 
 Authorization:
+
 - event-scoped role checks on every request
 
 Public access:
+
 - unguessable event slug URLs
 - read-only access only
 
 ---
 
 # 30. Scalability Considerations
+
 Main constraints:
+
 - SMS cost scaling
 - realtime event concurrency
 - media storage growth
@@ -598,7 +726,9 @@ Main constraints:
 ---
 
 # 31. Phase Strategy
+
 Phase 1 (MVP):
+
 - core event system
 - tasks and dependencies
 - live mode
@@ -611,6 +741,7 @@ Phase 1 (MVP):
 - group messaging
 
 Phase 2:
+
 - templates
 - advanced scheduling tools
 - AI suggestions

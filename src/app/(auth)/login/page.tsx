@@ -1,8 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Logo } from "@/components/ui/logo";
+import { Button } from "@/components/ui/button";
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const isSignup = searchParams.get("mode") === "signup";
+
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -30,67 +37,105 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4"
-      style={{ background: "var(--bg)" }}>
-
+    <div className="flex min-h-screen flex-col items-center justify-center px-4 bg-background">
       {/* Logo */}
       <div className="mb-8 text-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="Day Coordinator" className="h-10 mx-auto mb-3" />
-        <p className="text-sm" style={{ color: "var(--text)", opacity: 0.5 }}>
+        <Link href="/" className="inline-flex justify-center">
+          <Logo size="lg" />
+        </Link>
+        <p className="mt-2 text-sm text-muted-foreground">
           Real-time event coordination
         </p>
       </div>
 
-      <div className="w-full max-w-sm rounded-2xl p-6 shadow-xl"
-        style={{ background: "var(--panel)" }}>
-
+      {/* Card */}
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-sm">
         {sent ? (
-          <div className="text-center py-4">
-            <div className="text-3xl mb-3">📬</div>
-            <p className="font-medium" style={{ color: "var(--text)" }}>Check your email</p>
-            <p className="text-sm mt-1 text-gray-400">
-              We sent a sign-in link to <span className="text-white">{email}</span>
+          <div className="py-4 text-center">
+            <div className="mb-3 text-3xl">📬</div>
+            <p className="font-semibold text-foreground">Check your email</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              We sent a sign-in link to{" "}
+              <span className="font-medium text-foreground">{email}</span>
             </p>
             <button
-              onClick={() => { setSent(false); setEmail(""); }}
-              className="mt-4 text-sm underline text-gray-400 hover:text-white"
+              onClick={() => {
+                setSent(false);
+                setEmail("");
+              }}
+              className="mt-5 text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
             >
               Use a different email
             </button>
           </div>
         ) : (
           <form onSubmit={handleMagicLink} className="space-y-4">
-            <h1 className="text-base font-semibold mb-4" style={{ color: "var(--text)" }}>
-              Sign in
+            <h1 className="text-base font-semibold text-foreground">
+              {isSignup ? "Create your account" : "Sign in"}
             </h1>
+
             <div>
-              <label htmlFor="email" className="block text-xs font-medium mb-1.5 text-gray-400">
+              <label
+                htmlFor="email"
+                className="mb-1.5 block text-xs font-medium text-muted-foreground"
+              >
                 Email address
               </label>
               <input
                 id="email"
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full rounded-lg px-3 py-2.5 text-sm border border-white/10 bg-white/5 text-white placeholder-gray-500 focus:outline-none focus:ring-2"
-                style={{ "--tw-ring-color": "var(--primary)" } as React.CSSProperties}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
               />
             </div>
-            {error && <p className="text-sm" style={{ color: "var(--danger)" }}>{error}</p>}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-50"
-              style={{ background: "var(--primary)" }}
-            >
+
+            {error && <p className="text-sm text-destructive">{error}</p>}
+
+            <Button type="submit" disabled={loading} className="w-full">
               {loading ? "Sending…" : "Send magic link"}
-            </button>
+            </Button>
           </form>
         )}
       </div>
+
+      {/* Sign in / Sign up toggle */}
+      {!sent && (
+        <p className="mt-6 text-sm text-muted-foreground">
+          {isSignup ? (
+            <>
+              Already have an account?{" "}
+              <Link
+                href="/login"
+                className="font-medium text-foreground underline underline-offset-4 transition-colors hover:text-primary"
+              >
+                Sign in
+              </Link>
+            </>
+          ) : (
+            <>
+              Don&apos;t have an account?{" "}
+              <Link
+                href="/login?mode=signup"
+                className="font-medium text-foreground underline underline-offset-4 transition-colors hover:text-primary"
+              >
+                Sign up
+              </Link>
+            </>
+          )}
+        </p>
+      )}
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <LoginForm />
+    </Suspense>
   );
 }

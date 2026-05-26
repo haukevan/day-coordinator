@@ -14,15 +14,15 @@ export async function proxy(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
+            request.cookies.set(name, value),
           );
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options),
           );
         },
       },
-    }
+    },
   );
 
   const {
@@ -35,7 +35,8 @@ export async function proxy(request: NextRequest) {
   const isProtected =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/events") ||
-    pathname.startsWith("/live");
+    pathname.startsWith("/live") ||
+    pathname === "/onboarding";
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
@@ -54,7 +55,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|public|api/auth).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|public|api/auth).*)"],
 };
