@@ -36,6 +36,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/events") ||
     pathname.startsWith("/live") ||
+    pathname.startsWith("/vendor") ||
+    pathname.startsWith("/invite") ||
     pathname === "/onboarding";
 
   if (!user && isProtected) {

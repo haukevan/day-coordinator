@@ -15,14 +15,12 @@ export default async function OnboardingPage() {
     select: {
       firstName: true,
       lastName: true,
-      company: true,
       phone: true,
       onboarded: true,
     },
   });
   if (!dbUser) redirect("/login");
 
-  // Strip +1 prefix to get the 10-digit string for the phone input
   const initialPhoneDigits = dbUser.phone?.startsWith("+1")
     ? dbUser.phone.slice(2)
     : (dbUser.phone ?? "");
@@ -32,7 +30,6 @@ export default async function OnboardingPage() {
       onboarded={dbUser.onboarded}
       initialFirstName={dbUser.firstName ?? ""}
       initialLastName={dbUser.lastName ?? ""}
-      initialCompany={dbUser.company ?? ""}
       initialPhoneDigits={initialPhoneDigits}
     />
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +35,7 @@ function buildGroups(): [string, string[]][] {
 }
 
 type Props = {
+  id?: string;
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
@@ -42,42 +43,23 @@ type Props = {
 };
 
 export function TimezoneSelect({
+  id,
   value,
   onChange,
   disabled,
   className,
-}: Props) {
-  const [groups, setGroups] = useState<[string, string[]][] | null>(null);
-
-  useEffect(() => {
-    setGroups(buildGroups());
-  }, []);
+}: Readonly<Props>) {
+  const groups = useMemo(() => buildGroups(), []);
 
   const selectClass = cn(
     "w-full appearance-none rounded-md border border-input bg-background py-2 pl-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
     className,
   );
 
-  // Before client mount: render only the current value to match SSR output exactly
-  if (!groups) {
-    return (
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          className={selectClass}
-        >
-          <option value={value}>{value.replace(/_/g, " ")}</option>
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 opacity-50" />
-      </div>
-    );
-  }
-
   return (
     <div className="relative">
       <select
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
@@ -87,7 +69,7 @@ export function TimezoneSelect({
           <optgroup key={region} label={region}>
             {tzs.map((tz) => (
               <option key={tz} value={tz}>
-                {tz.replace(/_/g, " ")}
+                {tz.replaceAll("_", " ")}
               </option>
             ))}
           </optgroup>

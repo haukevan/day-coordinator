@@ -38,10 +38,7 @@ type Transition = {
 
 const transitions: Partial<Record<EventStatus, Transition[]>> = {
   DRAFT: [{ to: "SCHEDULED", label: "Upgrade to Scheduled" }],
-  SCHEDULED: [
-    { to: "LIVE", label: "Go Live" },
-    { to: "DRAFT", label: "Back to Draft", destructive: true },
-  ],
+  SCHEDULED: [{ to: "LIVE", label: "Go Live" }],
   LIVE: [{ to: "COMPLETED", label: "Mark Completed" }],
   COMPLETED: [{ to: "ARCHIVED", label: "Archive", destructive: true }],
 };

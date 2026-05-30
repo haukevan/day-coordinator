@@ -12,7 +12,9 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error && data.user) {
       const dbUser = await getOrCreateUser(data.user);
-      const destination = dbUser.onboarded ? next : "/onboarding";
+      // Non-onboarded users going to the invite flow handle onboarding inline
+      const isInviteFlow = next.startsWith("/invite/");
+      const destination = dbUser.onboarded || isInviteFlow ? next : "/onboarding";
       return NextResponse.redirect(`${origin}${destination}`);
     }
   }

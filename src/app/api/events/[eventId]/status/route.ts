@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { emitEventUpdate } from "@/lib/realtime";
+import { sendVendorInviteEmail } from "@/lib/notifications/vendor-invite";
 import type { EventStatus } from "@/generated/prisma/client";
 
 type Params = { params: Promise<{ eventId: string }> };
 
 const VALID_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
   DRAFT: ["SCHEDULED", "ARCHIVED"],
-  SCHEDULED: ["LIVE", "DRAFT", "ARCHIVED"],
+  SCHEDULED: ["LIVE", "ARCHIVED"],
   LIVE: ["COMPLETED"],
   COMPLETED: ["ARCHIVED"],
   ARCHIVED: [],
@@ -19,7 +20,6 @@ const ACTION_MAP: Record<string, string> = {
   LIVE: "event.live_started",
   COMPLETED: "event.completed",
   ARCHIVED: "event.archived",
-  DRAFT: "event.reverted_to_draft",
 };
 
 export async function POST(req: NextRequest, { params }: Params) {
@@ -73,6 +73,19 @@ export async function POST(req: NextRequest, { params }: Params) {
   });
 
   await emitEventUpdate(eventId, action, { eventId, status: targetStatus });
+
+  // When going SCHEDULED, send queued invite emails to all PENDING vendors
+  if (targetStatus === "SCHEDULED") {
+    const pendingVendors = await prisma.eventVendor.findMany({
+      where: { eventId, status: "PENDING", inviteSentAt: null, inviteToken: { not: null } },
+      select: { id: true },
+    });
+    for (const v of pendingVendors) {
+      try { await sendVendorInviteEmail(v.id); } catch (err) {
+        console.error("[vendor-invite] Failed to send invite for eventVendor", v.id, err);
+      }
+    }
+  }
 
   return NextResponse.json({ event: updated });
 }

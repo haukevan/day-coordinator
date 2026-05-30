@@ -18,7 +18,6 @@ interface Props {
   onboarded: boolean;
   initialFirstName: string;
   initialLastName: string;
-  initialCompany: string;
   initialPhoneDigits: string;
 }
 
@@ -26,15 +25,14 @@ export function OnboardingForm({
   onboarded,
   initialFirstName,
   initialLastName,
-  initialCompany,
   initialPhoneDigits,
 }: Props) {
   const router = useRouter();
 
   const [firstName, setFirstName] = useState(initialFirstName);
   const [lastName, setLastName] = useState(initialLastName);
-  const [company, setCompany] = useState(initialCompany);
   const [phoneDigits, setPhoneDigits] = useState(initialPhoneDigits);
+  const [phoneError, setPhoneError] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -42,6 +40,7 @@ export function OnboardingForm({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
       setPhoneDigits(digits);
+      setPhoneError(digits.length > 0 && digits.length < 10 ? "Please enter a valid 10-digit phone number." : "");
     },
     [],
   );
@@ -54,7 +53,6 @@ export function OnboardingForm({
     const body: Record<string, string | null> = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      company: company.trim() || null,
       phone: phoneDigits.length === 10 ? `+1${phoneDigits}` : null,
     };
 
@@ -150,23 +148,7 @@ export function OnboardingForm({
           </div>
 
           {/* Company */}
-          <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">
-              Company{" "}
-              <span className="text-muted-foreground text-xs font-normal">
-                (optional)
-              </span>
-            </label>
-            <input
-              type="text"
-              autoComplete="organization"
-              maxLength={128}
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              className={inputClass}
-              placeholder="Acme Events Co."
-            />
-          </div>
+          {/* Company is now set at the event/vendor level, not the user profile */}
 
           {/* Phone */}
           <div>
@@ -191,9 +173,13 @@ export function OnboardingForm({
                 maxLength={14}
               />
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Used for event SMS notifications.
-            </p>
+            {phoneError ? (
+              <p className="mt-1 text-xs text-destructive">{phoneError}</p>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Used for event SMS notifications.
+              </p>
+            )}
           </div>
 
           {error && (
@@ -205,7 +191,7 @@ export function OnboardingForm({
           <Button
             type="submit"
             className="w-full"
-            disabled={loading || !firstName.trim() || !lastName.trim()}
+            disabled={loading || !firstName.trim() || !lastName.trim() || !!phoneError}
           >
             {loading ? "Saving…" : onboarded ? "Save changes" : "Continue"}
           </Button>

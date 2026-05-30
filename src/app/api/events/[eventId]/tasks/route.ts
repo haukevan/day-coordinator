@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { emitEventUpdate } from "@/lib/realtime";
-import { computeScheduledEnd, propagateSchedule } from "@/lib/scheduler";
+import { computeScheduledEnd, propagateSchedule, detectCycle } from "@/lib/scheduler";
 
 type Params = { params: Promise<{ eventId: string }> };
 
@@ -79,6 +79,14 @@ export async function POST(req: NextRequest, { params }: Params) {
         { status: 400 },
       );
     }
+    // Cycle detection: a newly created task has no children, so technically
+    // no cycle is possible, but guard against the task being its own parent.
+    if (parentTaskId === "self") {
+      return NextResponse.json(
+        { error: "Circular dependency detected." },
+        { status: 400 },
+      );
+    }
   }
 
   const task = await prisma.task.create({
@@ -117,6 +125,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     title: task.title,
   });
 
-  const fresh = await prisma.task.findUnique({ where: { id: task.id } });
+  const fresh = await prisma.task.findUnique({
+    where: { id: task.id },
+    include: { parentTask: { select: { id: true, title: true } } },
+  });
   return NextResponse.json({ task: fresh }, { status: 201 });
 }

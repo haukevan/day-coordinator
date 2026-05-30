@@ -1,3 +1,4 @@
+import { Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TaskStatusBadge } from "./task-status-badge";
 import { formatTimeInZone } from "@/lib/format-time";
@@ -36,18 +37,33 @@ const statusStyles: Record<string, { wrapper: string; dot: string }> = {
 export function TaskCard({
   task,
   timezone,
+  parentTitle,
+  onTaskClick,
 }: {
   task: SerializedTask;
   timezone: string;
+  parentTitle?: string | null;
+  onTaskClick?: (task: SerializedTask) => void;
 }) {
   const style = statusStyles[task.status] ?? statusStyles.PENDING;
+  const isClickable = Boolean(onTaskClick);
 
   return (
     <div
+      role={isClickable ? "button" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      aria-label={isClickable ? `Edit task: ${task.title}` : undefined}
       className={cn(
         "flex items-center gap-3 rounded-xl border px-4 py-3.5 transition-colors",
         style.wrapper,
+        isClickable &&
+          "cursor-pointer hover:ring-2 hover:ring-ring focus:outline-none focus:ring-2 focus:ring-ring",
       )}
+      onClick={() => onTaskClick?.(task)}
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && onTaskClick)
+          onTaskClick(task);
+      }}
     >
       <div className={cn("size-2 flex-shrink-0 rounded-full", style.dot)} />
       <div className="min-w-0 flex-1">
@@ -60,12 +76,24 @@ export function TaskCard({
         >
           {task.title}
         </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {task.scheduledStart
-            ? formatTimeInZone(task.scheduledStart, timezone)
-            : "No time set"}
-          {task.durationMins ? ` · ${formatDuration(task.durationMins)}` : ""}
-        </p>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <p className="text-xs text-muted-foreground">
+            {task.scheduledStart
+              ? formatTimeInZone(task.scheduledStart, timezone)
+              : "No time set"}
+            {task.scheduledEnd && task.scheduledStart
+              ? ` → ${formatTimeInZone(task.scheduledEnd, timezone)}`
+              : task.durationMins
+                ? ` · ${formatDuration(task.durationMins)}`
+                : ""}
+          </p>
+          {parentTitle && (
+            <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+              <Link2 className="size-3" />
+              {parentTitle}
+            </span>
+          )}
+        </div>
       </div>
       <TaskStatusBadge status={task.status} />
     </div>

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 const schema = z.object({
   email: z.string().email(),
+  next: z.string().optional(),
 });
 
 // In-memory rate limiter: max 3 requests per IP per 15 minutes
@@ -39,16 +40,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid email address." }, { status: 400 });
   }
 
-  const { email } = parsed.data;
+  const { email, next } = parsed.data;
   const supabase = await createSupabaseServerClient();
 
   // Use the request origin so magic links work on any local port or deploy URL
   const origin = request.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
 
+  const callbackUrl = next
+    ? `${origin}/api/auth/callback?next=${encodeURIComponent(next)}`
+    : `${origin}/api/auth/callback`;
+
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${origin}/api/auth/callback`,
+      emailRedirectTo: callbackUrl,
     },
   });
 

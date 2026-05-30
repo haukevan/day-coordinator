@@ -23,7 +23,7 @@ export default async function TimelinePage({
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, ownerId: dbUser.id },
-    select: { id: true, timezone: true },
+    select: { id: true, timezone: true, eventDate: true },
   });
 
   if (!event) notFound();
@@ -31,6 +31,7 @@ export default async function TimelinePage({
   const tasks = await prisma.task.findMany({
     where: { eventId },
     orderBy: [{ scheduledStart: "asc" }, { createdAt: "asc" }],
+    include: { parentTask: { select: { id: true, title: true } } },
   });
 
   const serializedTasks: SerializedTask[] = tasks.map((t) => ({
@@ -45,8 +46,10 @@ export default async function TimelinePage({
     durationMins: t.durationMins,
     manualOverride: t.manualOverride,
     parentTaskId: t.parentTaskId,
+    parentTask: t.parentTask ?? null,
     publicVisibility: t.publicVisibility,
     eventId: t.eventId,
+    assignedToId: t.assignedToId,
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
   }));
@@ -56,6 +59,8 @@ export default async function TimelinePage({
       eventId={eventId}
       tasks={serializedTasks}
       timezone={event.timezone}
+      eventDate={event.eventDate ? event.eventDate.toISOString() : null}
+      userRole="admin"
     />
   );
 }

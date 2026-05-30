@@ -4,18 +4,33 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-const TABS = [
+const ADMIN_TABS = [
   { label: "Timeline", segment: "timeline" },
+  { label: "Vendors", segment: "vendors" },
   { label: "Settings", segment: "settings" },
 ];
 
-export function EventTabs({ eventId }: { eventId: string }) {
+const VENDOR_TABS = [
+  { label: "Timeline", segment: "timeline" },
+  { label: "Vendors", segment: "vendors" },
+];
+
+export function EventTabs({
+  eventId,
+  userRole,
+}: {
+  eventId: string;
+  userRole: "admin" | "vendor";
+}) {
   const pathname = usePathname();
+  const tabs = userRole === "vendor" ? VENDOR_TABS : ADMIN_TABS;
+  const baseHref =
+    userRole === "vendor" ? `/vendor/${eventId}` : `/events/${eventId}`;
 
   return (
     <nav className="flex gap-1">
-      {TABS.map((tab) => {
-        const href = `/events/${eventId}/${tab.segment}`;
+      {tabs.map((tab) => {
+        const href = `${baseHref}/${tab.segment}`;
         const isActive = pathname.endsWith(`/${tab.segment}`);
         return (
           <Link

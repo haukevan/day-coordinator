@@ -6,7 +6,6 @@ import { z } from "zod";
 const profileSchema = z.object({
   firstName: z.string().min(1, "First name is required").max(64),
   lastName: z.string().min(1, "Last name is required").max(64),
-  company: z.string().max(128).optional().nullable(),
   phone: z
     .string()
     .regex(/^\+1\d{10}$/, "Phone must be a valid US number")
@@ -39,7 +38,7 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  const { firstName, lastName, company, phone } = parsed.data;
+  const { firstName, lastName, phone } = parsed.data;
 
   const updated = await prisma.user.update({
     where: { supabaseId: user.id },
@@ -47,7 +46,6 @@ export async function PATCH(request: NextRequest) {
       firstName,
       lastName,
       name: `${firstName} ${lastName}`,
-      company: company ?? null,
       phone: phone ?? null,
       onboarded: true,
     },
@@ -56,7 +54,6 @@ export async function PATCH(request: NextRequest) {
       firstName: true,
       lastName: true,
       name: true,
-      company: true,
       phone: true,
       onboarded: true,
     },

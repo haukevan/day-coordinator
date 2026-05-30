@@ -5,7 +5,9 @@ import { EventStatusButton } from "@/components/event/event-status-button";
 import { DraftBanner, DraftWarningIcon } from "@/components/event/draft-banner";
 import { EventTabs } from "@/components/dashboard/event-tabs";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, CalendarDays } from "lucide-react";
+import { formatInTimeZone } from "date-fns-tz";
+import { cn } from "@/lib/utils";
 
 type EventStatus = "DRAFT" | "SCHEDULED" | "LIVE" | "COMPLETED" | "ARCHIVED";
 
@@ -30,15 +32,50 @@ export default async function EventLayout({
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, ownerId: dbUser.id },
-    select: { id: true, title: true, status: true },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      eventDate: true,
+      timezone: true,
+    },
   });
 
   if (!event) notFound();
 
   const status = event.status as EventStatus;
 
+  const eventDateInfo = (() => {
+    if (!event.eventDate) return null;
+    // eventDate is stored as midnight UTC (calendar date only — no timezone conversion)
+    const d = event.eventDate;
+    const formatted = formatInTimeZone(d, "UTC", "EEE, MMM d, yyyy");
+    const now = new Date();
+    // Compare UTC date parts only
+    const eventDay = Date.UTC(
+      d.getUTCFullYear(),
+      d.getUTCMonth(),
+      d.getUTCDate(),
+    );
+    const todayDay = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+    );
+    const diff = eventDay - todayDay;
+    let dateStatus: "today" | "upcoming" | "past";
+    if (diff === 0) {
+      dateStatus = "today";
+    } else if (diff > 0) {
+      dateStatus = "upcoming";
+    } else {
+      dateStatus = "past";
+    }
+    return { formatted, dateStatus };
+  })();
+
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden sm:h-dvh">
       {/* Event header */}
       <div className="border-b border-border bg-card px-4 py-4 sm:px-6">
         <Link
@@ -54,15 +91,33 @@ export default async function EventLayout({
           </h1>
           <EventStatusButton eventId={event.id} status={status} />
           {status === "DRAFT" && <DraftWarningIcon eventId={event.id} />}
+          {eventDateInfo && (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium",
+                eventDateInfo.dateStatus === "today" &&
+                  "bg-warning/15 text-warning",
+                eventDateInfo.dateStatus === "upcoming" &&
+                  "bg-info/15 text-info",
+                eventDateInfo.dateStatus === "past" &&
+                  "bg-muted text-muted-foreground",
+              )}
+            >
+              <CalendarDays className="size-3" />
+              {eventDateInfo.dateStatus === "today"
+                ? `Today · ${eventDateInfo.formatted}`
+                : eventDateInfo.formatted}
+            </span>
+          )}
         </div>
         <div className="mt-3">
-          <EventTabs eventId={event.id} />
+          <EventTabs eventId={event.id} userRole="admin" />
         </div>
       </div>
 
       {status === "DRAFT" && <DraftBanner eventId={event.id} status={status} />}
 
-      <div className="flex-1">{children}</div>
+      <div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
     </div>
   );
 }

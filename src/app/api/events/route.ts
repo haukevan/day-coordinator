@@ -3,6 +3,17 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { emitEventUpdate } from "@/lib/realtime";
 import { nanoid } from "nanoid";
+import { z } from "zod";
+
+const createEventSchema = z.object({
+  title: z.string().min(1, "Title is required.").max(100),
+  description: z.string().max(500).optional(),
+  eventDate: z.string().optional(),
+  timezone: z.string().optional(),
+  slug: z.string().optional(),
+  company: z.string().min(1, "Company is required.").max(128),
+  jobTitle: z.string().min(1, "Role is required.").max(128),
+});
 
 function slugify(text: string): string {
   return text
@@ -15,39 +26,93 @@ function slugify(text: string): string {
 
 async function uniqueSlug(base: string): Promise<string> {
   const candidate = slugify(base);
-  const existing = await prisma.event.findUnique({ where: { slug: candidate } });
+  const existing = await prisma.event.findUnique({
+    where: { slug: candidate },
+  });
   if (!existing) return candidate;
   return `${candidate}-${nanoid(6)}`;
 }
 
 export async function POST(req: NextRequest) {
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const dbUser = await prisma.user.findUnique({ where: { supabaseId: user.id } });
-  if (!dbUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  const dbUser = await prisma.user.findUnique({
+    where: { supabaseId: user.id },
+  });
+  if (!dbUser)
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-  const body = await req.json();
-  const { title, description, eventDate, timezone, slug } = body;
-
-  if (!title?.trim()) {
-    return NextResponse.json({ error: "Title is required." }, { status: 400 });
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const resolvedSlug = slug?.trim()
-    ? await uniqueSlug(slug.trim())
-    : undefined;
+  const parsed = createEventSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+      { status: 422 },
+    );
+  }
 
-  const event = await prisma.event.create({
-    data: {
-      title: title.trim(),
-      description: description?.trim() || null,
-      eventDate: eventDate ? new Date(eventDate) : null,
-      timezone: timezone || "UTC",
-      slug: resolvedSlug ?? null,
-      ownerId: dbUser.id,
-    },
+  const { title, description, eventDate, timezone, slug, company, jobTitle } =
+    parsed.data;
+
+  const resolvedSlug = slug?.trim() ? await uniqueSlug(slug.trim()) : undefined;
+
+  const event = await prisma.$transaction(async (tx) => {
+    const createdEvent = await tx.event.create({
+      data: {
+        title: title.trim(),
+        description: description?.trim() || null,
+        eventDate: eventDate ? new Date(eventDate) : null,
+        timezone: timezone || "UTC",
+        slug: resolvedSlug ?? null,
+        ownerId: dbUser.id,
+      },
+    });
+
+    const ownerEmail = dbUser.email.toLowerCase().trim();
+
+    const ownerVendorContact = await tx.vendorContact.upsert({
+      where: { ownerId_email: { ownerId: dbUser.id, email: ownerEmail } },
+      update: {
+        firstName: dbUser.firstName ?? null,
+        lastName: dbUser.lastName ?? null,
+        company: company.trim(),
+        jobTitle: jobTitle.trim(),
+      },
+      create: {
+        ownerId: dbUser.id,
+        email: ownerEmail,
+        firstName: dbUser.firstName ?? null,
+        lastName: dbUser.lastName ?? null,
+        phone: dbUser.phone ?? null,
+        company: company.trim(),
+        jobTitle: jobTitle.trim(),
+      },
+    });
+
+    await tx.eventVendor.create({
+      data: {
+        eventId: createdEvent.id,
+        vendorContactId: ownerVendorContact.id,
+        userId: dbUser.id,
+        company: company.trim(),
+        jobTitle: jobTitle.trim(),
+        status: "ACCEPTED",
+        joinedAt: new Date(),
+      },
+    });
+
+    return createdEvent;
   });
 
   await prisma.activityLog.create({
@@ -59,7 +124,10 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  await emitEventUpdate(event.id, "event.created", { eventId: event.id, title: event.title });
+  await emitEventUpdate(event.id, "event.created", {
+    eventId: event.id,
+    title: event.title,
+  });
 
   return NextResponse.json({ event }, { status: 201 });
 }

@@ -26,9 +26,11 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  ownedEvents  Event[]       @relation("EventOwner")
-  assignedTasks Task[]       @relation("AssignedTo")
-  activityLogs ActivityLog[]
+  ownedEvents        Event[]         @relation("EventOwner")
+  assignedTasks     Task[]          @relation("AssignedTo")
+  activityLogs      ActivityLog[]
+  vendorContacts    VendorContact[] @relation("VendorContacts")
+  vendorMemberships EventVendor[]   @relation("VendorMemberships")
 }
 
 // ─── Event ───────────────────────────────────────────────────────────────────
@@ -52,6 +54,7 @@ model Event {
   tasks         Task[]
   notifications Notification[]
   activityLogs  ActivityLog[]
+  eventVendors  EventVendor[]
 }
 
 enum EventStatus {
@@ -138,6 +141,53 @@ enum NotificationStatus {
   SENT
   FAILED
   SKIPPED
+}
+
+// ─── Vendors ─────────────────────────────────────────────────────────────────
+
+model VendorContact {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation("VendorContacts", fields: [ownerId], references: [id])
+  email     String
+  firstName String?
+  lastName  String?
+  phone     String?
+  company   String?
+  jobTitle  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  eventVendors EventVendor[]
+
+  @@unique([ownerId, email])
+}
+
+enum VendorStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+model EventVendor {
+  id                   String        @id @default(cuid())
+  eventId              String
+  event                Event         @relation(fields: [eventId], references: [id])
+  vendorContactId      String
+  vendorContact        VendorContact @relation(fields: [vendorContactId], references: [id])
+  userId               String?
+  user                 User?         @relation("VendorMemberships", fields: [userId], references: [id])
+  company              String?
+  jobTitle             String?
+  status               VendorStatus  @default(PENDING)
+  inviteToken          String?       @unique
+  inviteTokenExpiresAt DateTime?
+  inviteSentAt         DateTime?
+  joinedAt             DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@unique([eventId, vendorContactId])
 }
 
 // ─── Activity Log ─────────────────────────────────────────────────────────────

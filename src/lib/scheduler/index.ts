@@ -11,6 +11,34 @@
 import { prisma } from "@/lib/db/prisma";
 
 /**
+ * Detect a circular dependency. Returns true if adding proposedParentId as the
+ * parent of taskId would create a cycle. Walks up the ancestor chain from
+ * proposedParentId and returns true if taskId is encountered.
+ */
+export async function detectCycle(
+  taskId: string,
+  proposedParentId: string,
+): Promise<boolean> {
+  const visited = new Set<string>();
+  let current: string | null = proposedParentId;
+
+  while (current) {
+    if (current === taskId) return true;
+    if (visited.has(current)) return false;
+    visited.add(current);
+
+    const parent: { parentTaskId: string | null } | null =
+      await prisma.task.findUnique({
+        where: { id: current },
+        select: { parentTaskId: true },
+      });
+    current = parent?.parentTaskId ?? null;
+  }
+
+  return false;
+}
+
+/**
  * Propagate a schedule change from a given task downward through the DAG.
  * Skips subtrees rooted at tasks with manualOverride = true.
  */

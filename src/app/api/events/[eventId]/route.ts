@@ -100,3 +100,40 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   return NextResponse.json({ event: updated });
 }
+
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const { eventId } = await params;
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const dbUser = await prisma.user.findUnique({
+    where: { supabaseId: user.id },
+  });
+  if (!dbUser)
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, ownerId: dbUser.id },
+  });
+  if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (event.status === "LIVE") {
+    return NextResponse.json(
+      { error: "Cannot delete an event that is currently live." },
+      { status: 422 },
+    );
+  }
+
+  await prisma.$transaction([
+    prisma.activityLog.deleteMany({ where: { eventId } }),
+    prisma.eventVendor.deleteMany({ where: { eventId } }),
+    prisma.task.deleteMany({ where: { eventId } }),
+    prisma.event.delete({ where: { id: eventId } }),
+  ]);
+
+  return NextResponse.json({ success: true });
+}
