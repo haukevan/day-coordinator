@@ -67,6 +67,20 @@
     --event-blocked: 340 8% 55%;
 
     /* =========================================================
+       DEPENDENCY CHAIN COLORS
+    ========================================================= */
+    --dependency-1: 344 50% 52%;
+    --dependency-1-foreground: 0 0% 100%;
+    --dependency-2: 22 74% 52%;
+    --dependency-2-foreground: 0 0% 100%;
+    --dependency-3: 205 70% 48%;
+    --dependency-3-foreground: 0 0% 100%;
+    --dependency-4: 152 42% 40%;
+    --dependency-4-foreground: 0 0% 100%;
+    --dependency-5: 268 44% 52%;
+    --dependency-5-foreground: 0 0% 100%;
+
+    /* =========================================================
        SIDEBAR (maps to card surface)
     ========================================================= */
     --sidebar: 0 0% 100%;
@@ -149,6 +163,20 @@
     --event-blocked: 24 10% 58%;
 
     /* =========================================================
+       DEPENDENCY CHAIN COLORS
+    ========================================================= */
+    --dependency-1: 344 58% 66%;
+    --dependency-1-foreground: 330 16% 10%;
+    --dependency-2: 24 84% 66%;
+    --dependency-2-foreground: 330 16% 10%;
+    --dependency-3: 204 78% 68%;
+    --dependency-3-foreground: 330 16% 10%;
+    --dependency-4: 146 44% 62%;
+    --dependency-4-foreground: 330 16% 10%;
+    --dependency-5: 272 56% 72%;
+    --dependency-5-foreground: 330 16% 10%;
+
+    /* =========================================================
        SIDEBAR (maps to card surface)
     ========================================================= */
     --sidebar: 330 14% 14%;
@@ -218,6 +246,18 @@
   --color-event-deadline: hsl(var(--event-deadline));
   --color-event-travel: hsl(var(--event-travel));
   --color-event-blocked: hsl(var(--event-blocked));
+
+  /* DEPENDENCY CHAINS */
+  --color-dependency-1: hsl(var(--dependency-1));
+  --color-dependency-1-foreground: hsl(var(--dependency-1-foreground));
+  --color-dependency-2: hsl(var(--dependency-2));
+  --color-dependency-2-foreground: hsl(var(--dependency-2-foreground));
+  --color-dependency-3: hsl(var(--dependency-3));
+  --color-dependency-3-foreground: hsl(var(--dependency-3-foreground));
+  --color-dependency-4: hsl(var(--dependency-4));
+  --color-dependency-4-foreground: hsl(var(--dependency-4-foreground));
+  --color-dependency-5: hsl(var(--dependency-5));
+  --color-dependency-5-foreground: hsl(var(--dependency-5-foreground));
 
   /* SIDEBAR */
   --color-sidebar: hsl(var(--sidebar));

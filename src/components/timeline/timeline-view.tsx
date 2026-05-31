@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { List, BarChart2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TimelineList } from "./timeline-list";
 import { TimelineGantt } from "./timeline-gantt";
 import { TaskPanel } from "./task-panel";
+import { buildDependencyGroupMeta } from "./dependency-groups";
 import { cn } from "@/lib/utils";
 import type { SerializedTask } from "@/lib/types";
 
@@ -26,6 +27,23 @@ export function TimelineView({
   const [tasks, setTasks] = useState(initialTasks);
   const [panelOpen, setPanelOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<SerializedTask | undefined>();
+
+  const dependencyLegend = useMemo(() => {
+    const metaByTask = buildDependencyGroupMeta(tasks);
+    const groups = new Map<string, { label: string; chipClass: string }>();
+
+    for (const meta of metaByTask.values()) {
+      if (groups.has(meta.groupId)) continue;
+      groups.set(meta.groupId, {
+        label: meta.groupLabel,
+        chipClass: meta.style.chipClass,
+      });
+    }
+
+    return [...groups.values()]
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .slice(0, 5);
+  }, [tasks]);
 
   // Reload all tasks from the API (used after edits that may propagate)
   const refreshTasks = useCallback(async () => {
@@ -113,6 +131,25 @@ export function TimelineView({
           </Button>
         )}
       </div>
+
+      {dependencyLegend.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-medium text-muted-foreground">
+            Dependency chains:
+          </span>
+          {dependencyLegend.map((group) => (
+            <span
+              key={group.label}
+              className={cn(
+                "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                group.chipClass,
+              )}
+            >
+              {group.label}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* View content */}
       {view === "list" ? (

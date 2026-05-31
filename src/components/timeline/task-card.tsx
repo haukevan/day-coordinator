@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { TaskStatusBadge } from "./task-status-badge";
 import { formatTimeInZone } from "@/lib/format-time";
 import type { SerializedTask } from "@/lib/types";
+import type { DependencyGroupMeta } from "./dependency-groups";
 
 function formatDuration(mins: number): string {
   if (mins < 60) return `${mins}m`;
@@ -38,11 +39,13 @@ export function TaskCard({
   task,
   timezone,
   parentTitle,
+  dependencyMeta,
   onTaskClick,
 }: {
   task: SerializedTask;
   timezone: string;
   parentTitle?: string | null;
+  dependencyMeta?: DependencyGroupMeta;
   onTaskClick?: (task: SerializedTask) => void;
 }) {
   const style = statusStyles[task.status] ?? statusStyles.PENDING;
@@ -54,8 +57,9 @@ export function TaskCard({
       tabIndex={isClickable ? 0 : undefined}
       aria-label={isClickable ? `Edit task: ${task.title}` : undefined}
       className={cn(
-        "flex items-center gap-3 rounded-xl border px-4 py-3.5 transition-colors",
+        "flex items-center gap-3 rounded-xl border border-l-[3px] px-4 py-3.5 transition-colors",
         style.wrapper,
+        dependencyMeta ? dependencyMeta.style.railClass : "border-l-border",
         isClickable &&
           "cursor-pointer hover:ring-2 hover:ring-ring focus:outline-none focus:ring-2 focus:ring-ring",
       )}
@@ -91,6 +95,16 @@ export function TaskCard({
             <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
               <Link2 className="size-3" />
               {parentTitle}
+            </span>
+          )}
+          {dependencyMeta && (
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
+                dependencyMeta.style.chipClass,
+              )}
+            >
+              {dependencyMeta.groupLabel}
             </span>
           )}
         </div>

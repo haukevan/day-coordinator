@@ -5,6 +5,7 @@ import { toZonedTime } from "date-fns-tz";
 import { getHours, getMinutes } from "date-fns";
 import { Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { buildDependencyGroupMeta } from "./dependency-groups";
 import type { SerializedTask } from "@/lib/types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -65,24 +66,73 @@ function layoutTasks(
   });
 
   // Sort by start time
-  items.sort((a, b) => a.startMin - b.startMin);
+  items.sort((a, b) => {
+    if (a.startMin !== b.startMin) return a.startMin - b.startMin;
+    return a.endMin - b.endMin;
+  });
 
-  // Greedy column assignment: find the leftmost column where this task doesn't
-  // overlap any already-placed task.
-  const columnEnds: number[] = [];
+  // Build overlap groups so each group can be laid out with a shared column
+  // grid. This prevents visual collisions from mixed per-task totalColumns.
+  const groups: PositionedTask[][] = [];
+  let currentGroup: PositionedTask[] = [];
+  let currentGroupEnd = -1;
+
   for (const item of items) {
-    const col = columnEnds.findIndex((end) => end <= item.startMin);
-    const assigned = col === -1 ? columnEnds.length : col;
-    columnEnds[assigned] = item.endMin;
-    item.column = assigned;
+    if (currentGroup.length === 0) {
+      currentGroup = [item];
+      currentGroupEnd = item.endMin;
+      continue;
+    }
+
+    if (item.startMin < currentGroupEnd) {
+      currentGroup.push(item);
+      currentGroupEnd = Math.max(currentGroupEnd, item.endMin);
+      continue;
+    }
+
+    groups.push(currentGroup);
+    currentGroup = [item];
+    currentGroupEnd = item.endMin;
   }
 
-  // Compute totalColumns for each task based on its overlap group
-  for (const item of items) {
-    const overlapping = items.filter(
-      (o) => o.startMin < item.endMin && o.endMin > item.startMin,
-    );
-    item.totalColumns = Math.max(...overlapping.map((o) => o.column)) + 1;
+  if (currentGroup.length > 0) groups.push(currentGroup);
+
+  const assignedColumnsByTaskId = new Map<string, number>();
+
+  for (const group of groups) {
+    const columnEnds: number[] = [];
+
+    for (const item of group) {
+      const availableColumns: number[] = [];
+      for (let i = 0; i < columnEnds.length; i++) {
+        if (columnEnds[i] <= item.startMin) availableColumns.push(i);
+      }
+
+      const preferredColumn = item.task.parentTaskId
+        ? assignedColumnsByTaskId.get(item.task.parentTaskId)
+        : undefined;
+
+      let assigned: number;
+      if (
+        preferredColumn !== undefined &&
+        availableColumns.includes(preferredColumn)
+      ) {
+        assigned = preferredColumn;
+      } else if (availableColumns.length > 0) {
+        assigned = availableColumns[0];
+      } else {
+        assigned = columnEnds.length;
+      }
+
+      columnEnds[assigned] = item.endMin;
+      item.column = assigned;
+      assignedColumnsByTaskId.set(item.task.id, assigned);
+    }
+
+    const groupTotalColumns = Math.max(1, columnEnds.length);
+    for (const item of group) {
+      item.totalColumns = groupTotalColumns;
+    }
   }
 
   return items;
@@ -146,6 +196,11 @@ export function TimelineGantt({
   const positioned = useMemo(
     () => layoutTasks(tasks, timezone),
     [tasks, timezone],
+  );
+
+  const dependencyMetaByTask = useMemo(
+    () => buildDependencyGroupMeta(tasks),
+    [tasks],
   );
 
   // Current-time indicator
@@ -267,7 +322,7 @@ export function TimelineGantt({
                 const height = Math.max(rawHeight, MIN_BLOCK_HEIGHT);
                 const widthPct = 100 / totalColumns;
                 const leftPct = (column / totalColumns) * 100;
-                const hasParent = Boolean(task.parentTaskId);
+                const dependencyMeta = dependencyMetaByTask.get(task.id);
                 const colorClass =
                   STATUS_BLOCK[task.status] ?? STATUS_BLOCK.PENDING;
 
@@ -278,11 +333,13 @@ export function TimelineGantt({
                     tabIndex={0}
                     aria-label={`Task: ${task.title}`}
                     className={cn(
-                      "absolute overflow-hidden rounded-lg border p-2 transition-shadow",
+                      "absolute overflow-hidden rounded-lg border border-l-[3px] p-2 transition-shadow",
                       colorClass,
+                      dependencyMeta
+                        ? dependencyMeta.style.railClass
+                        : "border-l-border",
                       onTaskClick &&
                         "cursor-pointer hover:ring-2 hover:ring-ring focus:outline-none focus:ring-2 focus:ring-ring",
-                      hasParent && "border-l-[3px] border-l-accent",
                     )}
                     style={{
                       top: `${top + 1}px`,
@@ -306,7 +363,7 @@ export function TimelineGantt({
                         {fmtMin(endMin)}
                       </p>
                     )}
-                    {hasParent && height > 52 && (
+                    {dependencyMeta && height > 52 && (
                       <Link2 className="absolute bottom-1.5 right-1.5 size-3 opacity-40" />
                     )}
                   </div>

@@ -1,4 +1,5 @@
 import { TaskCard } from "./task-card";
+import { buildDependencyGroupMeta } from "./dependency-groups";
 import type { SerializedTask } from "@/lib/types";
 
 /** Build an ordered list that places children immediately after their parent,
@@ -7,6 +8,7 @@ import type { SerializedTask } from "@/lib/types";
 function buildSortedList(
   tasks: SerializedTask[],
 ): { task: SerializedTask; depth: number }[] {
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
   const byParent = new Map<string | null, SerializedTask[]>();
   for (const task of tasks) {
     const key = task.parentTaskId ?? null;
@@ -27,6 +29,31 @@ function buildSortedList(
     });
   }
 
+  // Sort dependency chains by their first scheduled task (root or descendant).
+  const chainStartMemo = new Map<string, number>();
+  function getChainStartMs(taskId: string, seen = new Set<string>()): number {
+    const memo = chainStartMemo.get(taskId);
+    if (memo !== undefined) return memo;
+    if (seen.has(taskId)) return Number.POSITIVE_INFINITY;
+
+    seen.add(taskId);
+
+    const task = taskById.get(taskId);
+    let earliest = task?.scheduledStart
+      ? new Date(task.scheduledStart).getTime()
+      : Number.POSITIVE_INFINITY;
+
+    const children = byParent.get(taskId) ?? [];
+    for (const child of children) {
+      const childEarliest = getChainStartMs(child.id, seen);
+      if (childEarliest < earliest) earliest = childEarliest;
+    }
+
+    seen.delete(taskId);
+    chainStartMemo.set(taskId, earliest);
+    return earliest;
+  }
+
   const result: { task: SerializedTask; depth: number }[] = [];
 
   function walk(parentId: string | null, depth: number) {
@@ -37,11 +64,29 @@ function buildSortedList(
     }
   }
 
-  walk(null, 0);
+  const rootTasks = tasks.filter(
+    (task) => !task.parentTaskId || !taskById.has(task.parentTaskId),
+  );
+
+  const sortedRoots = [...rootTasks].sort((a, b) => {
+    const aStart = getChainStartMs(a.id);
+    const bStart = getChainStartMs(b.id);
+
+    if (aStart !== bStart) return aStart - bStart;
+
+    const aCreated = new Date(a.createdAt).getTime();
+    const bCreated = new Date(b.createdAt).getTime();
+    return aCreated - bCreated;
+  });
+
+  for (const root of sortedRoots) {
+    result.push({ task: root, depth: 0 });
+    walk(root.id, 1);
+  }
 
   // Append any tasks not reached (should not happen, but guard against cycles)
   const seen = new Set(result.map((r) => r.task.id));
-  for (const task of tasks) {
+  for (const task of sortGroup(tasks)) {
     if (!seen.has(task.id)) result.push({ task, depth: 0 });
   }
 
@@ -70,14 +115,17 @@ export function TimelineList({
 
   const taskMap = new Map(tasks.map((t) => [t.id, t]));
   const sorted = buildSortedList(tasks);
+  const dependencyMetaByTask = buildDependencyGroupMeta(tasks);
 
   return (
     <div className="flex flex-col gap-2">
       {sorted.map(({ task, depth }) => {
-        const parentTitle =
-          task.parentTaskId
-            ? (task.parentTask?.title ?? taskMap.get(task.parentTaskId)?.title ?? null)
-            : null;
+        const dependencyMeta = dependencyMetaByTask.get(task.id);
+        const parentTitle = task.parentTaskId
+          ? (task.parentTask?.title ??
+            taskMap.get(task.parentTaskId)?.title ??
+            null)
+          : null;
 
         return (
           <div
@@ -86,12 +134,19 @@ export function TimelineList({
             className={depth > 0 ? "relative" : undefined}
           >
             {depth > 0 && (
-              <div className="absolute left-3 top-0 bottom-0 w-px bg-border/60" />
+              <div
+                className={
+                  dependencyMeta
+                    ? `absolute left-3 top-0 bottom-0 w-px ${dependencyMeta.style.lineClass}`
+                    : "absolute left-3 top-0 bottom-0 w-px bg-border/60"
+                }
+              />
             )}
             <TaskCard
               task={task}
               timezone={timezone}
               parentTitle={parentTitle}
+              dependencyMeta={dependencyMeta}
               onTaskClick={onTaskClick}
             />
           </div>

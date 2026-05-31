@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { format, addMinutes } from "date-fns";
 import {
@@ -84,12 +84,22 @@ function formatTimeDisplay(hhmm: string): string {
   return `${h}:${String(m).padStart(2, "0")} ${period}`;
 }
 
+function hhmmToMinutes(hhmm: string): number {
+  const [hStr, mStr] = hhmm.split(":");
+  const h = Number.parseInt(hStr, 10);
+  const m = Number.parseInt(mStr, 10);
+  if (Number.isNaN(h) || Number.isNaN(m)) return Number.NaN;
+  return h * 60 + m;
+}
+
 function TimePickerPopover({
   value,
   onChange,
+  minInclusive,
 }: Readonly<{
   value: string;
   onChange: (hhmm: string) => void;
+  minInclusive?: string | null;
 }>) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{
@@ -108,6 +118,17 @@ function TimePickerPopover({
   const [selPeriod, setSelPeriod] = useState<"AM" | "PM">(
     parsed?.period ?? "AM",
   );
+
+  const minInclusiveMinutes = useMemo(() => {
+    if (!minInclusive) return null;
+    const mins = hhmmToMinutes(minInclusive);
+    return Number.isNaN(mins) ? null : mins;
+  }, [minInclusive]);
+
+  function isSelectable(h: number, m: number, p: "AM" | "PM") {
+    if (minInclusiveMinutes === null) return true;
+    return hhmmToMinutes(to24h(h, m, p)) >= minInclusiveMinutes;
+  }
 
   useEffect(() => {
     if (value) {
@@ -177,6 +198,7 @@ function TimePickerPopover({
   }
 
   function commit(h: number, m: number, p: "AM" | "PM") {
+    if (!isSelectable(h, m, p)) return;
     onChange(to24h(h, m, p));
   }
 
@@ -211,25 +233,34 @@ function TimePickerPopover({
             ref={hourRef}
             className="flex max-h-52 flex-col overflow-y-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
-            {HOURS_12.map((h) => (
-              <button
-                key={h}
-                type="button"
-                data-selected={selH === h ? "true" : undefined}
-                onClick={() => {
-                  setSelH(h);
-                  commit(h, selM, selPeriod);
-                }}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                  selH === h
-                    ? "bg-primary text-primary-foreground"
-                    : "text-foreground",
-                )}
-              >
-                {h}
-              </button>
-            ))}
+            {HOURS_12.map((h) =>
+              (() => {
+                const selectable = isSelectable(h, selM, selPeriod);
+                return (
+                  <button
+                    key={h}
+                    type="button"
+                    data-selected={selH === h ? "true" : undefined}
+                    disabled={!selectable}
+                    onClick={() => {
+                      setSelH(h);
+                      commit(h, selM, selPeriod);
+                    }}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-sm transition-colors",
+                      selectable
+                        ? "hover:bg-accent hover:text-accent-foreground"
+                        : "cursor-not-allowed opacity-40",
+                      selH === h
+                        ? "bg-primary text-primary-foreground"
+                        : "text-foreground",
+                    )}
+                  >
+                    {h}
+                  </button>
+                );
+              })(),
+            )}
           </div>
 
           {/* Minutes */}
@@ -237,48 +268,66 @@ function TimePickerPopover({
             ref={minuteRef}
             className="flex max-h-52 flex-col overflow-y-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
-            {MINUTES_5.map((m) => (
-              <button
-                key={m}
-                type="button"
-                data-selected={selM === m ? "true" : undefined}
-                onClick={() => {
-                  setSelM(m);
-                  commit(selH, m, selPeriod);
-                }}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                  selM === m
-                    ? "bg-primary text-primary-foreground"
-                    : "text-foreground",
-                )}
-              >
-                {String(m).padStart(2, "0")}
-              </button>
-            ))}
+            {MINUTES_5.map((m) =>
+              (() => {
+                const selectable = isSelectable(selH, m, selPeriod);
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    data-selected={selM === m ? "true" : undefined}
+                    disabled={!selectable}
+                    onClick={() => {
+                      setSelM(m);
+                      commit(selH, m, selPeriod);
+                    }}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-sm transition-colors",
+                      selectable
+                        ? "hover:bg-accent hover:text-accent-foreground"
+                        : "cursor-not-allowed opacity-40",
+                      selM === m
+                        ? "bg-primary text-primary-foreground"
+                        : "text-foreground",
+                    )}
+                  >
+                    {String(m).padStart(2, "0")}
+                  </button>
+                );
+              })(),
+            )}
           </div>
 
           {/* AM / PM */}
           <div className="flex flex-col p-1">
-            {(["AM", "PM"] as const).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => {
-                  setSelPeriod(p);
-                  commit(selH, selM, p);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                  selPeriod === p
-                    ? "bg-primary text-primary-foreground"
-                    : "text-foreground",
-                )}
-              >
-                {p}
-              </button>
-            ))}
+            {(["AM", "PM"] as const).map((p) =>
+              (() => {
+                const selectable = isSelectable(selH, selM, p);
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    disabled={!selectable}
+                    onClick={() => {
+                      setSelPeriod(p);
+                      commit(selH, selM, p);
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-sm transition-colors",
+                      selectable
+                        ? "hover:bg-accent hover:text-accent-foreground"
+                        : "cursor-not-allowed opacity-40",
+                      selPeriod === p
+                        ? "bg-primary text-primary-foreground"
+                        : "text-foreground",
+                    )}
+                  >
+                    {p}
+                  </button>
+                );
+              })(),
+            )}
           </div>
         </div>
       )}
@@ -519,7 +568,8 @@ export function TaskPanel({
     if (pid) {
       const parent = tasks.find((t) => t.id === pid);
       if (parent?.scheduledEnd) {
-        setStartHHMM(utcToLocalHHMM(parent.scheduledEnd, timezone));
+        const parentEndHHMM = utcToLocalHHMM(parent.scheduledEnd, timezone);
+        setStartHHMM(parentEndHHMM);
         setStartManuallyEdited(false);
         return;
       }
@@ -542,8 +592,39 @@ export function TaskPanel({
   const isManualOverride =
     Boolean(parentTaskId) && startManuallyEdited && startHHMM !== autoStartHHMM;
 
-  // Eligible prerequisites: all other tasks
-  const eligiblePrereqs = tasks.filter((t) => t.id !== task?.id);
+  const minInclusiveStartHHMM = parent?.scheduledEnd
+    ? utcToLocalHHMM(parent.scheduledEnd, timezone)
+    : null;
+
+  // Eligible prerequisites: exclude self and descendants to avoid reverse links.
+  const ineligiblePrereqIds = useMemo(() => {
+    if (!task?.id) return new Set<string>();
+
+    const childrenByParent = new Map<string, string[]>();
+    for (const t of tasks) {
+      if (!t.parentTaskId) continue;
+      const siblings = childrenByParent.get(t.parentTaskId) ?? [];
+      siblings.push(t.id);
+      childrenByParent.set(t.parentTaskId, siblings);
+    }
+
+    const blocked = new Set<string>([task.id]);
+    const stack = [task.id];
+
+    while (stack.length > 0) {
+      const currentId = stack.pop()!;
+      const children = childrenByParent.get(currentId) ?? [];
+      for (const childId of children) {
+        if (blocked.has(childId)) continue;
+        blocked.add(childId);
+        stack.push(childId);
+      }
+    }
+
+    return blocked;
+  }, [task?.id, tasks]);
+
+  const eligiblePrereqs = tasks.filter((t) => !ineligiblePrereqIds.has(t.id));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -720,11 +801,18 @@ export function TaskPanel({
               </label>
               <TimePickerPopover
                 value={startHHMM}
+                minInclusive={minInclusiveStartHHMM}
                 onChange={(hhmm) => {
                   setStartHHMM(hhmm);
                   if (parentTaskId) setStartManuallyEdited(true);
                 }}
               />
+              {minInclusiveStartHHMM && (
+                <p className="text-xs text-muted-foreground">
+                  Start must be at or after{" "}
+                  {formatTimeDisplay(minInclusiveStartHHMM)}.
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-foreground">
