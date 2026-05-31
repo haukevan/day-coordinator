@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
-import { resend, FROM_EMAIL } from "@/lib/resend";
+import { getResendClient, FROM_EMAIL } from "@/lib/resend";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
@@ -30,6 +30,8 @@ export async function sendVendorInviteEmail(eventVendorId: string): Promise<void
     eventTitle: ev.event.title,
     inviteUrl,
   });
+
+  const resend = getResendClient();
 
   await resend.emails.send({
     from: FROM_EMAIL,
@@ -77,6 +79,8 @@ export async function sendVendorEventLink(eventVendorId: string): Promise<void> 
     eventTitle: ev.event.title,
     eventUrl,
   });
+
+  const resend = getResendClient();
 
   await resend.emails.send({
     from: FROM_EMAIL,
