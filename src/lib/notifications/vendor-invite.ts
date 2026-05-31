@@ -7,7 +7,9 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "";
  * Send a vendor invite email for a PENDING EventVendor.
  * Idempotent — checks inviteSentAt before sending.
  */
-export async function sendVendorInviteEmail(eventVendorId: string): Promise<void> {
+export async function sendVendorInviteEmail(
+  eventVendorId: string,
+): Promise<void> {
   const ev = await prisma.eventVendor.findUnique({
     where: { id: eventVendorId },
     include: {
@@ -21,9 +23,10 @@ export async function sendVendorInviteEmail(eventVendorId: string): Promise<void
   if (ev.inviteSentAt) return;
 
   const inviteUrl = `${APP_URL}/login?next=${encodeURIComponent(`/invite/${ev.inviteToken}`)}`;
-  const recipientName = [ev.vendorContact.firstName, ev.vendorContact.lastName]
-    .filter(Boolean)
-    .join(" ") || ev.vendorContact.email;
+  const recipientName =
+    [ev.vendorContact.firstName, ev.vendorContact.lastName]
+      .filter(Boolean)
+      .join(" ") || ev.vendorContact.email;
 
   const html = buildInviteHtml({
     recipientName,
@@ -58,7 +61,9 @@ export async function sendVendorInviteEmail(eventVendorId: string): Promise<void
  * Send a "view your event" email to an ACCEPTED vendor (resend action).
  * No token — just a direct link to the vendor event view.
  */
-export async function sendVendorEventLink(eventVendorId: string): Promise<void> {
+export async function sendVendorEventLink(
+  eventVendorId: string,
+): Promise<void> {
   const ev = await prisma.eventVendor.findUnique({
     where: { id: eventVendorId },
     include: {
@@ -70,9 +75,10 @@ export async function sendVendorEventLink(eventVendorId: string): Promise<void> 
   if (!ev) return;
 
   const eventUrl = `${APP_URL}/vendor/${ev.event.id}/timeline`;
-  const recipientName = [ev.vendorContact.firstName, ev.vendorContact.lastName]
-    .filter(Boolean)
-    .join(" ") || ev.vendorContact.email;
+  const recipientName =
+    [ev.vendorContact.firstName, ev.vendorContact.lastName]
+      .filter(Boolean)
+      .join(" ") || ev.vendorContact.email;
 
   const html = buildEventLinkHtml({
     recipientName,
@@ -93,7 +99,11 @@ export async function sendVendorEventLink(eventVendorId: string): Promise<void> 
     data: {
       eventId: ev.eventId,
       action: "vendor.invite_sent",
-      metadata: { eventVendorId, email: ev.vendorContact.email, type: "event_link" },
+      metadata: {
+        eventVendorId,
+        email: ev.vendorContact.email,
+        type: "event_link",
+      },
     },
   });
 }
