@@ -304,46 +304,46 @@
     @apply font-sans;
   }
 
-   /* Prevent iOS Safari form-focus zoom by keeping controls at >= 16px. */
-   input,
-   textarea,
-   select,
-   button {
-      font-size: 16px;
-   }
+  /* Prevent iOS Safari form-focus zoom by keeping controls at >= 16px. */
+  input,
+  textarea,
+  select,
+  button {
+    font-size: 16px;
+  }
 
-   /* Use dynamic/small viewport units so content stays above browser chrome. */
-   html,
-   body {
-      min-height: 100%;
-   }
+  /* Use dynamic/small viewport units so content stays above browser chrome. */
+  html,
+  body {
+    min-height: 100%;
+  }
 
-   body {
-      min-height: 100svh;
-      min-height: 100dvh;
-      overflow-x: hidden;
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-touch-callout: none;
-   }
+  body {
+    min-height: 100svh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
 
-   /* Tailwind's screen-height utilities default to 100vh; override on mobile browsers. */
-   .min-h-screen {
-      min-height: 100svh;
-      min-height: 100dvh;
-   }
+  /* Tailwind's screen-height utilities default to 100vh; override on mobile browsers. */
+  .min-h-screen {
+    min-height: 100svh;
+    min-height: 100dvh;
+  }
 
-   .h-screen {
-      height: 100svh;
-      height: 100dvh;
-   }
+  .h-screen {
+    height: 100svh;
+    height: 100dvh;
+  }
 
-   /* Safe-area insets for notch / Dynamic Island devices. */
-   @supports (padding: max(0px)) {
-      body {
-         padding-left: max(0px, env(safe-area-inset-left));
-         padding-right: max(0px, env(safe-area-inset-right));
-         padding-bottom: max(0px, env(safe-area-inset-bottom));
-      }
-   }
+  /* Safe-area insets for notch / Dynamic Island devices. */
+  @supports (padding: max(0px)) {
+    body {
+      padding-left: max(0px, env(safe-area-inset-left));
+      padding-right: max(0px, env(safe-area-inset-right));
+      padding-bottom: max(0px, env(safe-area-inset-bottom));
+    }
+  }
 }
