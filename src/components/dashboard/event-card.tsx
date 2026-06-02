@@ -1,6 +1,16 @@
 import Link from "next/link";
-import { Calendar, ArrowRight } from "lucide-react";
+import { Calendar, ArrowRight, MapPin } from "lucide-react";
 import { EventStatusBadge } from "./event-status-badge";
+
+type VenueChip = {
+  id: string;
+  name: string;
+  address: string;
+  description: string | null;
+  ownerName: string | null;
+  ownerPhone: string | null;
+  ownerEmail: string | null;
+};
 
 type EventWithCount = {
   id: string;
@@ -8,6 +18,7 @@ type EventWithCount = {
   eventDate: Date | null;
   status: "DRAFT" | "SCHEDULED" | "LIVE" | "COMPLETED" | "ARCHIVED";
   _count: { tasks: number };
+  venue: VenueChip | null;
 };
 
 export function EventCard({ event }: { event: EventWithCount }) {
@@ -22,6 +33,17 @@ export function EventCard({ event }: { event: EventWithCount }) {
         </h3>
         <EventStatusBadge status={event.status} />
       </div>
+
+      {/* Venue chip */}
+      {event.venue && (
+        <div className="mb-2">
+          <span className="inline-flex items-center gap-1 truncate max-w-full rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+            <MapPin className="size-3 shrink-0" />
+            <span className="truncate">{event.venue.name}</span>
+          </span>
+        </div>
+      )}
+
       <div className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Calendar className="size-3.5" />
         <span>

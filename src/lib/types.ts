@@ -62,4 +62,12 @@ export type SerializedVenue = {
   creatorId: string;
   createdAt: string;
   updatedAt: string;
+  events?: LinkedEvent[];
+  _count?: { events: number };
+};
+
+export type LinkedEvent = {
+  id: string;
+  title: string;
+  status: string;
 };

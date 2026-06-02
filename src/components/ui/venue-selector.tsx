@@ -99,17 +99,25 @@ export function VenueSelector({ venueId, onChange, disabled = false }: Props) {
           <MapPin className="size-4 shrink-0 text-muted-foreground" />
           <span className="flex-1 truncate text-left">{displayLabel}</span>
           {selectedVenue && !disabled && (
-            <button
-              type="button"
+            <span
+              role="button"
+              tabIndex={0}
               onClick={(e) => {
                 e.stopPropagation();
                 handleClear();
               }}
-              className="shrink-0 rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleClear();
+                }
+              }}
+              className="shrink-0 rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
               aria-label="Clear venue selection"
             >
               <X className="size-3.5" />
-            </button>
+            </span>
           )}
         </button>
 

@@ -22,12 +22,31 @@ export default async function DashboardPage() {
 
   const events = await prisma.event.findMany({
     where: { ownerId: dbUser.id },
-    include: { _count: { select: { tasks: true } } },
+    include: {
+      _count: { select: { tasks: true } },
+      venue: {
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          description: true,
+          ownerName: true,
+          ownerPhone: true,
+          ownerEmail: true,
+        },
+      },
+    },
     orderBy: { createdAt: "desc" },
   });
 
   const vendorMemberships = await prisma.eventVendor.findMany({
-    where: { userId: dbUser.id, status: "ACCEPTED" },
+    where: {
+      userId: dbUser.id,
+      status: "ACCEPTED",
+      event: {
+        ownerId: { not: dbUser.id },
+      },
+    },
     include: {
       event: {
         select: {

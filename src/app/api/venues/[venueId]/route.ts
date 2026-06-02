@@ -21,6 +21,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const venue = await prisma.venue.findFirst({
     where: { id: venueId, creatorId: dbUser.id },
+    include: {
+      events: { select: { id: true, title: true, status: true } },
+    },
   });
   if (!venue) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -80,21 +83,27 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   const venue = await prisma.venue.findFirst({
     where: { id: venueId, creatorId: dbUser.id },
+    include: {
+      events: { select: { id: true, title: true, status: true } },
+    },
   });
   if (!venue) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Block deletion if any events reference this venue
-  const eventCount = await prisma.event.count({
-    where: { venueId },
+  // Unlink all events from this venue, then delete — in a transaction
+  const linkedEventIds = venue.events.map((e) => e.id);
+
+  await prisma.$transaction([
+    // Set venueId to null on all linked events
+    prisma.event.updateMany({
+      where: { venueId },
+      data: { venueId: null },
+    }),
+    // Delete the venue
+    prisma.venue.delete({ where: { id: venueId } }),
+  ]);
+
+  return NextResponse.json({
+    success: true,
+    unlinkedEvents: linkedEventIds,
   });
-  if (eventCount > 0) {
-    return NextResponse.json(
-      { error: "Cannot delete a venue that is linked to events." },
-      { status: 409 },
-    );
-  }
-
-  await prisma.venue.delete({ where: { id: venueId } });
-
-  return NextResponse.json({ success: true });
 }

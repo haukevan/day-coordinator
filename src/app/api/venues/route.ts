@@ -36,6 +36,13 @@ export async function GET() {
 
   const venues = await prisma.venue.findMany({
     where: { creatorId: dbUser.id },
+    include: {
+      events: {
+        select: { id: true, title: true, status: true },
+        orderBy: { eventDate: "desc" },
+      },
+      _count: { select: { events: true } },
+    },
     orderBy: { updatedAt: "desc" },
   });
 
