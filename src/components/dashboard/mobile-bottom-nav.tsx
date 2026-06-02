@@ -2,12 +2,13 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboard, CalendarDays } from "lucide-react";
+import { CalendarDays, BriefcaseBusiness, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Events", href: "/events", icon: CalendarDays },
+  { label: "Events", href: "/dashboard", icon: CalendarDays },
+  { label: "Vendors", href: "/dashboard/vendors", icon: BriefcaseBusiness },
+  { label: "Venues", href: "/dashboard/venues", icon: MapPin },
 ];
 
 export function MobileBottomNav() {

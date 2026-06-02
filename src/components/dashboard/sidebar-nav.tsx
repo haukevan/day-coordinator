@@ -2,12 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Plus } from "lucide-react";
+import { CalendarDays, BriefcaseBusiness, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Events", href: "/dashboard", icon: CalendarDays },
+  { label: "Vendors", href: "/dashboard/vendors", icon: BriefcaseBusiness },
+  { label: "Venues", href: "/dashboard/venues", icon: MapPin },
 ];
+
+function isNavActive(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  // Events tab (/dashboard) also highlights when browsing event detail pages
+  if (href === "/dashboard") return pathname.startsWith("/dashboard/events");
+  // Other tabs highlight for any sub-route
+  return pathname.startsWith(`${href}/`);
+}
 
 export function SidebarNav() {
   const pathname = usePathname();
@@ -15,7 +25,7 @@ export function SidebarNav() {
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
       {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-        const isActive = pathname === href || pathname.startsWith(`${href}/`);
+        const isActive = isNavActive(pathname, href);
         return (
           <Link
             key={href}

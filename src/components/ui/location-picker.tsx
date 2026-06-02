@@ -31,6 +31,16 @@ interface NominatimResult {
   lon: string;
   type?: string;
   class?: string;
+  address?: {
+    house_number?: string;
+    road?: string;
+    city?: string;
+    town?: string;
+    village?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
+  };
 }
 
 export interface LocationValue {
@@ -65,7 +75,7 @@ async function reverseGeocode(
   lng: number,
 ): Promise<NominatimResult | null> {
   const res = await fetch(
-    `${NOMINATIM_BASE}/reverse?lat=${lat}&lon=${lng}&format=json`,
+    `${NOMINATIM_BASE}/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
     { headers: { "Accept-Language": "en" } },
   );
   if (!res.ok) return null;
@@ -87,11 +97,22 @@ function buildSubtitle(parts: string[], r: NominatimResult): string {
   return segments.join(", ");
 }
 
+/** Build a clean address from Nominatim's structured address object. */
+function buildCleanAddress(r: NominatimResult): string {
+  const a = r.address;
+  if (!a) return r.display_name; // fallback
+
+  const street = [a.house_number, a.road].filter(Boolean).join(" ");
+  const city = a.city ?? a.town ?? a.village ?? "";
+  const parts = [street, city, a.state, a.postcode, a.country].filter(Boolean);
+  return parts.join(", ");
+}
+
 function resultToLocation(r: NominatimResult): LocationValue {
   const parts = r.display_name.split(",").map((s) => s.trim());
   return {
     name: buildDisplayName(parts),
-    address: r.display_name,
+    address: buildCleanAddress(r),
     lat: Number.parseFloat(r.lat),
     lng: Number.parseFloat(r.lon),
     placeId: `${r.osm_type}/${r.osm_id}`,

@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { Logo } from "@/components/ui/logo";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
+import { MobileNavSheet } from "@/components/dashboard/mobile-nav-sheet";
 import { UserMenu } from "@/components/dashboard/user-menu";
 
 function buildAvatar(
@@ -82,7 +83,8 @@ export default async function DashboardLayout({
       </aside>
 
       {/* ── Mobile top bar (hidden on desktop) ── */}
-      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card px-4 sm:hidden">
+      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card px-3 sm:hidden">
+        <MobileNavSheet />
         <Link href="/dashboard">
           <Logo size="sm" iconOnly />
         </Link>

@@ -17,7 +17,23 @@ interface Props {
 }
 
 function mapsUrl(address: string): string {
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
+  // Strip verbose Nominatim display_name down to a clean address for Google Maps.
+  // display_name parts: [street, neighborhood?, city, district?, state, postcode, country]
+  // Keep at most 5 parts: street, city, state, postcode, country.
+  const parts = address.split(",").map((s) => s.trim());
+  const clean =
+    parts.length > 5
+      ? [
+          parts[0],
+          parts[parts.length - 4],
+          parts[parts.length - 3],
+          parts[parts.length - 2],
+          parts[parts.length - 1],
+        ]
+          .filter(Boolean)
+          .join(", ")
+      : address;
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(clean)}`;
 }
 
 export function VenueChipPopup({
