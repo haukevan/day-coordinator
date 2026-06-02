@@ -349,6 +349,14 @@ const DURATION_SUGGESTIONS = [
   { mins: 90, label: "1 hr 30 min" },
   { mins: 105, label: "1 hr 45 min" },
   { mins: 120, label: "2 hr" },
+  { mins: 135, label: "2 hr 15 min" },
+  { mins: 150, label: "2 hr 30 min" },
+  { mins: 165, label: "2 hr 45 min" },
+  { mins: 180, label: "3 hr" },
+  { mins: 210, label: "3 hr 30 min" },
+  { mins: 240, label: "4 hr" },
+  { mins: 270, label: "4 hr 30 min" },
+  { mins: 300, label: "5 hr" },
 ];
 
 function computeDurationDropdownPosition(r: DOMRect) {
@@ -371,12 +379,27 @@ function computeDurationDropdownPosition(r: DOMRect) {
   return { top, left, width, maxHeight };
 }
 
+/** Format the computed end time given a start HH:mm and duration in minutes. */
+function formatEndTimeFromStart(
+  startHHMM: string,
+  durationMins: number,
+): string | null {
+  const [h, m] = startHHMM.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m) || durationMins <= 0) return null;
+  const totalMins = h * 60 + m + durationMins;
+  const endH = Math.floor(totalMins / 60) % 24;
+  const endM = totalMins % 60;
+  return format(new Date(0, 0, 0, endH, endM), "h:mm a");
+}
+
 function DurationInput({
   value,
   onChange,
+  startHHMM,
 }: Readonly<{
   value: string;
   onChange: (v: string) => void;
+  startHHMM?: string;
 }>) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{
@@ -432,6 +455,8 @@ function DurationInput({
       <div ref={wrapRef} className="relative">
         <input
           type="number"
+          inputMode="numeric"
+          pattern="[0-9]*"
           min="1"
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -465,24 +490,34 @@ function DurationInput({
           }}
           className="z-[9999] overflow-y-auto rounded-lg bg-popover py-1 shadow-md ring-1 ring-foreground/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          {DURATION_SUGGESTIONS.map(({ mins, label }) => (
-            <button
-              key={mins}
-              type="button"
-              onClick={() => {
-                onChange(String(mins));
-                setOpen(false);
-              }}
-              className={cn(
-                "w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                !Number.isNaN(numValue) && numValue === mins
-                  ? "bg-primary text-primary-foreground"
-                  : "text-foreground",
-              )}
-            >
-              {label}
-            </button>
-          ))}
+          {DURATION_SUGGESTIONS.map(({ mins, label }) => {
+            const endTime = startHHMM
+              ? formatEndTimeFromStart(startHHMM, mins)
+              : null;
+            return (
+              <button
+                key={mins}
+                type="button"
+                onClick={() => {
+                  onChange(String(mins));
+                  setOpen(false);
+                }}
+                className={cn(
+                  "w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
+                  !Number.isNaN(numValue) && numValue === mins
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground",
+                )}
+              >
+                <span>{label}</span>
+                {endTime && (
+                  <span className="ml-1.5 text-muted-foreground">
+                    — {endTime}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </>
@@ -628,13 +663,18 @@ export function TaskPanel({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim()) {
+      setError("Task name is required.");
+      return;
+    }
+    if (!startHHMM) {
+      setError("Start time is required.");
+      return;
+    }
     setSaving(true);
     setError("");
 
-    const scheduledStartISO = startHHMM
-      ? localHHMMToUtcISO(eventDate, startHHMM, timezone)
-      : null;
+    const scheduledStartISO = localHHMMToUtcISO(eventDate, startHHMM, timezone);
 
     const payload: Record<string, unknown> = {
       title: title.trim(),
@@ -730,7 +770,7 @@ export function TaskPanel({
           {/* Title */}
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-foreground">
-              Task name
+              Task name <span className="text-destructive">*</span>
             </label>
             <input
               type="text"
@@ -797,7 +837,7 @@ export function TaskPanel({
             <div className="flex flex-col gap-1.5">
               <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                 <Clock className="size-3.5 text-muted-foreground" />
-                Start time
+                Start time <span className="text-destructive">*</span>
               </label>
               <TimePickerPopover
                 value={startHHMM}
@@ -818,7 +858,11 @@ export function TaskPanel({
               <label className="text-sm font-medium text-foreground">
                 Duration (min)
               </label>
-              <DurationInput value={durationStr} onChange={setDurationStr} />
+              <DurationInput
+                value={durationStr}
+                onChange={setDurationStr}
+                startHHMM={startHHMM || undefined}
+              />
             </div>
           </div>
 

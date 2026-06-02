@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { emitEventUpdate } from "@/lib/realtime";
-import { computeScheduledEnd, propagateSchedule, detectCycle } from "@/lib/scheduler";
+import {
+  computeScheduledEnd,
+  propagateSchedule,
+  detectCycle,
+} from "@/lib/scheduler";
 
 type Params = { params: Promise<{ eventId: string }> };
 
@@ -66,6 +70,13 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   if (!title?.trim()) {
     return NextResponse.json({ error: "Title is required." }, { status: 400 });
+  }
+
+  if (!scheduledStart) {
+    return NextResponse.json(
+      { error: "Start time is required." },
+      { status: 400 },
+    );
   }
 
   // Validate parentTaskId belongs to same event
