@@ -12,6 +12,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { TimezoneSelect } from "@/components/ui/timezone-select";
+import { VenueSelector } from "@/components/ui/venue-selector";
 import { cn } from "@/lib/utils";
 
 type SubmitEvent = Parameters<
@@ -39,6 +40,7 @@ export default function NewEventPage() {
     () => Intl.DateTimeFormat().resolvedOptions().timeZone,
   );
   const [slug, setSlug] = useState("");
+  const [venueId, setVenueId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -63,6 +65,7 @@ export default function NewEventPage() {
         eventDate: eventDate ? format(eventDate, "yyyy-MM-dd") : undefined,
         timezone,
         slug: slug || undefined,
+        venueId: venueId || undefined,
       }),
     });
 
@@ -238,6 +241,14 @@ export default function NewEventPage() {
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
             />
           </div>
+        </div>
+
+        {/* Event location */}
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+            Event location
+          </label>
+          <VenueSelector venueId={venueId} onChange={setVenueId} />
         </div>
 
         {error && <p className="text-xs text-destructive">{error}</p>}

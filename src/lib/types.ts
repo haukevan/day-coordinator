@@ -47,3 +47,19 @@ export type SerializedVendorContact = {
   company: string | null;
   jobTitle: string | null;
 };
+
+export type SerializedVenue = {
+  id: string;
+  name: string;
+  address: string;
+  description: string | null;
+  ownerName: string | null;
+  ownerPhone: string | null;
+  ownerEmail: string | null;
+  lat: number | null;
+  lng: number | null;
+  placeId: string | null;
+  creatorId: string;
+  createdAt: string;
+  updatedAt: string;
+};

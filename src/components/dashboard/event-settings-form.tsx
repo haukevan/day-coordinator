@@ -6,9 +6,14 @@ import { format } from "date-fns";
 import { CalendarIcon, ExternalLink, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { TimezoneSelect } from "@/components/ui/timezone-select";
+import { VenueSelector } from "@/components/ui/venue-selector";
 import { cn } from "@/lib/utils";
 
 type EventStatus = "DRAFT" | "SCHEDULED" | "LIVE" | "COMPLETED" | "ARCHIVED";
@@ -22,6 +27,7 @@ type EventData = {
   slug: string | null;
   status: EventStatus;
   publicTimeline: boolean;
+  venueId: string | null;
 };
 
 export function EventSettingsForm({ event }: { event: EventData }) {
@@ -35,6 +41,7 @@ export function EventSettingsForm({ event }: { event: EventData }) {
   const [timezone, setTimezone] = useState(event.timezone);
   const [slug, setSlug] = useState(event.slug ?? "");
   const [publicTimeline, setPublicTimeline] = useState(event.publicTimeline);
+  const [venueId, setVenueId] = useState<string | null>(event.venueId);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [appOrigin, setAppOrigin] = useState("https://daycoordinator.com");
@@ -95,6 +102,7 @@ export function EventSettingsForm({ event }: { event: EventData }) {
         eventDate: eventDate ? format(eventDate, "yyyy-MM-dd") : null,
         timezone,
         slug: slug || null,
+        venueId: venueId || null,
       }),
     });
 
@@ -119,7 +127,14 @@ export function EventSettingsForm({ event }: { event: EventData }) {
               <label className="text-xs font-medium text-muted-foreground">
                 Title <span className="text-destructive">*</span>
               </label>
-              <span className={cn("text-xs tabular-nums", title.length >= 90 ? "text-warning-foreground" : "text-muted-foreground/50")}>
+              <span
+                className={cn(
+                  "text-xs tabular-nums",
+                  title.length >= 90
+                    ? "text-warning-foreground"
+                    : "text-muted-foreground/50",
+                )}
+              >
                 {title.length}/100
               </span>
             </div>
@@ -138,7 +153,14 @@ export function EventSettingsForm({ event }: { event: EventData }) {
               <label className="text-xs font-medium text-muted-foreground">
                 Description
               </label>
-              <span className={cn("text-xs tabular-nums", description.length >= 450 ? "text-warning-foreground" : "text-muted-foreground/50")}>
+              <span
+                className={cn(
+                  "text-xs tabular-nums",
+                  description.length >= 450
+                    ? "text-warning-foreground"
+                    : "text-muted-foreground/50",
+                )}
+              >
                 {description.length}/500
               </span>
             </div>
@@ -177,7 +199,9 @@ export function EventSettingsForm({ event }: { event: EventData }) {
                     setEventDate(date);
                     setDatePickerOpen(false);
                   }}
-                  disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
+                  disabled={{
+                    before: new Date(new Date().setHours(0, 0, 0, 0)),
+                  }}
                 />
               </PopoverContent>
             </Popover>
@@ -189,6 +213,17 @@ export function EventSettingsForm({ event }: { event: EventData }) {
             <TimezoneSelect
               value={timezone}
               onChange={setTimezone}
+              disabled={isLive}
+            />
+          </div>
+          {/* Event location */}
+          <div className="sm:col-span-2">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+              Event location
+            </label>
+            <VenueSelector
+              venueId={venueId}
+              onChange={setVenueId}
               disabled={isLive}
             />
           </div>

@@ -40,6 +40,7 @@ export default async function EventSettingsPage({
       | "COMPLETED"
       | "ARCHIVED",
     publicTimeline: event.publicTimeline,
+    venueId: event.venueId,
   };
 
   return <EventSettingsForm event={serialized} />;

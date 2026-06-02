@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { EventStatusButton } from "@/components/event/event-status-button";
 import { DraftBanner, DraftWarningIcon } from "@/components/event/draft-banner";
+import { VenueChipPopup } from "@/components/event/venue-chip-popup";
 import { EventTabs } from "@/components/dashboard/event-tabs";
 import Link from "next/link";
 import { ChevronLeft, CalendarDays } from "lucide-react";
@@ -38,6 +39,16 @@ export default async function EventLayout({
       status: true,
       eventDate: true,
       timezone: true,
+      venue: {
+        select: {
+          name: true,
+          address: true,
+          description: true,
+          ownerName: true,
+          ownerPhone: true,
+          ownerEmail: true,
+        },
+      },
     },
   });
 
@@ -77,20 +88,26 @@ export default async function EventLayout({
   return (
     <div className="flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden sm:h-dvh">
       {/* Event header */}
-      <div className="border-b border-border bg-card px-4 py-4 sm:px-6">
+      <div className="border-b border-border bg-card px-4 py-3 sm:px-6">
         <Link
           href="/dashboard"
-          className="mb-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          className="mb-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="size-3.5" />
           Events
         </Link>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-lg font-semibold text-foreground">
+
+        {/* Title row */}
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-semibold text-foreground truncate">
             {event.title}
           </h1>
-          <EventStatusButton eventId={event.id} status={status} />
           {status === "DRAFT" && <DraftWarningIcon eventId={event.id} />}
+        </div>
+
+        {/* Metadata row — status, date, venue */}
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          <EventStatusButton eventId={event.id} status={status} />
           {eventDateInfo && (
             <span
               className={cn(
@@ -109,7 +126,18 @@ export default async function EventLayout({
                 : eventDateInfo.formatted}
             </span>
           )}
+          {event.venue && (
+            <VenueChipPopup
+              name={event.venue.name}
+              address={event.venue.address}
+              description={event.venue.description}
+              ownerName={event.venue.ownerName}
+              ownerPhone={event.venue.ownerPhone}
+              ownerEmail={event.venue.ownerEmail}
+            />
+          )}
         </div>
+
         <div className="mt-3">
           <EventTabs eventId={event.id} userRole="admin" />
         </div>

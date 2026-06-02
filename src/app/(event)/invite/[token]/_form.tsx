@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
+import { VenueStaticMap } from "@/components/ui/venue-static-map";
+import { MapPin } from "lucide-react";
 
 function formatPhone(digits: string): string {
   const d = digits.slice(0, 10);
@@ -14,18 +16,24 @@ function formatPhone(digits: string): string {
 }
 
 interface Props {
-  token: string;
-  eventId: string;
-  eventTitle: string;
-  eventDate: string | null;
-  onboarded: boolean;
-  userEmail: string;
-  inviteEmail: string;
-  initialFirstName: string;
-  initialLastName: string;
-  initialPhoneDigits: string;
-  initialCompany: string;
-  initialJobTitle: string;
+  readonly token: string;
+  readonly eventId: string;
+  readonly eventTitle: string;
+  readonly eventDate: string | null;
+  readonly eventVenue: {
+    name: string;
+    address: string;
+    lat: number | null;
+    lng: number | null;
+  } | null;
+  readonly onboarded: boolean;
+  readonly userEmail: string;
+  readonly inviteEmail: string;
+  readonly initialFirstName: string;
+  readonly initialLastName: string;
+  readonly initialPhoneDigits: string;
+  readonly initialCompany: string;
+  readonly initialJobTitle: string;
 }
 
 export function VendorJoinForm({
@@ -33,6 +41,7 @@ export function VendorJoinForm({
   eventId,
   eventTitle,
   eventDate,
+  eventVenue,
   onboarded,
   userEmail,
   inviteEmail,
@@ -54,16 +63,23 @@ export function VendorJoinForm({
   const [phoneError, setPhoneError] = useState("");
   const [error, setError] = useState("");
 
-  const handlePhoneChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
-    setPhoneDigits(digits);
-    setPhoneError(digits.length > 0 && digits.length < 10 ? "Please enter a valid 10-digit phone number." : "");
-  }, []);
+  const handlePhoneChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+      setPhoneDigits(digits);
+      setPhoneError(
+        digits.length > 0 && digits.length < 10
+          ? "Please enter a valid 10-digit phone number."
+          : "",
+      );
+    },
+    [],
+  );
 
   const inputClass =
     "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -108,7 +124,9 @@ export function VendorJoinForm({
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             You&apos;re invited to
           </p>
-          <p className="mt-0.5 text-base font-semibold text-foreground">{eventTitle}</p>
+          <p className="mt-0.5 text-base font-semibold text-foreground">
+            {eventTitle}
+          </p>
           {eventDate && (
             <p className="mt-0.5 text-xs text-muted-foreground">
               {new Date(eventDate).toLocaleDateString("en-US", {
@@ -118,6 +136,31 @@ export function VendorJoinForm({
                 year: "numeric",
               })}
             </p>
+          )}
+          {eventVenue && (
+            <div className="mt-2 border-t border-border pt-2">
+              <div className="flex items-start gap-1.5">
+                <MapPin className="mt-0.5 size-3 shrink-0 text-accent" />
+                <div>
+                  <p className="text-xs font-medium text-foreground">
+                    {eventVenue.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {eventVenue.address}
+                  </p>
+                </div>
+              </div>
+              {eventVenue.lat != null && eventVenue.lng != null && (
+                <div className="mt-2">
+                  <VenueStaticMap
+                    lat={eventVenue.lat}
+                    lng={eventVenue.lng}
+                    name={eventVenue.name}
+                    address={eventVenue.address}
+                  />
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -142,10 +185,14 @@ export function VendorJoinForm({
               {/* Name — editable for new users, editable but pre-filled for existing */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-foreground">
+                  <label
+                    htmlFor="invite-first-name"
+                    className="mb-1 block text-xs font-medium text-foreground"
+                  >
                     First name <span className="text-destructive">*</span>
                   </label>
                   <input
+                    id="invite-first-name"
                     type="text"
                     autoComplete="given-name"
                     required
@@ -158,10 +205,14 @@ export function VendorJoinForm({
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-foreground">
+                  <label
+                    htmlFor="invite-last-name"
+                    className="mb-1 block text-xs font-medium text-foreground"
+                  >
                     Last name <span className="text-destructive">*</span>
                   </label>
                   <input
+                    id="invite-last-name"
                     type="text"
                     autoComplete="family-name"
                     required
@@ -199,7 +250,11 @@ export function VendorJoinForm({
                       maxLength={14}
                     />
                   </div>
-                  {phoneError && <p className="mt-1 text-xs text-destructive">{phoneError}</p>}
+                  {phoneError && (
+                    <p className="mt-1 text-xs text-destructive">
+                      {phoneError}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -249,7 +304,12 @@ export function VendorJoinForm({
               <Button
                 type="submit"
                 className="w-full"
-                disabled={loading || !firstName.trim() || !lastName.trim() || !!phoneError}
+                disabled={
+                  loading ||
+                  !firstName.trim() ||
+                  !lastName.trim() ||
+                  !!phoneError
+                }
               >
                 {loading ? "Joining…" : "Join event"}
               </Button>

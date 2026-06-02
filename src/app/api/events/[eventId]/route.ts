@@ -50,8 +50,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
-  const { title, description, eventDate, timezone, slug, publicTimeline } =
-    body;
+  const {
+    title,
+    description,
+    eventDate,
+    timezone,
+    slug,
+    publicTimeline,
+    venueId,
+  } = body;
 
   const isLocked =
     event.status === "LIVE" ||
@@ -68,6 +75,21 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     );
   }
 
+  // Validate venue ownership if venueId is provided and different
+  if (venueId !== undefined && venueId !== event.venueId) {
+    if (venueId) {
+      const venue = await prisma.venue.findFirst({
+        where: { id: venueId, creatorId: dbUser.id },
+      });
+      if (!venue) {
+        return NextResponse.json(
+          { error: "Venue not found or you do not have access to it." },
+          { status: 422 },
+        );
+      }
+    }
+  }
+
   const updated = await prisma.event.update({
     where: { id: eventId },
     data: {
@@ -78,6 +100,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         !isLocked && { eventDate: eventDate ? new Date(eventDate) : null }),
       ...(timezone !== undefined && !isLocked && { timezone }),
       ...(slug !== undefined && !isLocked && { slug: slug?.trim() || null }),
+      ...(venueId !== undefined && !isLocked && { venueId: venueId || null }),
       ...(publicTimeline !== undefined && {
         publicTimeline: Boolean(publicTimeline),
       }),

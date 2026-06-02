@@ -13,6 +13,7 @@ const createEventSchema = z.object({
   slug: z.string().optional(),
   company: z.string().min(1, "Company is required.").max(128),
   jobTitle: z.string().min(1, "Role is required.").max(128),
+  venueId: z.string().optional(),
 });
 
 function slugify(text: string): string {
@@ -62,8 +63,29 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { title, description, eventDate, timezone, slug, company, jobTitle } =
-    parsed.data;
+  const {
+    title,
+    description,
+    eventDate,
+    timezone,
+    slug,
+    company,
+    jobTitle,
+    venueId,
+  } = parsed.data;
+
+  // Validate venue ownership if provided
+  if (venueId) {
+    const venue = await prisma.venue.findFirst({
+      where: { id: venueId, creatorId: dbUser.id },
+    });
+    if (!venue) {
+      return NextResponse.json(
+        { error: "Venue not found or you do not have access to it." },
+        { status: 422 },
+      );
+    }
+  }
 
   const resolvedSlug = slug?.trim() ? await uniqueSlug(slug.trim()) : undefined;
 
@@ -75,6 +97,7 @@ export async function POST(req: NextRequest) {
         eventDate: eventDate ? new Date(eventDate) : null,
         timezone: timezone || "UTC",
         slug: resolvedSlug ?? null,
+        venueId: venueId || null,
         ownerId: dbUser.id,
       },
     });

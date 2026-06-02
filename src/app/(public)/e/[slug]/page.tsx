@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { formatDateInZone } from "@/lib/format-time";
-import { Calendar, Clock } from "lucide-react";
+import { Calendar, Clock, MapPin } from "lucide-react";
+import { VenueStaticMap } from "@/components/ui/venue-static-map";
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = { readonly params: Promise<{ slug: string }> };
 
 const STATUS_LABELS: Record<string, string> = {
   SCHEDULED: "Upcoming",
@@ -31,6 +32,14 @@ export default async function PublicEventPage({ params }: Props) {
       eventDate: true,
       timezone: true,
       status: true,
+      venue: {
+        select: {
+          name: true,
+          address: true,
+          lat: true,
+          lng: true,
+        },
+      },
     },
   });
 
@@ -85,6 +94,31 @@ export default async function PublicEventPage({ params }: Props) {
             <span className="text-muted-foreground">{event.timezone}</span>
           </div>
         </div>
+
+        {/* Location */}
+        {event.venue && (
+          <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+            <div className="flex items-center gap-3 text-sm">
+              <MapPin className="size-4 shrink-0 text-accent" />
+              <div>
+                <p className="font-medium text-foreground">
+                  {event.venue.name}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {event.venue.address}
+                </p>
+              </div>
+            </div>
+            {event.venue.lat != null && event.venue.lng != null && (
+              <VenueStaticMap
+                lat={event.venue.lat}
+                lng={event.venue.lng}
+                name={event.venue.name}
+                address={event.venue.address}
+              />
+            )}
+          </div>
+        )}
 
         <p className="text-center text-xs text-muted-foreground">
           Powered by{" "}

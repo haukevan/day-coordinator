@@ -27,6 +27,7 @@ model User {
   updatedAt     DateTime @updatedAt
 
   ownedEvents        Event[]         @relation("EventOwner")
+  venues             Venue[]
   assignedTasks     Task[]          @relation("AssignedTo")
   activityLogs      ActivityLog[]
   vendorContacts    VendorContact[] @relation("VendorContacts")
@@ -48,6 +49,8 @@ model Event {
   liveStartedAt  DateTime?
   ownerId        String
   owner          User          @relation("EventOwner", fields: [ownerId], references: [id])
+  venueId        String?
+  venue          Venue?        @relation(fields: [venueId], references: [id])
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -203,5 +206,26 @@ model ActivityLog {
   action    String
   metadata  Json?
   createdAt DateTime @default(now())
+}
+
+// ─── Venue ───────────────────────────────────────────────────────────────────
+
+model Venue {
+  id          String   @id @default(cuid())
+  name        String
+  address     String
+  description String?
+  ownerName   String?
+  ownerPhone  String?
+  ownerEmail  String?
+  lat         Float?
+  lng         Float?
+  placeId     String?
+  creatorId   String
+  creator     User     @relation(fields: [creatorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  events Event[]
 }
 
