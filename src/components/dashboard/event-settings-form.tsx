@@ -34,9 +34,17 @@ export function EventSettingsForm({ event }: { event: EventData }) {
   const router = useRouter();
   const [title, setTitle] = useState(event.title);
   const [description, setDescription] = useState(event.description ?? "");
-  const [eventDate, setEventDate] = useState<Date | undefined>(
-    event.eventDate ? new Date(event.eventDate) : undefined,
-  );
+  // Parse event date as local noon so it survives timezone round-trips.
+  // event.eventDate comes from the API as an ISO string like "2026-06-03T12:00:00.000Z"
+  // We extract the date portion and construct a local-noon Date so that
+  // date-fns format() in the user's local timezone always yields the correct date.
+  const [eventDate, setEventDate] = useState<Date | undefined>(() => {
+    if (!event.eventDate) return undefined;
+    // Extract just the date part from the ISO string (handles both midnight and noon UTC)
+    const datePart = event.eventDate.split("T")[0];
+    // Construct as local noon — preserves the date regardless of timezone
+    return new Date(datePart + "T12:00:00");
+  });
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [timezone, setTimezone] = useState(event.timezone);
   const [slug, setSlug] = useState(event.slug ?? "");
@@ -99,6 +107,7 @@ export function EventSettingsForm({ event }: { event: EventData }) {
       body: JSON.stringify({
         title,
         description,
+        // Send only the date portion — server will store at UTC noon
         eventDate: eventDate ? format(eventDate, "yyyy-MM-dd") : null,
         timezone,
         slug: slug || null,

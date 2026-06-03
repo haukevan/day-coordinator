@@ -4,8 +4,9 @@
  * Rules:
  * - scheduledStart of a task = scheduledEnd of its parent (if parent exists)
  * - scheduledEnd = scheduledStart + durationMins
- * - manualOverride = true → stop propagation to children
- * - Delays propagate downstream unless child has manualOverride = true
+ * - Propagation is delta-based: when a parent's end shifts by +X min, all
+ *   descendants shift by +X min, preserving any buffers the user set.
+ * - manualOverride is no longer used; propagation always cascades.
  */
 
 import { prisma } from "@/lib/db/prisma";
@@ -40,9 +41,16 @@ export async function detectCycle(
 
 /**
  * Propagate a schedule change from a given task downward through the DAG.
- * Skips subtrees rooted at tasks with manualOverride = true.
+ *
+ * When deltaMs is provided, every descendant is shifted by that many
+ * milliseconds, preserving any buffer the user set between parent end
+ * and child start.  When deltaMs is omitted (e.g. for new tasks),
+ * children are set to start at the parent's end.
  */
-export async function propagateSchedule(taskId: string): Promise<void> {
+export async function propagateSchedule(
+  taskId: string,
+  deltaMs?: number,
+): Promise<void> {
   const task = await prisma.task.findUnique({ where: { id: taskId } });
   if (!task || !task.scheduledEnd) return;
 
@@ -51,9 +59,14 @@ export async function propagateSchedule(taskId: string): Promise<void> {
   });
 
   for (const child of children) {
-    if (child.manualOverride) continue; // break propagation chain
+    // Always propagate — buffers are preserved via delta shifting.
+    let newStart: Date;
+    if (deltaMs !== undefined && child.scheduledStart) {
+      newStart = new Date(child.scheduledStart.getTime() + deltaMs);
+    } else {
+      newStart = task.scheduledEnd;
+    }
 
-    const newStart = task.scheduledEnd;
     const newEnd =
       child.durationMins != null
         ? new Date(newStart.getTime() + child.durationMins * 60 * 1000)
@@ -67,7 +80,8 @@ export async function propagateSchedule(taskId: string): Promise<void> {
       },
     });
 
-    await propagateSchedule(child.id);
+    // Recurse with the same delta so grandchildren also shift.
+    await propagateSchedule(child.id, deltaMs);
   }
 }
 
@@ -79,7 +93,7 @@ export async function computeScheduledEnd(taskId: string): Promise<void> {
   if (!task || !task.scheduledStart || !task.durationMins) return;
 
   const scheduledEnd = new Date(
-    task.scheduledStart.getTime() + task.durationMins * 60 * 1000
+    task.scheduledStart.getTime() + task.durationMins * 60 * 1000,
   );
   await prisma.task.update({ where: { id: taskId }, data: { scheduledEnd } });
 }

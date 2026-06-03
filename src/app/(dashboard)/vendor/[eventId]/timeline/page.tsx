@@ -11,10 +11,14 @@ export default async function VendorTimelinePage({
 }) {
   const { eventId } = await params;
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const dbUser = await prisma.user.findUnique({ where: { supabaseId: user.id } });
+  const dbUser = await prisma.user.findUnique({
+    where: { supabaseId: user.id },
+  });
   if (!dbUser) redirect("/login");
 
   // Verify vendor membership (layout also checks, but keep defense-in-depth)
@@ -43,6 +47,7 @@ export default async function VendorTimelinePage({
     actualEnd: t.actualEnd ? t.actualEnd.toISOString() : null,
     durationMins: t.durationMins,
     manualOverride: t.manualOverride,
+    sequenceLabel: t.sequenceLabel,
     parentTaskId: t.parentTaskId,
     parentTask: t.parentTask ?? null,
     publicVisibility: t.publicVisibility,

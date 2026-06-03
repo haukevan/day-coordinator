@@ -49,7 +49,7 @@ export function VenueChipPopup({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1 truncate rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground max-w-[180px] hover:bg-hover hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-1 truncate rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground max-w-[120px] sm:max-w-[180px] hover:bg-hover hover:text-foreground transition-colors"
         >
           <MapPin className="size-3 shrink-0" />
           <span className="truncate">{name}</span>

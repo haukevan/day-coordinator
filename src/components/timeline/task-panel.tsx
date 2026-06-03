@@ -3,14 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { format, addMinutes } from "date-fns";
-import {
-  Clock,
-  ChevronDown,
-  Link2,
-  AlertTriangle,
-  Trash2,
-  Check,
-} from "lucide-react";
+import { Clock, ChevronDown, Link2, Trash2, Check } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -576,7 +569,6 @@ export function TaskPanel({
     task?.durationMins?.toString() ?? "",
   );
   const [parentTaskId, setParentTaskId] = useState(task?.parentTaskId ?? "");
-  const [startManuallyEdited, setStartManuallyEdited] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -591,13 +583,12 @@ export function TaskPanel({
     );
     setDurationStr(task?.durationMins?.toString() ?? "");
     setParentTaskId(task?.parentTaskId ?? "");
-    setStartManuallyEdited(false);
     setDeleting(false);
     setConfirmDelete(false);
     setError("");
   }, [task, timezone, open]);
 
-  // Auto-fill start time from parent's scheduledEnd when prerequisite changes
+  // Auto-fill start time from parent's scheduledEnd when blocking task changes.
   function handleParentChange(pid: string) {
     setParentTaskId(pid);
     if (pid) {
@@ -605,11 +596,9 @@ export function TaskPanel({
       if (parent?.scheduledEnd) {
         const parentEndHHMM = utcToLocalHHMM(parent.scheduledEnd, timezone);
         setStartHHMM(parentEndHHMM);
-        setStartManuallyEdited(false);
         return;
       }
     }
-    if (!pid) setStartManuallyEdited(false);
   }
 
   // Computed end time label
@@ -619,13 +608,17 @@ export function TaskPanel({
       ? computedEnd(startHHMM, durationMins)
       : null;
 
-  // Is the start time manually overriding the prerequisite's end?
+  // Compute buffer from parent's end to this task's start (in minutes).
+  // When parent shifts, this buffer is preserved.
   const parent = tasks.find((t) => t.id === parentTaskId);
-  const autoStartHHMM = parent?.scheduledEnd
+  const parentEndHHMM = parent?.scheduledEnd
     ? utcToLocalHHMM(parent.scheduledEnd, timezone)
     : null;
-  const isManualOverride =
-    Boolean(parentTaskId) && startManuallyEdited && startHHMM !== autoStartHHMM;
+  const bufferMins =
+    parentEndHHMM && startHHMM
+      ? Math.max(0, hhmmToMinutes(startHHMM) - hhmmToMinutes(parentEndHHMM))
+      : null;
+  const hasBuffer = bufferMins !== null && bufferMins > 0;
 
   const minInclusiveStartHHMM = parent?.scheduledEnd
     ? utcToLocalHHMM(parent.scheduledEnd, timezone)
@@ -800,11 +793,11 @@ export function TaskPanel({
             />
           </div>
 
-          {/* Prerequisite */}
+          {/* Blocked by */}
           <div className="flex flex-col gap-1.5">
             <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
               <Link2 className="size-3.5 text-muted-foreground" />
-              Prerequisite{" "}
+              Blocked by{" "}
               <span className="font-normal text-muted-foreground">
                 (optional)
               </span>
@@ -821,13 +814,27 @@ export function TaskPanel({
                   {t.scheduledEnd
                     ? ` · ends ${utcToLocalHHMM(t.scheduledEnd, timezone)}`
                     : ""}
+                  {t.status === "COMPLETED" ? " ✓" : ""}
                 </option>
               ))}
             </select>
-            {parentTaskId && !isManualOverride && (
+            {!parentTaskId && (
               <p className="text-xs text-muted-foreground">
-                This task starts when the prerequisite finishes. Delays
-                propagate automatically.
+                Choose a task that must finish before this one can start. If
+                that task shifts, this one moves with it automatically.
+              </p>
+            )}
+            {parentTaskId && (
+              <p className="text-xs text-muted-foreground">
+                Can&apos;t start until{" "}
+                <span className="font-medium text-foreground">
+                  {parent?.title ?? "blocking task"}
+                </span>{" "}
+                finishes
+                {hasBuffer
+                  ? ` · ${bufferMins} min buffer after`
+                  : " — starts right after"}
+                . If that task runs late, this one shifts to stay in sequence.
               </p>
             )}
           </div>
@@ -844,7 +851,6 @@ export function TaskPanel({
                 minInclusive={minInclusiveStartHHMM}
                 onChange={(hhmm) => {
                   setStartHHMM(hhmm);
-                  if (parentTaskId) setStartManuallyEdited(true);
                 }}
               />
               {minInclusiveStartHHMM && (
@@ -876,13 +882,16 @@ export function TaskPanel({
             </p>
           )}
 
-          {/* Manual override warning */}
-          {isManualOverride && (
-            <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/5 px-3 py-2.5">
-              <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" />
-              <p className="text-xs text-warning">
-                Start time is overriding the prerequisite. Schedule changes to
-                the prerequisite won&apos;t auto-cascade to this task.
+          {/* Buffer info */}
+          {hasBuffer && (
+            <div className="flex items-start gap-2 rounded-lg border border-info/40 bg-info/5 px-3 py-2.5">
+              <Clock className="mt-0.5 size-3.5 shrink-0 text-info" />
+              <p className="text-xs text-foreground">
+                {bufferMins} min buffer after{" "}
+                <span className="font-medium">
+                  {parent?.title ?? "blocking task"}
+                </span>
+                . If that task shifts, the buffer stays the same.
               </p>
             </div>
           )}

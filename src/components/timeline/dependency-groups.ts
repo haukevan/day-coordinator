@@ -116,9 +116,13 @@ export function buildDependencyGroupMeta(
     const rootId = findRootId(taskId);
     const rawIndex = rootToIndex.get(rootId) ?? 0;
     const style = DEPENDENCY_STYLES[rawIndex % DEPENDENCY_STYLES.length];
+    const rootTask = byId.get(rootId);
     metaByTask.set(taskId, {
       groupId: rootId,
-      groupLabel: `Chain ${rawIndex + 1}`,
+      groupLabel:
+        rootTask?.sequenceLabel ||
+        rootTask?.title ||
+        `Sequence ${rawIndex + 1}`,
       style,
     });
   }

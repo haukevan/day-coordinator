@@ -97,7 +97,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       ...(description !== undefined &&
         !isLocked && { description: description?.trim() || null }),
       ...(eventDate !== undefined &&
-        !isLocked && { eventDate: eventDate ? new Date(eventDate) : null }),
+        !isLocked && {
+          eventDate: eventDate ? new Date(eventDate + "T12:00:00.000Z") : null,
+        }),
       ...(timezone !== undefined && !isLocked && { timezone }),
       ...(slug !== undefined && !isLocked && { slug: slug?.trim() || null }),
       ...(venueId !== undefined && !isLocked && { venueId: venueId || null }),

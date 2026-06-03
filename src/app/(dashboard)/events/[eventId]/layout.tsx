@@ -88,30 +88,29 @@ export default async function EventLayout({
   return (
     <div className="flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden sm:h-dvh">
       {/* Event header */}
-      <div className="border-b border-border bg-card px-4 py-3 sm:px-6">
-        <Link
-          href="/dashboard"
-          className="mb-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="size-3.5" />
-          Events
-        </Link>
-
-        {/* Title row */}
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold text-foreground truncate">
+      <div className="border-b border-border bg-card px-3 py-2 sm:px-6 sm:py-3">
+        {/* Title row — back link merged inline */}
+        <div className="flex items-center gap-1.5">
+          <Link
+            href="/dashboard"
+            className="flex shrink-0 items-center justify-center size-7 -ml-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            aria-label="Back to events"
+          >
+            <ChevronLeft className="size-4" />
+          </Link>
+          <h1 className="text-base sm:text-lg font-semibold text-foreground truncate">
             {event.title}
           </h1>
           {status === "DRAFT" && <DraftWarningIcon eventId={event.id} />}
         </div>
 
         {/* Metadata row — status, date, venue */}
-        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
           <EventStatusButton eventId={event.id} status={status} />
           {eventDateInfo && (
             <span
               className={cn(
-                "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium",
+                "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium",
                 eventDateInfo.dateStatus === "today" &&
                   "bg-warning/15 text-warning",
                 eventDateInfo.dateStatus === "upcoming" &&
@@ -121,9 +120,16 @@ export default async function EventLayout({
               )}
             >
               <CalendarDays className="size-3" />
-              {eventDateInfo.dateStatus === "today"
-                ? `Today · ${eventDateInfo.formatted}`
-                : eventDateInfo.formatted}
+              <span className="sm:hidden">
+                {eventDateInfo.dateStatus === "today"
+                  ? "Today"
+                  : eventDateInfo.formatted}
+              </span>
+              <span className="hidden sm:inline">
+                {eventDateInfo.dateStatus === "today"
+                  ? `Today · ${eventDateInfo.formatted}`
+                  : eventDateInfo.formatted}
+              </span>
             </span>
           )}
           {event.venue && (
@@ -138,7 +144,7 @@ export default async function EventLayout({
           )}
         </div>
 
-        <div className="mt-3">
+        <div className="mt-2">
           <EventTabs eventId={event.id} userRole="admin" />
         </div>
       </div>

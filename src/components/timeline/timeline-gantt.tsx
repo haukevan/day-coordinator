@@ -3,7 +3,7 @@
 import { useMemo, useEffect, useRef, useState } from "react";
 import { toZonedTime } from "date-fns-tz";
 import { getHours, getMinutes } from "date-fns";
-import { Link2 } from "lucide-react";
+import { Link2, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buildDependencyGroupMeta } from "./dependency-groups";
 import type { SerializedTask } from "@/lib/types";
@@ -203,6 +203,8 @@ export function TimelineGantt({
     [tasks],
   );
 
+  const taskMap = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
+
   // Current-time indicator
   const [nowMin, setNowMin] = useState<number | null>(null);
   useEffect(() => {
@@ -323,6 +325,11 @@ export function TimelineGantt({
                 const widthPct = 100 / totalColumns;
                 const leftPct = (column / totalColumns) * 100;
                 const dependencyMeta = dependencyMetaByTask.get(task.id);
+                const parentTask = task.parentTaskId
+                  ? taskMap.get(task.parentTaskId)
+                  : undefined;
+                const isBlocked =
+                  Boolean(parentTask) && parentTask!.status !== "COMPLETED";
                 const colorClass =
                   STATUS_BLOCK[task.status] ?? STATUS_BLOCK.PENDING;
 
@@ -363,7 +370,10 @@ export function TimelineGantt({
                         {fmtMin(endMin)}
                       </p>
                     )}
-                    {dependencyMeta && height > 52 && (
+                    {isBlocked && height > 52 && (
+                      <Lock className="absolute bottom-1.5 right-1.5 size-3 text-warning opacity-60" />
+                    )}
+                    {!isBlocked && dependencyMeta && height > 52 && (
                       <Link2 className="absolute bottom-1.5 right-1.5 size-3 opacity-40" />
                     )}
                   </div>

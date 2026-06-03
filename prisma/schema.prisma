@@ -88,6 +88,7 @@ model Task {
   actualEnd        DateTime?
   durationMins     Int?
   manualOverride   Boolean    @default(false)
+  sequenceLabel    String?
   publicVisibility Boolean    @default(false)
   parentTaskId     String?
   parentTask       Task?      @relation("TaskDependency", fields: [parentTaskId], references: [id])

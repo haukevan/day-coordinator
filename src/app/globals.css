@@ -199,6 +199,14 @@
   }
 }
 
+@utility scrollbar-none {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 @theme inline {
   /* SURFACES */
   --color-background: hsl(var(--background));

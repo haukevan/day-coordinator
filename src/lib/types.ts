@@ -9,6 +9,7 @@ export type SerializedTask = {
   actualEnd: string | null;
   durationMins: number | null;
   manualOverride: boolean;
+  sequenceLabel: string | null;
   parentTaskId: string | null;
   parentTask?: { id: string; title: string } | null;
   publicVisibility: boolean;

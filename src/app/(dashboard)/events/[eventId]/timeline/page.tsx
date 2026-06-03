@@ -45,6 +45,7 @@ export default async function TimelinePage({
     actualEnd: t.actualEnd ? t.actualEnd.toISOString() : null,
     durationMins: t.durationMins,
     manualOverride: t.manualOverride,
+    sequenceLabel: t.sequenceLabel,
     parentTaskId: t.parentTaskId,
     parentTask: t.parentTask ?? null,
     publicVisibility: t.publicVisibility,

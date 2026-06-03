@@ -44,22 +44,22 @@ export function DraftBanner({ eventId, status }: Props) {
     <>
       <div
         className={cn(
-          "flex items-start gap-3 border-b border-warning/30 bg-warning/10 px-4 py-3 sm:px-6",
+          "flex items-start gap-2 border-b border-warning/30 bg-warning/10 px-3 py-2 sm:px-6 sm:py-3",
         )}
       >
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground">
+          <p className="text-xs sm:text-sm font-medium text-foreground truncate">
             This event is in draft mode
           </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-[11px] sm:text-xs text-muted-foreground line-clamp-1 sm:line-clamp-none">
             Vendors and guests won&apos;t be notified or invited until you
             upgrade to Scheduled.
           </p>
           <Button
             size="sm"
             variant="ghost"
-            className="mt-2 h-auto px-0 text-xs text-primary hover:text-primary/80 hover:bg-transparent"
+            className="mt-1 h-auto px-0 text-[11px] sm:text-xs text-primary hover:text-primary/80 hover:bg-transparent"
             onClick={() => setUpgradeOpen(true)}
           >
             Upgrade to Scheduled →

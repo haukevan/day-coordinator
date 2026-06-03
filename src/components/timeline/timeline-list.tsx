@@ -121,11 +121,12 @@ export function TimelineList({
     <div className="flex flex-col gap-2">
       {sorted.map(({ task, depth }) => {
         const dependencyMeta = dependencyMetaByTask.get(task.id);
-        const parentTitle = task.parentTaskId
-          ? (task.parentTask?.title ??
-            taskMap.get(task.parentTaskId)?.title ??
-            null)
+        const parentId = task.parentTaskId;
+        const parentTask = parentId ? taskMap.get(parentId) : undefined;
+        const parentTitle = parentId
+          ? (task.parentTask?.title ?? parentTask?.title ?? null)
           : null;
+        const parentStatus = parentTask?.status ?? null;
 
         return (
           <div
@@ -146,6 +147,7 @@ export function TimelineList({
               task={task}
               timezone={timezone}
               parentTitle={parentTitle}
+              parentStatus={parentStatus}
               dependencyMeta={dependencyMeta}
               onTaskClick={onTaskClick}
             />

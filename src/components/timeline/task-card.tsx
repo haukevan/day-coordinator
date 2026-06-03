@@ -1,4 +1,4 @@
-import { Link2 } from "lucide-react";
+import { Link2, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TaskStatusBadge } from "./task-status-badge";
 import { formatTimeInZone } from "@/lib/format-time";
@@ -39,17 +39,21 @@ export function TaskCard({
   task,
   timezone,
   parentTitle,
+  parentStatus,
   dependencyMeta,
   onTaskClick,
 }: {
   task: SerializedTask;
   timezone: string;
   parentTitle?: string | null;
+  parentStatus?: string | null;
   dependencyMeta?: DependencyGroupMeta;
   onTaskClick?: (task: SerializedTask) => void;
 }) {
   const style = statusStyles[task.status] ?? statusStyles.PENDING;
   const isClickable = Boolean(onTaskClick);
+  const isBlocked = Boolean(parentTitle) && parentStatus !== "COMPLETED";
+  const isFollowing = Boolean(parentTitle) && parentStatus === "COMPLETED";
 
   return (
     <div
@@ -60,6 +64,7 @@ export function TaskCard({
         "flex items-center gap-3 rounded-xl border border-l-[3px] px-4 py-3.5 transition-colors",
         style.wrapper,
         dependencyMeta ? dependencyMeta.style.railClass : "border-l-border",
+        isBlocked && "opacity-75",
         isClickable &&
           "cursor-pointer hover:ring-2 hover:ring-ring focus:outline-none focus:ring-2 focus:ring-ring",
       )}
@@ -91,13 +96,19 @@ export function TaskCard({
                 ? ` · ${formatDuration(task.durationMins)}`
                 : ""}
           </p>
-          {parentTitle && (
-            <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-              <Link2 className="size-3" />
-              {parentTitle}
+          {isBlocked && (
+            <span className="flex items-center gap-0.5 text-xs text-warning">
+              <Lock className="size-3" />
+              Blocked by {parentTitle}
             </span>
           )}
-          {dependencyMeta && (
+          {isFollowing && (
+            <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+              <Link2 className="size-3" />
+              Follows {parentTitle}
+            </span>
+          )}
+          {!parentTitle && dependencyMeta && (
             <span
               className={cn(
                 "inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium",

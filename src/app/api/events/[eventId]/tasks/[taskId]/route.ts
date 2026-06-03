@@ -37,14 +37,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const body = await req.json();
-  const {
-    title,
-    description,
-    durationMins,
-    scheduledStart,
-    parentTaskId,
-    manualOverride,
-  } = body;
+  const { title, description, durationMins, scheduledStart, parentTaskId } =
+    body;
 
   if (title !== undefined && !title?.trim()) {
     return NextResponse.json({ error: "Title is required." }, { status: 400 });
@@ -74,27 +68,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       );
   }
 
-  // Determine manualOverride value
-  const effectiveParentId =
-    newParentId !== undefined ? newParentId : task.parentTaskId;
-  const settingManualStart =
-    scheduledStart !== undefined && scheduledStart !== null;
-
-  let newManualOverride: boolean;
-  if ("manualOverride" in body && manualOverride !== undefined) {
-    newManualOverride = Boolean(manualOverride);
-  } else if (newParentId === null) {
-    newManualOverride = false;
-  } else if (settingManualStart && Boolean(effectiveParentId)) {
-    newManualOverride = true;
-  } else {
-    newManualOverride = task.manualOverride;
-  }
+  // Snapshot old scheduledEnd before the update so we can compute the delta
+  // for buffer-preserving propagation.
+  const oldScheduledEnd = task.scheduledEnd;
 
   // Build update payload
-  const updateData: Record<string, unknown> = {
-    manualOverride: newManualOverride,
-  };
+  const updateData: Record<string, unknown> = {};
   if (title !== undefined) updateData.title = title.trim();
   if ("description" in body)
     updateData.description = description?.trim() || null;
@@ -105,11 +84,26 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       ? new Date(scheduledStart)
       : null;
   if (newParentId !== undefined) updateData.parentTaskId = newParentId;
+  if ("sequenceLabel" in body)
+    updateData.sequenceLabel =
+      (body as Record<string, unknown>).sequenceLabel ?? null;
 
   await prisma.task.update({ where: { id: taskId }, data: updateData });
 
   await computeScheduledEnd(taskId);
-  await propagateSchedule(taskId);
+
+  // Compute how much the task's end shifted and propagate that delta
+  // downstream so every descendant keeps its buffer.
+  const updatedTask = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { scheduledEnd: true },
+  });
+  const deltaMs =
+    oldScheduledEnd && updatedTask?.scheduledEnd
+      ? updatedTask.scheduledEnd.getTime() - oldScheduledEnd.getTime()
+      : undefined;
+
+  await propagateSchedule(taskId, deltaMs);
 
   await prisma.activityLog.create({
     data: {
@@ -161,11 +155,25 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   // Keep the DAG valid by detaching direct children before deletion.
+  // Pass the sequence label down to the first child so the chain name survives.
   await prisma.$transaction(async (tx) => {
+    const firstChild = await tx.task.findFirst({
+      where: { eventId, parentTaskId: taskId },
+      orderBy: { scheduledStart: "asc" },
+      select: { id: true },
+    });
+
     await tx.task.updateMany({
       where: { eventId, parentTaskId: taskId },
       data: { parentTaskId: null, manualOverride: false },
     });
+
+    if (firstChild && task.sequenceLabel) {
+      await tx.task.update({
+        where: { id: firstChild.id },
+        data: { sequenceLabel: task.sequenceLabel },
+      });
+    }
 
     await tx.task.delete({ where: { id: taskId } });
 

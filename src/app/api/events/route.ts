@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
       data: {
         title: title.trim(),
         description: description?.trim() || null,
-        eventDate: eventDate ? new Date(eventDate) : null,
+        eventDate: eventDate ? new Date(eventDate + "T12:00:00.000Z") : null,
         timezone: timezone || "UTC",
         slug: resolvedSlug ?? null,
         venueId: venueId || null,

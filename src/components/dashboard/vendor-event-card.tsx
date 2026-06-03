@@ -20,7 +20,11 @@ interface VendorMembership {
   event: VendorEvent;
 }
 
-export function VendorEventCard({ membership }: { membership: VendorMembership }) {
+export function VendorEventCard({
+  membership,
+}: {
+  membership: VendorMembership;
+}) {
   const { event } = membership;
   const ownerName =
     [event.owner.firstName, event.owner.lastName].filter(Boolean).join(" ") ||
@@ -39,6 +43,7 @@ export function VendorEventCard({ membership }: { membership: VendorMembership }
             month: "long",
             day: "numeric",
             year: "numeric",
+            timeZone: "UTC",
           })}
         </p>
       )}
