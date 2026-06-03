@@ -48,6 +48,11 @@ export type SerializedVendorContact = {
   jobTitle: string | null;
 };
 
+export type SerializedVendorContactWithEvents = SerializedVendorContact & {
+  events?: LinkedEvent[];
+  _count?: { eventVendors: number };
+};
+
 export type SerializedVenue = {
   id: string;
   name: string;

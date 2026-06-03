@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import dynamic from "next/dynamic";
 import { AlertTriangle, Trash2, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,24 +10,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { LocationValue } from "@/components/ui/location-picker";
-import type { SerializedVenue, LinkedEvent } from "@/lib/types";
-
-const LocationPicker = dynamic(
-  () =>
-    import("@/components/ui/location-picker").then((mod) => ({
-      default: mod.LocationPicker,
-    })),
-  { ssr: false },
-);
+import type {
+  SerializedVendorContactWithEvents,
+  LinkedEvent,
+} from "@/lib/types";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface Props {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
-  readonly venue?: SerializedVenue | null;
-  readonly onSaved: (venue: SerializedVenue) => void;
+  readonly vendor?: SerializedVendorContactWithEvents | null;
+  readonly isSelf?: boolean;
+  readonly onSaved: (vendor: SerializedVendorContactWithEvents) => void;
   readonly onDeleted?: (id: string) => void;
 }
 
@@ -48,22 +41,23 @@ function formatLinkedEvents(events: LinkedEvent[]): string {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function VenueFormDialog({
+export function VendorFormDialog({
   open,
   onOpenChange,
-  venue,
+  vendor,
+  isSelf = false,
   onSaved,
   onDeleted,
 }: Props) {
-  const isEdit = !!venue;
+  const isEdit = !!vendor;
 
   // ── Form state ────────────────────────────────────────────────────────────
-  const [location, setLocation] = useState<LocationValue | null>(null);
-  const [venueName, setVenueName] = useState("");
-  const [venueDescription, setVenueDescription] = useState("");
-  const [venueOwnerName, setVenueOwnerName] = useState("");
-  const [venueOwnerPhone, setVenueOwnerPhone] = useState("");
-  const [venueOwnerEmail, setVenueOwnerEmail] = useState("");
+  const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [company, setCompany] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -74,42 +68,26 @@ export function VenueFormDialog({
 
   // ── Populate form when editing ────────────────────────────────────────────
   useEffect(() => {
-    if (open && venue) {
-      setVenueName(venue.name ?? "");
-      setVenueDescription(venue.description ?? "");
-      setVenueOwnerName(venue.ownerName ?? "");
-      setVenueOwnerPhone(venue.ownerPhone ?? "");
-      setVenueOwnerEmail(venue.ownerEmail ?? "");
-      setLocation(
-        venue.lat != null && venue.lng != null
-          ? {
-              name: venue.name,
-              address: venue.address,
-              lat: venue.lat,
-              lng: venue.lng,
-              placeId: venue.placeId ?? "",
-            }
-          : {
-              name: venue.name,
-              address: venue.address,
-              lat: 0,
-              lng: 0,
-              placeId: "",
-            },
-      );
-    } else if (open && !venue) {
+    if (open && vendor) {
+      setEmail(vendor.email ?? "");
+      setFirstName(vendor.firstName ?? "");
+      setLastName(vendor.lastName ?? "");
+      setPhone(vendor.phone ?? "");
+      setCompany(vendor.company ?? "");
+      setJobTitle(vendor.jobTitle ?? "");
+    } else if (open && !vendor) {
       resetForm();
     }
-  }, [open, venue]);
+  }, [open, vendor]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const resetForm = useCallback(() => {
-    setLocation(null);
-    setVenueName("");
-    setVenueDescription("");
-    setVenueOwnerName("");
-    setVenueOwnerPhone("");
-    setVenueOwnerEmail("");
+    setEmail("");
+    setFirstName("");
+    setLastName("");
+    setPhone("");
+    setCompany("");
+    setJobTitle("");
     setSaveError("");
     setDeleteError("");
     setConfirmDelete(false);
@@ -128,28 +106,23 @@ export function VenueFormDialog({
 
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
-    if (!location && !isEdit) return;
+    if (!email.trim() && !isEdit) return;
     setSaving(true);
     setSaveError("");
 
-    const body: Record<string, unknown> = {};
-    if (location) {
-      body.name = venueName.trim() || location.name;
-      body.address = location.address;
-      if (location.lat != null) body.lat = location.lat;
-      if (location.lng != null) body.lng = location.lng;
-      if (location.placeId?.trim()) body.placeId = location.placeId.trim();
-    } else {
-      body.name = venueName.trim();
-      body.address = venue?.address ?? "";
-    }
-    if (venueDescription.trim()) body.description = venueDescription.trim();
-    if (venueOwnerName.trim()) body.ownerName = venueOwnerName.trim();
-    if (venueOwnerPhone.trim()) body.ownerPhone = venueOwnerPhone.trim();
-    if (venueOwnerEmail.trim()) body.ownerEmail = venueOwnerEmail.trim();
+    const body: Record<string, unknown> = {
+      email: email.trim().toLowerCase(),
+    };
+    if (firstName.trim()) body.firstName = firstName.trim();
+    if (lastName.trim()) body.lastName = lastName.trim();
+    if (phone.trim()) body.phone = phone.trim();
+    if (company.trim()) body.company = company.trim();
+    if (jobTitle.trim()) body.jobTitle = jobTitle.trim();
 
     try {
-      const url = isEdit ? `/api/venues/${venue!.id}` : "/api/venues";
+      const url = isEdit
+        ? `/api/user/vendor-contacts/${vendor!.id}`
+        : "/api/user/vendor-contacts";
       const method = isEdit ? "PATCH" : "POST";
 
       const res = await fetch(url, {
@@ -160,17 +133,17 @@ export function VenueFormDialog({
 
       const data = await res.json();
       if (res.ok) {
-        // Merge existing events data from the original venue so the card
+        // Merge existing events data from the original vendor so the card
         // still shows linked events after edit
         const merged = {
-          ...(data.venue ?? data),
-          events: venue?.events,
-          _count: venue?._count,
+          ...(data.contact ?? data),
+          events: vendor?.events,
+          _count: vendor?._count,
         };
         onSaved(merged);
         handleOpenChange(false);
       } else {
-        setSaveError(data.error ?? "Failed to save venue.");
+        setSaveError(data.error ?? "Failed to save vendor.");
       }
     } catch {
       setSaveError("Network error. Please try again.");
@@ -178,21 +151,21 @@ export function VenueFormDialog({
       setSaving(false);
     }
   }, [
-    location,
+    email,
+    firstName,
+    lastName,
+    phone,
+    company,
+    jobTitle,
     isEdit,
-    venue,
-    venueName,
-    venueDescription,
-    venueOwnerName,
-    venueOwnerPhone,
-    venueOwnerEmail,
+    vendor,
     onSaved,
     handleOpenChange,
   ]);
 
   // ── Delete ────────────────────────────────────────────────────────────────
   const handleDelete = useCallback(async () => {
-    if (!venue) return;
+    if (!vendor) return;
 
     // Two-step confirm
     if (!confirmDelete) {
@@ -204,16 +177,16 @@ export function VenueFormDialog({
     setDeleteError("");
 
     try {
-      const res = await fetch(`/api/venues/${venue.id}`, {
+      const res = await fetch(`/api/user/vendor-contacts/${vendor.id}`, {
         method: "DELETE",
       });
 
       if (res.ok) {
-        onDeleted?.(venue.id);
+        onDeleted?.(vendor.id);
         handleOpenChange(false);
       } else {
         const data = await res.json();
-        setDeleteError(data.error ?? "Failed to delete venue.");
+        setDeleteError(data.error ?? "Failed to delete vendor.");
         setConfirmDelete(false);
       }
     } catch {
@@ -222,11 +195,11 @@ export function VenueFormDialog({
     } finally {
       setDeleting(false);
     }
-  }, [venue, confirmDelete, onDeleted, handleOpenChange]);
+  }, [vendor, confirmDelete, onDeleted, handleOpenChange]);
 
   // ── Derived ───────────────────────────────────────────────────────────────
-  const linkedCount = isEdit ? (venue?._count?.events ?? 0) : 0;
-  const linkedEvents = isEdit ? (venue?.events ?? []) : [];
+  const linkedCount = isEdit ? (vendor?._count?.eventVendors ?? 0) : 0;
+  const linkedEvents = isEdit ? (vendor?.events ?? []) : [];
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -234,12 +207,12 @@ export function VenueFormDialog({
       <DialogContent className="max-h-[90dvh] overflow-y-auto overflow-x-hidden sm:max-w-md min-w-0">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold text-foreground">
-            {isEdit ? "Edit venue" : "New venue"}
+            {isEdit ? "Edit vendor" : "New vendor"}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
             {isEdit
-              ? "Update this venue's details."
-              : "Add a venue you can reuse across events."}
+              ? "Update this vendor's contact details."
+              : "Add a vendor to your contact book."}
           </DialogDescription>
         </DialogHeader>
 
@@ -249,8 +222,8 @@ export function VenueFormDialog({
             <AlertTriangle className="size-4 shrink-0 text-warning" />
             <div className="min-w-0">
               <p className="text-xs font-medium text-warning break-words">
-                This venue is linked to {linkedCount} event
-                {linkedCount !== 1 ? "s" : ""}
+                This vendor is linked to {linkedCount} event
+                {linkedCount === 1 ? "" : "s"}
               </p>
               <ul className="mt-1 list-none space-y-0.5">
                 {linkedEvents.map((e) => (
@@ -263,7 +236,7 @@ export function VenueFormDialog({
                 ))}
               </ul>
               <p className="mt-1.5 text-xs text-muted-foreground">
-                Changes you make here will affect how this venue appears in the
+                Changes you make here will affect how this vendor appears in the
                 above events.
               </p>
             </div>
@@ -271,115 +244,122 @@ export function VenueFormDialog({
         )}
 
         <div className="space-y-4">
-          {/* Venue name */}
+          {/* Email */}
           <div>
             <label
-              htmlFor="vf-venue-name"
+              htmlFor="vf-vendor-email"
               className="mb-1.5 block text-xs font-medium text-muted-foreground"
             >
-              Venue name <span className="text-destructive">*</span>
+              Email <span className="text-destructive">*</span>
             </label>
             <input
-              id="vf-venue-name"
-              type="text"
-              value={venueName}
-              onChange={(e) => setVenueName(e.target.value)}
-              maxLength={200}
-              placeholder="e.g. The Grand Ballroom"
+              id="vf-vendor-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              maxLength={254}
+              placeholder="vendor@example.com"
               className={inputClass}
+              disabled={isEdit}
               autoFocus={!isEdit}
             />
+            {isEdit && (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Email cannot be changed after creation.
+              </p>
+            )}
           </div>
 
-          {/* Address via map */}
-          <div>
-            <span className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              Address <span className="text-destructive">*</span>
-            </span>
-            <LocationPicker
-              value={location}
-              onChange={(loc) => {
-                setLocation(loc);
-                if (loc && !venueName.trim()) {
-                  setVenueName(loc.name);
-                }
-              }}
-            />
+          {/* Name row */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label
+                htmlFor="vf-vendor-first-name"
+                className="mb-1.5 block text-xs font-medium text-muted-foreground"
+              >
+                First name
+              </label>
+              <input
+                id="vf-vendor-first-name"
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                maxLength={128}
+                placeholder="e.g. Jane"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="vf-vendor-last-name"
+                className="mb-1.5 block text-xs font-medium text-muted-foreground"
+              >
+                Last name
+              </label>
+              <input
+                id="vf-vendor-last-name"
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                maxLength={128}
+                placeholder="e.g. Smith"
+                className={inputClass}
+              />
+            </div>
           </div>
 
-          {/* Description */}
+          {/* Phone */}
           <div>
             <label
-              htmlFor="vf-venue-description"
+              htmlFor="vf-vendor-phone"
               className="mb-1.5 block text-xs font-medium text-muted-foreground"
             >
-              Description
+              Phone
             </label>
-            <textarea
-              id="vf-venue-description"
-              value={venueDescription}
-              onChange={(e) => setVenueDescription(e.target.value)}
-              rows={2}
-              maxLength={1000}
-              placeholder="Brief description of the venue…"
-              className={cn(inputClass, "resize-none")}
+            <input
+              id="vf-vendor-phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              maxLength={20}
+              placeholder="(555) 123-4567"
+              className={inputClass}
             />
           </div>
 
+          {/* Company & job title */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {/* Owner name */}
             <div>
               <label
-                htmlFor="vf-owner-name"
+                htmlFor="vf-vendor-company"
                 className="mb-1.5 block text-xs font-medium text-muted-foreground"
               >
-                Venue contact name
+                Company
               </label>
               <input
-                id="vf-owner-name"
+                id="vf-vendor-company"
                 type="text"
-                value={venueOwnerName}
-                onChange={(e) => setVenueOwnerName(e.target.value)}
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
                 maxLength={128}
-                placeholder="e.g. Jane Smith"
+                placeholder="e.g. ABC Catering"
                 className={inputClass}
               />
             </div>
-
-            {/* Owner phone */}
             <div>
               <label
-                htmlFor="vf-owner-phone"
+                htmlFor="vf-vendor-job-title"
                 className="mb-1.5 block text-xs font-medium text-muted-foreground"
               >
-                Venue contact phone
+                Job title
               </label>
               <input
-                id="vf-owner-phone"
-                type="tel"
-                value={venueOwnerPhone}
-                onChange={(e) => setVenueOwnerPhone(e.target.value)}
-                maxLength={20}
-                placeholder="(555) 123-4567"
-                className={inputClass}
-              />
-            </div>
-
-            {/* Owner email */}
-            <div className="sm:col-span-2">
-              <label
-                htmlFor="vf-owner-email"
-                className="mb-1.5 block text-xs font-medium text-muted-foreground"
-              >
-                Venue contact email
-              </label>
-              <input
-                id="vf-owner-email"
-                type="email"
-                value={venueOwnerEmail}
-                onChange={(e) => setVenueOwnerEmail(e.target.value)}
-                maxLength={254}
-                placeholder="manager@venue.com"
+                id="vf-vendor-job-title"
+                type="text"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                maxLength={128}
+                placeholder="e.g. Head Chef"
                 className={inputClass}
               />
             </div>
@@ -394,7 +374,7 @@ export function VenueFormDialog({
             <AlertTriangle className="size-4 shrink-0 text-destructive mt-0.5" />
             <div className="min-w-0">
               <p className="text-xs font-medium text-destructive break-words">
-                This venue will be removed from {linkedCount} event
+                This vendor will be removed from {linkedCount} event
                 {linkedCount === 1 ? "" : "s"}
               </p>
               <ul className="mt-1 list-none space-y-0.5">
@@ -413,24 +393,31 @@ export function VenueFormDialog({
 
         {/* Actions row */}
         <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
-          {/* Delete — bottom left (edit only) */}
+          {/* Delete — bottom left (edit only; hidden for self) */}
           <div>
-            {isEdit && onDeleted && (
+            {isEdit && isSelf && (
+              <p className="text-[11px] text-muted-foreground">
+                You cannot delete your own vendor profile.
+              </p>
+            )}
+            {isEdit && !isSelf && onDeleted && (
               <Button
                 type="button"
                 variant={confirmDelete ? "destructive" : "ghost"}
                 size={linkedCount > 0 && confirmDelete ? "sm" : "icon"}
                 aria-label={
-                  confirmDelete ? "Confirm delete venue" : "Delete venue"
+                  confirmDelete ? "Confirm delete vendor" : "Delete vendor"
                 }
                 title={
-                  confirmDelete ? "Tap again to confirm delete" : "Delete venue"
+                  confirmDelete
+                    ? "Tap again to confirm delete"
+                    : "Delete vendor"
                 }
                 onClick={handleDelete}
                 disabled={saving || deleting}
               >
                 {linkedCount > 0 && confirmDelete ? (
-                  "Delete venue"
+                  "Delete vendor"
                 ) : confirmDelete ? (
                   <Check className="size-4" />
                 ) : (
@@ -455,9 +442,9 @@ export function VenueFormDialog({
               type="button"
               size="sm"
               onClick={handleSave}
-              disabled={(!location && !isEdit) || saving || deleting}
+              disabled={(!email.trim() && !isEdit) || saving || deleting}
             >
-              {saving ? "Saving…" : isEdit ? "Save changes" : "Save venue"}
+              {saving ? "Saving…" : isEdit ? "Save changes" : "Save vendor"}
             </Button>
           </div>
         </div>
