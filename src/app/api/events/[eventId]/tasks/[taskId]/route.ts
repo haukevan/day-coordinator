@@ -37,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const body = await req.json();
-  const { title, description, durationMins, scheduledStart, parentTaskId } =
+  const { title, description, scheduledEnd, scheduledStart, parentTaskId } =
     body;
 
   if (title !== undefined && !title?.trim()) {
@@ -72,17 +72,41 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   // for buffer-preserving propagation.
   const oldScheduledEnd = task.scheduledEnd;
 
+  // Compute durationMins from scheduledEnd and scheduledStart when end is provided
+  const changingStart = scheduledStart !== undefined;
+  const startDate: Date | null | undefined = changingStart
+    ? scheduledStart
+      ? new Date(scheduledStart)
+      : null
+    : undefined;
+  const changingEnd = "scheduledEnd" in body;
+  const endDate: Date | null | undefined = changingEnd
+    ? scheduledEnd
+      ? new Date(scheduledEnd)
+      : null
+    : undefined;
+
+  function resolveDurationMins(
+    sd: Date | null | undefined,
+    ed: Date | null | undefined,
+  ): number | null | undefined {
+    if (ed === undefined || sd === undefined) return undefined;
+    if (!ed || !sd) return null;
+    if (Number.isNaN(ed.getTime()) || Number.isNaN(sd.getTime())) return null;
+    const mins = Math.round((ed.getTime() - sd.getTime()) / 60_000);
+    return mins > 0 ? mins : null;
+  }
+
+  const durationMins = resolveDurationMins(startDate, endDate);
+
   // Build update payload
   const updateData: Record<string, unknown> = {};
   if (title !== undefined) updateData.title = title.trim();
   if ("description" in body)
     updateData.description = description?.trim() || null;
-  if (durationMins !== undefined)
-    updateData.durationMins = durationMins ?? null;
-  if (scheduledStart !== undefined)
-    updateData.scheduledStart = scheduledStart
-      ? new Date(scheduledStart)
-      : null;
+  if (durationMins !== undefined) updateData.durationMins = durationMins;
+  if (scheduledStart !== undefined) updateData.scheduledStart = startDate;
+  if (endDate !== undefined) updateData.scheduledEnd = endDate;
   if (newParentId !== undefined) updateData.parentTaskId = newParentId;
   if ("sequenceLabel" in body)
     updateData.sequenceLabel =
@@ -90,7 +114,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   await prisma.task.update({ where: { id: taskId }, data: updateData });
 
-  await computeScheduledEnd(taskId);
+  // Fallback: compute scheduledEnd from durationMins if end wasn't provided
+  const endIsMissing = endDate !== undefined ? !endDate : !task.scheduledEnd;
+  if (endIsMissing) {
+    await computeScheduledEnd(taskId);
+  }
 
   // Compute how much the task's end shifted and propagate that delta
   // downstream so every descendant keeps its buffer.

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
-import { format, addMinutes } from "date-fns";
-import { Clock, ChevronDown, Link2, Trash2, Check } from "lucide-react";
+import { format } from "date-fns";
+import { ChevronDown, Clock, Link2, Trash2, Check, X } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -89,10 +89,12 @@ function TimePickerPopover({
   value,
   onChange,
   minInclusive,
+  onClear,
 }: Readonly<{
   value: string;
   onChange: (hhmm: string) => void;
   minInclusive?: string | null;
+  onClear?: () => void;
 }>) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{
@@ -121,6 +123,12 @@ function TimePickerPopover({
   function isSelectable(h: number, m: number, p: "AM" | "PM") {
     if (minInclusiveMinutes === null) return true;
     return hhmmToMinutes(to24h(h, m, p)) >= minInclusiveMinutes;
+  }
+
+  /** Check if *any* minute in the given hour is selectable (uses max minute 55). */
+  function isHourSelectable(h: number, p: "AM" | "PM") {
+    if (minInclusiveMinutes === null) return true;
+    return hhmmToMinutes(to24h(h, 55, p)) >= minInclusiveMinutes;
   }
 
   useEffect(() => {
@@ -195,6 +203,28 @@ function TimePickerPopover({
     onChange(to24h(h, m, p));
   }
 
+  /** Commit an hour selection, auto-adjusting minutes up if needed. */
+  function commitHour(h: number) {
+    setSelH(h);
+    if (minInclusiveMinutes === null) {
+      onChange(to24h(h, selM, selPeriod));
+      return;
+    }
+    const currentMins = hhmmToMinutes(to24h(h, selM, selPeriod));
+    if (currentMins >= minInclusiveMinutes) {
+      onChange(to24h(h, selM, selPeriod));
+      return;
+    }
+    // Find the first 5-min increment that meets the minimum
+    const firstValidM = MINUTES_5.find(
+      (m) => hhmmToMinutes(to24h(h, m, selPeriod)) >= minInclusiveMinutes,
+    );
+    if (firstValidM !== undefined) {
+      setSelM(firstValidM);
+      onChange(to24h(h, firstValidM, selPeriod));
+    }
+  }
+
   return (
     <>
       <button
@@ -202,12 +232,27 @@ function TimePickerPopover({
         type="button"
         onClick={handleTrigger}
         className={cn(
-          "flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring",
+          "flex w-full items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring",
           value ? "text-foreground" : "text-muted-foreground",
         )}
       >
         <Clock className="size-3.5 shrink-0 text-muted-foreground" />
-        {value ? formatTimeDisplay(value) : "Select time"}
+        <span className="flex-1 text-left">
+          {value ? formatTimeDisplay(value) : "Select time"}
+        </span>
+        {onClear && value && (
+          <button
+            type="button"
+            aria-label="Clear time"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            className="-mr-1 flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
       </button>
 
       {open && pos && (
@@ -228,7 +273,7 @@ function TimePickerPopover({
           >
             {HOURS_12.map((h) =>
               (() => {
-                const selectable = isSelectable(h, selM, selPeriod);
+                const selectable = isHourSelectable(h, selPeriod);
                 return (
                   <button
                     key={h}
@@ -236,8 +281,7 @@ function TimePickerPopover({
                     data-selected={selH === h ? "true" : undefined}
                     disabled={!selectable}
                     onClick={() => {
-                      setSelH(h);
-                      commit(h, selM, selPeriod);
+                      commitHour(h);
                     }}
                     className={cn(
                       "rounded-md px-3 py-1.5 text-sm transition-colors",
@@ -328,211 +372,13 @@ function TimePickerPopover({
   );
 }
 
-// ── Duration picker ─────────────────────────────────────────────────────────
-
-const DURATION_SUGGESTIONS = [
-  { mins: 5, label: "5 min" },
-  { mins: 10, label: "10 min" },
-  { mins: 15, label: "15 min" },
-  { mins: 20, label: "20 min" },
-  { mins: 30, label: "30 min" },
-  { mins: 45, label: "45 min" },
-  { mins: 60, label: "1 hr" },
-  { mins: 75, label: "1 hr 15 min" },
-  { mins: 90, label: "1 hr 30 min" },
-  { mins: 105, label: "1 hr 45 min" },
-  { mins: 120, label: "2 hr" },
-  { mins: 135, label: "2 hr 15 min" },
-  { mins: 150, label: "2 hr 30 min" },
-  { mins: 165, label: "2 hr 45 min" },
-  { mins: 180, label: "3 hr" },
-  { mins: 210, label: "3 hr 30 min" },
-  { mins: 240, label: "4 hr" },
-  { mins: 270, label: "4 hr 30 min" },
-  { mins: 300, label: "5 hr" },
-];
-
-function computeDurationDropdownPosition(r: DOMRect) {
-  const viewportPadding = 12;
-  const gap = 4;
-  const preferredHeight = 280;
-  const spaceBelow = window.innerHeight - r.bottom - viewportPadding;
-  const spaceAbove = r.top - viewportPadding;
-  const opensUp = spaceBelow < 180 && spaceAbove > spaceBelow;
-  const maxHeight = Math.max(120, opensUp ? spaceAbove : spaceBelow);
-  const heightForTop = Math.min(preferredHeight, maxHeight);
-  const top = opensUp
-    ? Math.max(viewportPadding, r.top - heightForTop - gap)
-    : r.bottom + gap;
-  const width = Math.min(r.width, window.innerWidth - viewportPadding * 2);
-  const left = Math.max(
-    viewportPadding,
-    Math.min(r.left, window.innerWidth - width - viewportPadding),
-  );
-  return { top, left, width, maxHeight };
-}
-
-/** Format the computed end time given a start HH:mm and duration in minutes. */
-function formatEndTimeFromStart(
-  startHHMM: string,
-  durationMins: number,
-): string | null {
-  const [h, m] = startHHMM.split(":").map(Number);
-  if (Number.isNaN(h) || Number.isNaN(m) || durationMins <= 0) return null;
-  const totalMins = h * 60 + m + durationMins;
-  const endH = Math.floor(totalMins / 60) % 24;
-  const endM = totalMins % 60;
-  return format(new Date(0, 0, 0, endH, endM), "h:mm a");
-}
-
-function DurationInput({
-  value,
-  onChange,
-  startHHMM,
-}: Readonly<{
-  value: string;
-  onChange: (v: string) => void;
-  startHHMM?: string;
-}>) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{
-    top: number;
-    left: number;
-    width: number;
-    maxHeight: number;
-  } | null>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: PointerEvent) {
-      if (
-        !dropdownRef.current?.contains(e.target as Node) &&
-        !wrapRef.current?.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open]);
-
-  function handleToggle() {
-    if (open) {
-      setOpen(false);
-      return;
-    }
-    if (wrapRef.current) {
-      const r = wrapRef.current.getBoundingClientRect();
-      setPos(computeDurationDropdownPosition(r));
-    }
-    setOpen(true);
-  }
-
-  function handleInputClick(e: React.MouseEvent<HTMLInputElement>) {
-    e.currentTarget.select();
-    if (!open) {
-      if (wrapRef.current) {
-        const r = wrapRef.current.getBoundingClientRect();
-        setPos(computeDurationDropdownPosition(r));
-      }
-      setOpen(true);
-    }
-  }
-
-  const numValue = value ? Number.parseInt(value, 10) : Number.NaN;
-
-  return (
-    <>
-      <div ref={wrapRef} className="relative">
-        <input
-          type="number"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          min="1"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onClick={handleInputClick}
-          placeholder="e.g. 60"
-          className="w-full rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-        />
-        <button
-          type="button"
-          onClick={handleToggle}
-          className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ChevronDown
-            className={cn(
-              "size-3.5 transition-transform duration-150",
-              open && "rotate-180",
-            )}
-          />
-        </button>
-      </div>
-
-      {open && pos && (
-        <div
-          ref={dropdownRef}
-          style={{
-            position: "fixed",
-            top: pos.top,
-            left: pos.left,
-            width: pos.width,
-            maxHeight: pos.maxHeight,
-          }}
-          className="z-[9999] overflow-y-auto rounded-lg bg-popover py-1 shadow-md ring-1 ring-foreground/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {DURATION_SUGGESTIONS.map(({ mins, label }) => {
-            const endTime = startHHMM
-              ? formatEndTimeFromStart(startHHMM, mins)
-              : null;
-            return (
-              <button
-                key={mins}
-                type="button"
-                onClick={() => {
-                  onChange(String(mins));
-                  setOpen(false);
-                }}
-                className={cn(
-                  "w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                  !Number.isNaN(numValue) && numValue === mins
-                    ? "bg-primary text-primary-foreground"
-                    : "text-foreground",
-                )}
-              >
-                <span>{label}</span>
-                {endTime && (
-                  <span className="ml-1.5 text-muted-foreground">
-                    — {endTime}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </>
-  );
-}
-
-/** Compute end HH:mm from start HH:mm + duration. Returns null if inputs invalid. */
-function computedEnd(
-  startHHMM: string,
-  durationMins: number,
-): { hhmm: string; label: string } | null {
-  const [h, m] = startHHMM.split(":").map(Number);
-  if (isNaN(h) || isNaN(m) || durationMins <= 0) return null;
-  const totalMins = h * 60 + m + durationMins;
-  const endH = Math.floor(totalMins / 60) % 24;
-  const endM = totalMins % 60;
-  const hhmm = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
-
-  // Build 12h label for the start
-  const startLabel = format(addMinutes(new Date(0, 0, 0, h, m), 0), "h:mm a");
-  const endLabel = format(new Date(0, 0, 0, endH, endM), "h:mm a");
-  return { hhmm, label: `${startLabel} → ${endLabel}` };
+/** Format duration in minutes as a human-readable string, e.g. "1hr 30min". */
+function formatDurationLabel(totalMins: number): string {
+  const h = Math.floor(totalMins / 60);
+  const m = totalMins % 60;
+  if (h === 0) return `${m}min`;
+  if (m === 0) return `${h}hr`;
+  return `${h}hr ${m}min`;
 }
 
 // ── TaskPanel ─────────────────────────────────────────────────────────────────
@@ -565,8 +411,8 @@ export function TaskPanel({
   const [startHHMM, setStartHHMM] = useState(
     task?.scheduledStart ? utcToLocalHHMM(task.scheduledStart, timezone) : "",
   );
-  const [durationStr, setDurationStr] = useState(
-    task?.durationMins?.toString() ?? "",
+  const [endHHMM, setEndHHMM] = useState(
+    task?.scheduledEnd ? utcToLocalHHMM(task.scheduledEnd, timezone) : "",
   );
   const [parentTaskId, setParentTaskId] = useState(task?.parentTaskId ?? "");
   const [saving, setSaving] = useState(false);
@@ -581,31 +427,59 @@ export function TaskPanel({
     setStartHHMM(
       task?.scheduledStart ? utcToLocalHHMM(task.scheduledStart, timezone) : "",
     );
-    setDurationStr(task?.durationMins?.toString() ?? "");
+    setEndHHMM(
+      task?.scheduledEnd ? utcToLocalHHMM(task.scheduledEnd, timezone) : "",
+    );
     setParentTaskId(task?.parentTaskId ?? "");
     setDeleting(false);
     setConfirmDelete(false);
     setError("");
   }, [task, timezone, open]);
 
-  // Auto-fill start time from parent's scheduledEnd when blocking task changes.
+  // Auto-fill times from parent's scheduledEnd when blocking task changes.
   function handleParentChange(pid: string) {
     setParentTaskId(pid);
-    if (pid) {
-      const parent = tasks.find((t) => t.id === pid);
-      if (parent?.scheduledEnd) {
-        const parentEndHHMM = utcToLocalHHMM(parent.scheduledEnd, timezone);
-        setStartHHMM(parentEndHHMM);
-        return;
+    if (!pid) return;
+
+    const parent = tasks.find((t) => t.id === pid);
+    if (!parent?.scheduledEnd) return;
+
+    const parentEndHHMM = utcToLocalHHMM(parent.scheduledEnd, timezone);
+
+    if (startHHMM && endHHMM) {
+      // Both start and end are set — preserve duration, shift both
+      const origDuration = hhmmToMinutes(endHHMM) - hhmmToMinutes(startHHMM);
+      setStartHHMM(parentEndHHMM);
+      if (origDuration > 0) {
+        const newEndTotalMins = hhmmToMinutes(parentEndHHMM) + origDuration;
+        const endH = Math.floor(newEndTotalMins / 60) % 24;
+        const endM = newEndTotalMins % 60;
+        setEndHHMM(
+          `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`,
+        );
       }
+    } else if (!startHHMM && endHHMM) {
+      // Only end is set, no start — set both to parent's end
+      setStartHHMM(parentEndHHMM);
+      setEndHHMM(parentEndHHMM);
+    } else {
+      // Only start set (or neither) — just update start
+      setStartHHMM(parentEndHHMM);
     }
   }
 
-  // Computed end time label
-  const durationMins = durationStr ? parseInt(durationStr, 10) : NaN;
-  const endInfo =
-    startHHMM && !isNaN(durationMins)
-      ? computedEnd(startHHMM, durationMins)
+  // Computed duration from start and end times
+  const startMins = startHHMM ? hhmmToMinutes(startHHMM) : Number.NaN;
+  const endMins = endHHMM ? hhmmToMinutes(endHHMM) : Number.NaN;
+  const durationMins =
+    !Number.isNaN(startMins) && !Number.isNaN(endMins) && endMins > startMins
+      ? endMins - startMins
+      : Number.NaN;
+
+  // Summary label: "12:00 PM - 1:00 PM (1hr)"
+  const summaryLabel =
+    startHHMM && endHHMM && !Number.isNaN(durationMins)
+      ? `${formatTimeDisplay(startHHMM)} - ${formatTimeDisplay(endHHMM)} (${formatDurationLabel(durationMins)})`
       : null;
 
   // Compute buffer from parent's end to this task's start (in minutes).
@@ -668,12 +542,15 @@ export function TaskPanel({
     setError("");
 
     const scheduledStartISO = localHHMMToUtcISO(eventDate, startHHMM, timezone);
+    const scheduledEndISO = endHHMM
+      ? localHHMMToUtcISO(eventDate, endHHMM, timezone)
+      : null;
 
     const payload: Record<string, unknown> = {
       title: title.trim(),
       description: description.trim() || null,
-      durationMins: !isNaN(durationMins) ? durationMins : null,
       scheduledStart: scheduledStartISO,
+      scheduledEnd: scheduledEndISO,
       parentTaskId: parentTaskId || null,
     };
 
@@ -751,7 +628,7 @@ export function TaskPanel({
         className="flex w-full flex-col sm:max-w-xl"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <SheetHeader className="px-5">
+        <SheetHeader className="px-4">
           <SheetTitle>{isEdit ? "Edit task" : "New task"}</SheetTitle>
           <SheetDescription>
             {isEdit
@@ -762,7 +639,7 @@ export function TaskPanel({
 
         <form
           onSubmit={handleSubmit}
-          className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto px-5 pb-4"
+          className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
         >
           {/* Title */}
           <div className="flex flex-col gap-1.5">
@@ -805,22 +682,25 @@ export function TaskPanel({
                 (optional)
               </span>
             </label>
-            <select
-              value={parentTaskId}
-              onChange={(e) => handleParentChange(e.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="">None</option>
-              {eligiblePrereqs.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title}
-                  {t.scheduledEnd
-                    ? ` · ends ${utcToLocalHHMM(t.scheduledEnd, timezone)}`
-                    : ""}
-                  {t.status === "COMPLETED" ? " ✓" : ""}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={parentTaskId}
+                onChange={(e) => handleParentChange(e.target.value)}
+                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">None</option>
+                {eligiblePrereqs.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title}
+                    {t.scheduledEnd
+                      ? ` · ends ${utcToLocalHHMM(t.scheduledEnd, timezone)}`
+                      : ""}
+                    {t.status === "COMPLETED" ? " ✓" : ""}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            </div>
             {!parentTaskId && (
               <p className="text-xs text-muted-foreground">
                 Choose a task that must finish before this one can start. If
@@ -842,8 +722,8 @@ export function TaskPanel({
             )}
           </div>
 
-          {/* Start + Duration row */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Start + End row */}
+          <div className="grid grid-cols-2 gap-2">
             <div className="flex flex-col gap-1.5">
               <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                 <Clock className="size-3.5 text-muted-foreground" />
@@ -864,24 +744,27 @@ export function TaskPanel({
               )}
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">
-                Duration (min)
+              <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                <Clock className="size-3.5 text-muted-foreground" />
+                End time
               </label>
-              <DurationInput
-                value={durationStr}
-                onChange={setDurationStr}
-                startHHMM={startHHMM || undefined}
+              <TimePickerPopover
+                value={endHHMM}
+                minInclusive={startHHMM || undefined}
+                onChange={(hhmm) => {
+                  setEndHHMM(hhmm);
+                }}
+                onClear={() => setEndHHMM("")}
               />
             </div>
           </div>
 
-          {/* Computed end time */}
-          {endInfo && (
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {/* Summary: "12:00 PM - 1:00 PM (1hr)" */}
+          {summaryLabel && (
+            <p className="text-xs text-muted-foreground">
               <span className="font-medium text-foreground">
-                {endInfo.label}
+                {summaryLabel}
               </span>
-              <span>({durationMins} min)</span>
             </p>
           )}
 

@@ -65,7 +65,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
-  const { title, description, durationMins, parentTaskId, scheduledStart } =
+  const { title, description, scheduledEnd, parentTaskId, scheduledStart } =
     body;
 
   if (!title?.trim()) {
@@ -77,6 +77,17 @@ export async function POST(req: NextRequest, { params }: Params) {
       { error: "Start time is required." },
       { status: 400 },
     );
+  }
+
+  // Compute durationMins from scheduledEnd and scheduledStart
+  const startDate = new Date(scheduledStart);
+  const endDate = scheduledEnd ? new Date(scheduledEnd) : null;
+  let durationMins: number | null = null;
+  if (endDate && !Number.isNaN(endDate.getTime())) {
+    durationMins = Math.round(
+      (endDate.getTime() - startDate.getTime()) / 60_000,
+    );
+    if (durationMins <= 0) durationMins = null;
   }
 
   // Validate parentTaskId belongs to same event
@@ -105,14 +116,15 @@ export async function POST(req: NextRequest, { params }: Params) {
       eventId,
       title: title.trim(),
       description: description?.trim() || null,
-      durationMins: durationMins ?? null,
+      durationMins,
+      scheduledEnd: endDate,
       parentTaskId: parentTaskId ?? null,
-      scheduledStart: scheduledStart ? new Date(scheduledStart) : null,
+      scheduledStart: startDate,
     },
   });
 
-  // Compute scheduled end if we have start + duration
-  if (task.scheduledStart && task.durationMins) {
+  // Fallback: compute scheduledEnd from durationMins if end wasn't provided
+  if (task.scheduledStart && task.durationMins && !task.scheduledEnd) {
     await computeScheduledEnd(task.id);
   }
 
