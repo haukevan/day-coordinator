@@ -746,7 +746,11 @@ export function TaskPanel({
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="right" className="flex w-full flex-col sm:max-w-xl">
+      <SheetContent
+        side="right"
+        className="flex w-full flex-col sm:max-w-xl"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <SheetHeader className="px-5">
           <SheetTitle>{isEdit ? "Edit task" : "New task"}</SheetTitle>
           <SheetDescription>
@@ -770,7 +774,6 @@ export function TaskPanel({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Bridal party photos"
-              autoFocus
               required
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />

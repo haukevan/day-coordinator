@@ -204,7 +204,10 @@ export function VendorFormDialog({
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto overflow-x-hidden sm:max-w-md min-w-0">
+      <DialogContent
+        className="max-h-[90dvh] overflow-y-auto overflow-x-hidden sm:max-w-md min-w-0"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-base font-semibold text-foreground">
             {isEdit ? "Edit vendor" : "New vendor"}
@@ -261,7 +264,6 @@ export function VendorFormDialog({
               placeholder="vendor@example.com"
               className={inputClass}
               disabled={isEdit}
-              autoFocus={!isEdit}
             />
             {isEdit && (
               <p className="mt-1 text-[11px] text-muted-foreground">

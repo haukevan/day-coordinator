@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { SerializedVendor } from "@/lib/types";
 
@@ -22,10 +27,17 @@ interface Props {
   onUpdated: (v: SerializedVendor) => void;
 }
 
-export function EditVendorDialog({ eventId, vendor, onClose, onUpdated }: Props) {
+export function EditVendorDialog({
+  eventId,
+  vendor,
+  onClose,
+  onUpdated,
+}: Props) {
   const [firstName, setFirstName] = useState(vendor.firstName ?? "");
   const [lastName, setLastName] = useState(vendor.lastName ?? "");
-  const existingDigits = vendor.phone?.startsWith("+1") ? vendor.phone.slice(2) : "";
+  const existingDigits = vendor.phone?.startsWith("+1")
+    ? vendor.phone.slice(2)
+    : "";
   const [phoneDigits, setPhoneDigits] = useState(existingDigits);
   const [company, setCompany] = useState(vendor.company ?? "");
   const [jobTitle, setJobTitle] = useState(vendor.jobTitle ?? "");
@@ -62,7 +74,10 @@ export function EditVendorDialog({ eventId, vendor, onClose, onUpdated }: Props)
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent
+        className="max-w-md"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Edit vendor</DialogTitle>
         </DialogHeader>
@@ -70,7 +85,9 @@ export function EditVendorDialog({ eventId, vendor, onClose, onUpdated }: Props)
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-foreground">First name</label>
+              <label className="mb-1 block text-xs font-medium text-foreground">
+                First name
+              </label>
               <input
                 type="text"
                 value={firstName}
@@ -81,7 +98,9 @@ export function EditVendorDialog({ eventId, vendor, onClose, onUpdated }: Props)
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-foreground">Last name</label>
+              <label className="mb-1 block text-xs font-medium text-foreground">
+                Last name
+              </label>
               <input
                 type="text"
                 value={lastName}
@@ -94,7 +113,9 @@ export function EditVendorDialog({ eventId, vendor, onClose, onUpdated }: Props)
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">Phone</label>
+            <label className="mb-1 block text-xs font-medium text-foreground">
+              Phone
+            </label>
             <div className="flex items-center gap-2">
               <span className="flex h-[38px] items-center rounded-lg border border-border bg-muted px-3 text-sm text-muted-foreground select-none">
                 +1
@@ -106,18 +127,26 @@ export function EditVendorDialog({ eventId, vendor, onClose, onUpdated }: Props)
                 onChange={(e) => {
                   const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
                   setPhoneDigits(digits);
-                  setPhoneError(digits.length > 0 && digits.length < 10 ? "Please enter a valid 10-digit phone number." : "");
+                  setPhoneError(
+                    digits.length > 0 && digits.length < 10
+                      ? "Please enter a valid 10-digit phone number."
+                      : "",
+                  );
                 }}
                 className={inputClass}
                 placeholder="(555) 123-4567"
                 maxLength={14}
               />
             </div>
-            {phoneError && <p className="mt-1 text-xs text-destructive">{phoneError}</p>}
+            {phoneError && (
+              <p className="mt-1 text-xs text-destructive">{phoneError}</p>
+            )}
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">Company</label>
+            <label className="mb-1 block text-xs font-medium text-foreground">
+              Company
+            </label>
             <input
               type="text"
               value={company}
@@ -129,7 +158,9 @@ export function EditVendorDialog({ eventId, vendor, onClose, onUpdated }: Props)
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">Job title</label>
+            <label className="mb-1 block text-xs font-medium text-foreground">
+              Job title
+            </label>
             <input
               type="text"
               value={jobTitle}
@@ -141,7 +172,9 @@ export function EditVendorDialog({ eventId, vendor, onClose, onUpdated }: Props)
           </div>
 
           {error && (
-            <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>
+            <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {error}
+            </p>
           )}
 
           <div className="flex justify-end gap-2 pt-2">

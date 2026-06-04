@@ -231,7 +231,10 @@ export function VenueFormDialog({
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto overflow-x-hidden sm:max-w-md min-w-0">
+      <DialogContent
+        className="max-h-[90dvh] overflow-y-auto overflow-x-hidden sm:max-w-md min-w-0"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-base font-semibold text-foreground">
             {isEdit ? "Edit venue" : "New venue"}
@@ -287,7 +290,6 @@ export function VenueFormDialog({
               maxLength={200}
               placeholder="e.g. The Grand Ballroom"
               className={inputClass}
-              autoFocus={!isEdit}
             />
           </div>
 

@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { SerializedVendor } from "@/lib/types";
 
@@ -63,7 +68,10 @@ export function AddVendorDialog({ eventId, onClose, onAdded }: Props) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent
+        className="max-w-md"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Add new contact</DialogTitle>
         </DialogHeader>
@@ -76,9 +84,11 @@ export function AddVendorDialog({ eventId, onClose, onAdded }: Props) {
             <input
               type="email"
               required
-              autoFocus
               value={email}
-              onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(""); }}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (emailError) setEmailError("");
+              }}
               onBlur={() => {
                 if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
                   setEmailError("Please enter a valid email address.");
@@ -87,12 +97,16 @@ export function AddVendorDialog({ eventId, onClose, onAdded }: Props) {
               placeholder="jane@example.com"
               maxLength={254}
             />
-            {emailError && <p className="mt-1 text-xs text-destructive">{emailError}</p>}
+            {emailError && (
+              <p className="mt-1 text-xs text-destructive">{emailError}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-foreground">First name</label>
+              <label className="mb-1 block text-xs font-medium text-foreground">
+                First name
+              </label>
               <input
                 type="text"
                 value={firstName}
@@ -103,7 +117,9 @@ export function AddVendorDialog({ eventId, onClose, onAdded }: Props) {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-foreground">Last name</label>
+              <label className="mb-1 block text-xs font-medium text-foreground">
+                Last name
+              </label>
               <input
                 type="text"
                 value={lastName}
@@ -116,7 +132,9 @@ export function AddVendorDialog({ eventId, onClose, onAdded }: Props) {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">Phone</label>
+            <label className="mb-1 block text-xs font-medium text-foreground">
+              Phone
+            </label>
             <div className="flex items-center gap-2">
               <span className="flex h-[38px] items-center rounded-lg border border-border bg-muted px-3 text-sm text-muted-foreground select-none">
                 +1
@@ -128,18 +146,26 @@ export function AddVendorDialog({ eventId, onClose, onAdded }: Props) {
                 onChange={(e) => {
                   const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
                   setPhoneDigits(digits);
-                  setPhoneError(digits.length > 0 && digits.length < 10 ? "Please enter a valid 10-digit phone number." : "");
+                  setPhoneError(
+                    digits.length > 0 && digits.length < 10
+                      ? "Please enter a valid 10-digit phone number."
+                      : "",
+                  );
                 }}
                 className={inputClass}
                 placeholder="(555) 123-4567"
                 maxLength={14}
               />
             </div>
-            {phoneError && <p className="mt-1 text-xs text-destructive">{phoneError}</p>}
+            {phoneError && (
+              <p className="mt-1 text-xs text-destructive">{phoneError}</p>
+            )}
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">Company</label>
+            <label className="mb-1 block text-xs font-medium text-foreground">
+              Company
+            </label>
             <input
               type="text"
               value={company}
@@ -151,7 +177,9 @@ export function AddVendorDialog({ eventId, onClose, onAdded }: Props) {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">Job title</label>
+            <label className="mb-1 block text-xs font-medium text-foreground">
+              Job title
+            </label>
             <input
               type="text"
               value={jobTitle}
@@ -163,14 +191,21 @@ export function AddVendorDialog({ eventId, onClose, onAdded }: Props) {
           </div>
 
           {error && (
-            <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>
+            <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {error}
+            </p>
           )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !email.trim() || !!emailError || !!phoneError}>
+            <Button
+              type="submit"
+              disabled={
+                loading || !email.trim() || !!emailError || !!phoneError
+              }
+            >
               {loading ? "Adding…" : "Add contact"}
             </Button>
           </div>

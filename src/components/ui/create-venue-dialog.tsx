@@ -96,7 +96,10 @@ export function CreateVenueDialog({ open, onOpenChange, onCreated }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-auto sm:max-w-md">
+      <DialogContent
+        className="max-h-[90dvh] overflow-auto sm:max-w-md"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <h2 className="text-base font-semibold text-foreground">New venue</h2>
           <p className="text-xs text-muted-foreground">
@@ -121,7 +124,6 @@ export function CreateVenueDialog({ open, onOpenChange, onCreated }: Props) {
               maxLength={200}
               placeholder="e.g. The Grand Ballroom"
               className={inputClass}
-              autoFocus
             />
           </div>
 

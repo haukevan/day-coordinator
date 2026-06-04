@@ -40,7 +40,11 @@ export function OnboardingForm({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
       setPhoneDigits(digits);
-      setPhoneError(digits.length > 0 && digits.length < 10 ? "Please enter a valid 10-digit phone number." : "");
+      setPhoneError(
+        digits.length > 0 && digits.length < 10
+          ? "Please enter a valid 10-digit phone number."
+          : "",
+      );
     },
     [],
   );
@@ -121,7 +125,6 @@ export function OnboardingForm({
               <input
                 type="text"
                 autoComplete="given-name"
-                autoFocus={!onboarded}
                 required
                 maxLength={64}
                 value={firstName}
@@ -191,7 +194,9 @@ export function OnboardingForm({
           <Button
             type="submit"
             className="w-full"
-            disabled={loading || !firstName.trim() || !lastName.trim() || !!phoneError}
+            disabled={
+              loading || !firstName.trim() || !lastName.trim() || !!phoneError
+            }
           >
             {loading ? "Saving…" : onboarded ? "Save changes" : "Continue"}
           </Button>
