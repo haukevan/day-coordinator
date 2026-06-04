@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { TimelineView } from "@/components/timeline/timeline-view";
@@ -58,16 +59,18 @@ export default async function VendorTimelinePage({
   }));
 
   return (
-    <TimelineView
-      eventId={eventId}
-      tasks={serializedTasks}
-      timezone={eventVendor.event.timezone}
-      eventDate={
-        eventVendor.event.eventDate
-          ? eventVendor.event.eventDate.toISOString()
-          : null
-      }
-      userRole="vendor"
-    />
+    <Suspense fallback={null}>
+      <TimelineView
+        eventId={eventId}
+        tasks={serializedTasks}
+        timezone={eventVendor.event.timezone}
+        eventDate={
+          eventVendor.event.eventDate
+            ? eventVendor.event.eventDate.toISOString()
+            : null
+        }
+        userRole="vendor"
+      />
+    </Suspense>
   );
 }

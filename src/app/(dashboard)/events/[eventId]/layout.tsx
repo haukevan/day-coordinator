@@ -5,7 +5,9 @@ import { EventStatusButton } from "@/components/event/event-status-button";
 import { DraftBanner, DraftWarningIcon } from "@/components/event/draft-banner";
 import { VenueChipPopup } from "@/components/event/venue-chip-popup";
 import { EventTabs } from "@/components/dashboard/event-tabs";
+import { TimelineToolbar } from "@/components/timeline/timeline-toolbar";
 import Link from "next/link";
+import { Suspense } from "react";
 import { ChevronLeft, CalendarDays } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
 import { cn } from "@/lib/utils";
@@ -145,7 +147,15 @@ export default async function EventLayout({
         </div>
 
         <div className="mt-2">
-          <EventTabs eventId={event.id} userRole="admin" />
+          <EventTabs
+            eventId={event.id}
+            userRole="admin"
+            rightContent={
+              <Suspense fallback={null}>
+                <TimelineToolbar />
+              </Suspense>
+            }
+          />
         </div>
       </div>
 
