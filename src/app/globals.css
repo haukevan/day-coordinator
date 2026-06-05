@@ -4,198 +4,229 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Dark Blue + Champagne Theme */
 @layer base {
   :root {
     /* =========================================================
        BACKGROUNDS & SURFACES
     ========================================================= */
-    --background: 24 33% 98%;
-    --foreground: 340 18% 18%;
+    --background: 36 28% 98%;
+    --foreground: 217 34% 18%;
     --card: 0 0% 100%;
-    --card-foreground: 340 18% 18%;
+    --card-foreground: 217 34% 18%;
     --popover: 0 0% 100%;
-    --popover-foreground: 340 18% 18%;
+    --popover-foreground: 217 34% 18%;
 
     /* =========================================================
        BRAND COLORS
     ========================================================= */
-    --primary: 344 42% 63%;
+    --primary: 217 49% 24%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 18 24% 90%;
-    --secondary-foreground: 340 18% 18%;
-    --accent: 8 72% 68%;
-    --accent-foreground: 0 0% 100%;
-    --muted: 12 28% 94%;
-    --muted-foreground: 340 10% 45%;
+
+    --secondary: 36 28% 92%;
+    --secondary-foreground: 217 34% 18%;
+
+    --accent: 33 36% 83%;
+    --accent-foreground: 217 49% 24%;
+
+    --muted: 36 18% 95%;
+    --muted-foreground: 217 15% 42%;
 
     /* =========================================================
        UI ELEMENTS
     ========================================================= */
-    --border: 18 18% 86%;
-    --input: 18 18% 86%;
-    --ring: 344 42% 63%;
+    --border: 35 18% 87%;
+    --input: 35 18% 87%;
+    --ring: 217 49% 24%;
     --radius: 0.5rem;
 
     /* =========================================================
        STATUS COLORS
     ========================================================= */
-    --success: 142 28% 52%;
+    --success: 145 32% 44%;
     --success-foreground: 0 0% 100%;
-    --warning: 36 88% 62%;
-    --warning-foreground: 340 18% 18%;
-    --destructive: 0 65% 58%;
+
+    --warning: 38 90% 55%;
+    --warning-foreground: 217 34% 18%;
+
+    --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 100%;
-    --info: 204 62% 60%;
+
+    --info: 205 72% 54%;
     --info-foreground: 0 0% 100%;
 
     /* =========================================================
        INTERACTION STATES
     ========================================================= */
-    --hover: 344 32% 92%;
-    --active: 344 42% 56%;
-    --disabled: 20 14% 92%;
-    --disabled-foreground: 340 8% 60%;
+    --hover: 36 28% 94%;
+    --active: 217 49% 30%;
+
+    --disabled: 36 12% 92%;
+    --disabled-foreground: 217 10% 58%;
 
     /* =========================================================
        SCHEDULING / CALENDAR COLORS
     ========================================================= */
-    --event-personal: 278 38% 64%;
-    --event-client: 344 42% 63%;
-    --event-vendor: 142 28% 52%;
-    --event-deadline: 0 65% 58%;
-    --event-travel: 30 82% 64%;
-    --event-blocked: 340 8% 55%;
+    --event-personal: 270 40% 60%;
+    --event-client: 217 49% 24%;
+    --event-vendor: 145 32% 44%;
+    --event-deadline: 0 70% 55%;
+    --event-travel: 38 90% 55%;
+    --event-blocked: 217 12% 55%;
 
     /* =========================================================
        DEPENDENCY CHAIN COLORS
     ========================================================= */
-    --dependency-1: 344 50% 52%;
+    --dependency-1: 217 49% 34%;
     --dependency-1-foreground: 0 0% 100%;
-    --dependency-2: 22 74% 52%;
+
+    --dependency-2: 28 82% 52%;
     --dependency-2-foreground: 0 0% 100%;
-    --dependency-3: 205 70% 48%;
+
+    --dependency-3: 205 72% 52%;
     --dependency-3-foreground: 0 0% 100%;
-    --dependency-4: 152 42% 40%;
+
+    --dependency-4: 150 38% 42%;
     --dependency-4-foreground: 0 0% 100%;
-    --dependency-5: 268 44% 52%;
+
+    --dependency-5: 270 44% 54%;
     --dependency-5-foreground: 0 0% 100%;
 
     /* =========================================================
-       SIDEBAR (maps to card surface)
+       SIDEBAR
     ========================================================= */
     --sidebar: 0 0% 100%;
-    --sidebar-foreground: 340 18% 18%;
-    --sidebar-primary: 344 42% 63%;
+    --sidebar-foreground: 217 34% 18%;
+
+    --sidebar-primary: 217 49% 24%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 8 72% 68%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 18 18% 86%;
-    --sidebar-ring: 344 42% 63%;
+
+    --sidebar-accent: 33 36% 83%;
+    --sidebar-accent-foreground: 217 49% 24%;
+
+    --sidebar-border: 35 18% 87%;
+    --sidebar-ring: 217 49% 24%;
 
     /* =========================================================
-       CHART COLORS (mapped to event palette)
+       CHART COLORS
     ========================================================= */
-    --chart-1: 344 42% 63%;
-    --chart-2: 142 28% 52%;
-    --chart-3: 278 38% 64%;
-    --chart-4: 30 82% 64%;
-    --chart-5: 204 62% 60%;
+    --chart-1: 217 49% 24%;
+    --chart-2: 145 32% 44%;
+    --chart-3: 270 40% 60%;
+    --chart-4: 38 90% 55%;
+    --chart-5: 205 72% 54%;
   }
 
   .dark {
     /* =========================================================
        BACKGROUNDS & SURFACES
     ========================================================= */
-    --background: 330 16% 10%;
-    --foreground: 24 30% 96%;
-    --card: 330 14% 14%;
-    --card-foreground: 24 30% 96%;
-    --popover: 330 14% 14%;
-    --popover-foreground: 24 30% 96%;
+    --background: 220 22% 9%;
+    --foreground: 36 24% 95%;
+
+    --card: 220 18% 13%;
+    --card-foreground: 36 24% 95%;
+
+    --popover: 220 18% 13%;
+    --popover-foreground: 36 24% 95%;
 
     /* =========================================================
        BRAND COLORS
     ========================================================= */
-    --primary: 344 52% 70%;
-    --primary-foreground: 330 16% 10%;
-    --secondary: 330 10% 22%;
-    --secondary-foreground: 24 30% 96%;
-    --accent: 8 78% 70%;
-    --accent-foreground: 330 16% 10%;
-    --muted: 330 10% 20%;
-    --muted-foreground: 24 12% 72%;
+    --primary: 33 36% 83%;
+    --primary-foreground: 217 49% 18%;
+
+    --secondary: 220 14% 20%;
+    --secondary-foreground: 36 24% 95%;
+
+    --accent: 217 49% 38%;
+    --accent-foreground: 0 0% 100%;
+
+    --muted: 220 14% 18%;
+    --muted-foreground: 36 10% 70%;
 
     /* =========================================================
        UI ELEMENTS
     ========================================================= */
-    --border: 330 10% 24%;
-    --input: 330 10% 24%;
-    --ring: 344 52% 70%;
+    --border: 220 12% 24%;
+    --input: 220 12% 24%;
+    --ring: 33 36% 83%;
 
     /* =========================================================
        STATUS COLORS
     ========================================================= */
-    --success: 142 34% 58%;
-    --success-foreground: 330 16% 10%;
-    --warning: 36 90% 66%;
-    --warning-foreground: 330 16% 10%;
-    --destructive: 0 72% 64%;
-    --destructive-foreground: 330 16% 10%;
-    --info: 204 72% 66%;
-    --info-foreground: 330 16% 10%;
+    --success: 145 38% 56%;
+    --success-foreground: 220 22% 9%;
+
+    --warning: 38 90% 66%;
+    --warning-foreground: 220 22% 9%;
+
+    --destructive: 0 78% 65%;
+    --destructive-foreground: 220 22% 9%;
+
+    --info: 205 78% 66%;
+    --info-foreground: 220 22% 9%;
 
     /* =========================================================
        INTERACTION STATES
     ========================================================= */
-    --hover: 330 10% 18%;
-    --active: 344 52% 62%;
-    --disabled: 330 8% 18%;
-    --disabled-foreground: 24 8% 52%;
+    --hover: 220 14% 17%;
+    --active: 33 36% 75%;
+
+    --disabled: 220 10% 17%;
+    --disabled-foreground: 36 8% 50%;
 
     /* =========================================================
        SCHEDULING / CALENDAR COLORS
     ========================================================= */
-    --event-personal: 278 48% 70%;
-    --event-client: 344 52% 70%;
-    --event-vendor: 142 34% 58%;
-    --event-deadline: 0 72% 64%;
-    --event-travel: 30 86% 68%;
-    --event-blocked: 24 10% 58%;
+    --event-personal: 270 50% 72%;
+    --event-client: 33 36% 83%;
+    --event-vendor: 145 38% 56%;
+    --event-deadline: 0 78% 65%;
+    --event-travel: 38 90% 66%;
+    --event-blocked: 220 8% 60%;
 
     /* =========================================================
        DEPENDENCY CHAIN COLORS
     ========================================================= */
-    --dependency-1: 344 58% 66%;
-    --dependency-1-foreground: 330 16% 10%;
-    --dependency-2: 24 84% 66%;
-    --dependency-2-foreground: 330 16% 10%;
-    --dependency-3: 204 78% 68%;
-    --dependency-3-foreground: 330 16% 10%;
-    --dependency-4: 146 44% 62%;
-    --dependency-4-foreground: 330 16% 10%;
-    --dependency-5: 272 56% 72%;
-    --dependency-5-foreground: 330 16% 10%;
+    --dependency-1: 33 36% 83%;
+    --dependency-1-foreground: 217 49% 18%;
+
+    --dependency-2: 28 88% 66%;
+    --dependency-2-foreground: 220 22% 9%;
+
+    --dependency-3: 205 78% 66%;
+    --dependency-3-foreground: 220 22% 9%;
+
+    --dependency-4: 145 38% 60%;
+    --dependency-4-foreground: 220 22% 9%;
+
+    --dependency-5: 270 54% 74%;
+    --dependency-5-foreground: 220 22% 9%;
 
     /* =========================================================
-       SIDEBAR (maps to card surface)
+       SIDEBAR
     ========================================================= */
-    --sidebar: 330 14% 14%;
-    --sidebar-foreground: 24 30% 96%;
-    --sidebar-primary: 344 52% 70%;
-    --sidebar-primary-foreground: 330 16% 10%;
-    --sidebar-accent: 8 78% 70%;
-    --sidebar-accent-foreground: 330 16% 10%;
-    --sidebar-border: 330 10% 24%;
-    --sidebar-ring: 344 52% 70%;
+    --sidebar: 220 18% 13%;
+    --sidebar-foreground: 36 24% 95%;
+
+    --sidebar-primary: 33 36% 83%;
+    --sidebar-primary-foreground: 217 49% 18%;
+
+    --sidebar-accent: 217 49% 38%;
+    --sidebar-accent-foreground: 0 0% 100%;
+
+    --sidebar-border: 220 12% 24%;
+    --sidebar-ring: 33 36% 83%;
 
     /* =========================================================
-       CHART COLORS (mapped to event palette dark)
+       CHART COLORS
     ========================================================= */
-    --chart-1: 344 52% 70%;
-    --chart-2: 142 34% 58%;
-    --chart-3: 278 48% 70%;
-    --chart-4: 30 86% 68%;
-    --chart-5: 204 72% 66%;
+    --chart-1: 33 36% 83%;
+    --chart-2: 145 38% 56%;
+    --chart-3: 270 50% 72%;
+    --chart-4: 38 90% 66%;
+    --chart-5: 205 78% 66%;
   }
 }
 

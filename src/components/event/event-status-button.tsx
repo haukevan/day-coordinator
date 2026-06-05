@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,12 +47,17 @@ type Props = {
   status: EventStatus;
 };
 
-export function EventStatusButton({ eventId, status }: Props) {
-  const router = useRouter();
+export function EventStatusButton({ eventId, status: initialStatus }: Props) {
+  const [status, setStatus] = useState(initialStatus);
   const config = statusConfig[status] ?? statusConfig.DRAFT;
   const available = transitions[status] ?? [];
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
+
+  // Sync if parent re-renders with a different status
+  useEffect(() => {
+    setStatus(initialStatus);
+  }, [initialStatus]);
 
   async function handleTransition(to: EventStatus) {
     if (to === "SCHEDULED" && status === "DRAFT") {
@@ -70,7 +74,7 @@ export function EventStatusButton({ eventId, status }: Props) {
     setTransitioning(false);
 
     if (res.ok) {
-      router.refresh();
+      setStatus(to);
     }
   }
 
@@ -127,6 +131,7 @@ export function EventStatusButton({ eventId, status }: Props) {
         eventId={eventId}
         open={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
+        onUpgraded={() => setStatus("SCHEDULED")}
       />
     </>
   );

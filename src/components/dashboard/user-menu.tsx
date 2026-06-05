@@ -21,14 +21,18 @@ interface Props {
   variant?: "icon" | "sidebar";
 }
 
-export function UserMenu({ initials, displayName, email, variant = "icon" }: Props) {
+export function UserMenu({
+  initials,
+  displayName,
+  email,
+  variant = "icon",
+}: Props) {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
 
   async function signOut() {
     await fetch("/api/auth/signout", { method: "POST" });
     router.push("/login");
-    router.refresh();
   }
 
   return (
@@ -40,7 +44,9 @@ export function UserMenu({ initials, displayName, email, variant = "icon" }: Pro
               {initials}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-foreground">{displayName}</p>
+              <p className="truncate text-xs font-medium text-foreground">
+                {displayName}
+              </p>
               <p className="truncate text-xs text-muted-foreground">{email}</p>
             </div>
           </button>
@@ -65,7 +71,10 @@ export function UserMenu({ initials, displayName, email, variant = "icon" }: Pro
         <DropdownMenuSeparator />
 
         <DropdownMenuItem asChild>
-          <a href="/onboarding" className="flex items-center gap-2 cursor-pointer">
+          <a
+            href="/onboarding"
+            className="flex items-center gap-2 cursor-pointer"
+          >
             <User className="size-4" />
             Profile
           </a>
@@ -77,7 +86,11 @@ export function UserMenu({ initials, displayName, email, variant = "icon" }: Pro
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           className="flex items-center gap-2 cursor-pointer"
         >
-          {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          {theme === "dark" ? (
+            <Sun className="size-4" />
+          ) : (
+            <Moon className="size-4" />
+          )}
           {theme === "dark" ? "Light mode" : "Dark mode"}
         </DropdownMenuItem>
 
@@ -85,7 +98,9 @@ export function UserMenu({ initials, displayName, email, variant = "icon" }: Pro
 
         <DropdownMenuItem
           onClick={signOut}
-          className={cn("flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive")}
+          className={cn(
+            "flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive",
+          )}
         >
           <LogOut className="size-4" />
           Sign out

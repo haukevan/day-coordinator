@@ -1,32 +1,13 @@
 "use client";
 
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useCallback } from "react";
 import { List, BarChart2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTimelineView } from "./timeline-view-context";
 import { cn } from "@/lib/utils";
 
 export function TimelineToolbar() {
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
-  const router = useRouter();
-
-  const view = searchParams.get("view") || "list";
-
-  const setView = useCallback(
-    (newView: "list" | "gantt") => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("view", newView);
-      router.replace(`${pathname}?${params.toString()}`);
-    },
-    [searchParams, pathname, router],
-  );
-
-  const openCreate = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("panel", "create");
-    router.replace(`${pathname}?${params.toString()}`);
-  }, [searchParams, pathname, router]);
+  const { view, setView, openCreatePanel } = useTimelineView();
 
   return (
     <div className="flex items-center gap-1.5">
@@ -59,7 +40,7 @@ export function TimelineToolbar() {
         </button>
       </div>
 
-      <Button size="lg" onClick={openCreate} className="sm:px-3">
+      <Button size="lg" onClick={openCreatePanel} className="sm:px-3">
         <Plus className="size-4 sm:mr-1" />
         <span className="hidden sm:inline">Add task</span>
       </Button>

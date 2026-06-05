@@ -73,7 +73,6 @@ export function EventSettingsForm({ event }: { event: EventData }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ publicTimeline: checked }),
     });
-    router.refresh();
   }
 
   async function handleDelete() {
@@ -83,7 +82,6 @@ export function EventSettingsForm({ event }: { event: EventData }) {
     setDeleting(false);
     if (res.ok) {
       router.push("/dashboard");
-      router.refresh();
     } else {
       const text = await res.text();
       let message = "Failed to delete event.";
@@ -118,7 +116,7 @@ export function EventSettingsForm({ event }: { event: EventData }) {
     setSaving(false);
 
     if (res.ok) {
-      router.refresh();
+      // Local state already reflects changes; header data will be fresh on next navigation
     } else {
       const data = await res.json();
       setSaveError(data.error ?? "Failed to save.");

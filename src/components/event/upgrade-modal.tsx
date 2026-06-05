@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -17,10 +16,10 @@ type Props = {
   eventId: string;
   open: boolean;
   onClose: () => void;
+  onUpgraded?: () => void;
 };
 
-export function UpgradeModal({ eventId, open, onClose }: Props) {
-  const router = useRouter();
+export function UpgradeModal({ eventId, open, onClose, onUpgraded }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -38,7 +37,7 @@ export function UpgradeModal({ eventId, open, onClose }: Props) {
 
     if (res.ok) {
       onClose();
-      router.refresh();
+      onUpgraded?.();
     } else {
       const data = await res.json();
       setError(data.error ?? "Failed to schedule event.");

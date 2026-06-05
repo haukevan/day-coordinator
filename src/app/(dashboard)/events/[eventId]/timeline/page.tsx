@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { TimelineView } from "@/components/timeline/timeline-view";
+import { TaskRowSkeletonList } from "@/components/ui/skeletons";
 import type { SerializedTask } from "@/lib/types";
 
 export default async function TimelinePage({
@@ -57,7 +58,7 @@ export default async function TimelinePage({
   }));
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<TimelineSkeleton />}>
       <TimelineView
         eventId={eventId}
         tasks={serializedTasks}
@@ -66,5 +67,13 @@ export default async function TimelinePage({
         userRole="admin"
       />
     </Suspense>
+  );
+}
+
+function TimelineSkeleton() {
+  return (
+    <div className="px-3 py-2 sm:p-6">
+      <TaskRowSkeletonList count={6} />
+    </div>
   );
 }

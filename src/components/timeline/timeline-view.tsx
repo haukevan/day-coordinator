@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { TimelineList } from "./timeline-list";
 import { TimelineGantt } from "./timeline-gantt";
 import { TaskPanel } from "./task-panel";
+import { useTimelineView } from "./timeline-view-context";
 import { cn } from "@/lib/utils";
+import { TaskRowSkeletonList } from "@/components/ui/skeletons";
 import type { SerializedTask } from "@/lib/types";
 
 export function TimelineView({
@@ -21,43 +22,42 @@ export function TimelineView({
   eventDate: string | null;
   userRole?: "admin" | "vendor";
 }) {
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
-  const router = useRouter();
-
-  const view = (searchParams.get("view") as "list" | "gantt") || "list";
+  const { view, createPanelTrigger } = useTimelineView();
   const [tasks, setTasks] = useState(initialTasks);
   const [panelOpen, setPanelOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<SerializedTask | undefined>();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Handle ?panel=create from the toolbar in the header
+  // Open create panel instantly when toolbar triggers it via context
+  const prevTrigger = useRef(createPanelTrigger);
   useEffect(() => {
-    if (searchParams.get("panel") === "create") {
+    if (createPanelTrigger !== prevTrigger.current) {
+      prevTrigger.current = createPanelTrigger;
       openCreate();
-      // Clear the param without a full navigation
-      const next = new URLSearchParams(searchParams.toString());
-      next.delete("panel");
-      router.replace(`${pathname}?${next.toString()}`, { scroll: false });
     }
-    // Only run when searchParams change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [createPanelTrigger]);
 
   // Reload all tasks from the API (used after edits that may propagate)
   const refreshTasks = useCallback(async () => {
-    const res = await fetch(`/api/events/${eventId}/tasks`);
-    if (!res.ok) return;
-    const data = await res.json();
-    setTasks(
-      data.tasks.map((t: SerializedTask) => ({
-        ...t,
-        scheduledStart: t.scheduledStart ?? null,
-        scheduledEnd: t.scheduledEnd ?? null,
-        actualStart: t.actualStart ?? null,
-        actualEnd: t.actualEnd ?? null,
-        parentTask: t.parentTask ?? null,
-      })),
-    );
+    setIsRefreshing(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/tasks`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setTasks(
+        data.tasks.map((t: SerializedTask) => ({
+          ...t,
+          scheduledStart: t.scheduledStart ?? null,
+          scheduledEnd: t.scheduledEnd ?? null,
+          actualStart: t.actualStart ?? null,
+          actualEnd: t.actualEnd ?? null,
+          parentTask: t.parentTask ?? null,
+        })),
+      );
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [eventId]);
 
   function openCreate() {
@@ -89,7 +89,9 @@ export function TimelineView({
       )}
     >
       {/* View content */}
-      {view === "list" ? (
+      {isRefreshing && tasks.length > 0 ? (
+        <TaskRowSkeletonList count={4} />
+      ) : view === "list" ? (
         <TimelineList
           tasks={tasks}
           timezone={timezone}

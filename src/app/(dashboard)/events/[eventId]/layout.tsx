@@ -6,6 +6,8 @@ import { DraftBanner, DraftWarningIcon } from "@/components/event/draft-banner";
 import { VenueChipPopup } from "@/components/event/venue-chip-popup";
 import { EventTabs } from "@/components/dashboard/event-tabs";
 import { TimelineToolbar } from "@/components/timeline/timeline-toolbar";
+import { TimelineViewProvider } from "@/components/timeline/timeline-view-context";
+import { EventHeaderSkeleton } from "@/components/ui/skeletons";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ChevronLeft, CalendarDays } from "lucide-react";
@@ -22,6 +24,8 @@ export default async function EventLayout({
   params: Promise<{ eventId: string }>;
 }) {
   const { eventId } = await params;
+
+  // Auth check — fast (cookie read), remains blocking so redirects work
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -33,8 +37,31 @@ export default async function EventLayout({
   });
   if (!dbUser) redirect("/login");
 
+  return (
+    <TimelineViewProvider>
+      <div className="flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden sm:h-dvh">
+        {/* Event header — data fetched async inside Suspense so layout shell renders instantly */}
+        <Suspense fallback={<EventHeaderSkeleton />}>
+          <EventHeaderContent eventId={eventId} userId={dbUser.id} />
+        </Suspense>
+
+        <div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
+      </div>
+    </TimelineViewProvider>
+  );
+}
+
+/** Async component that fetches event data and renders the header.
+ *  Wrapped in Suspense by the parent layout so navigation is instant. */
+async function EventHeaderContent({
+  eventId,
+  userId,
+}: {
+  eventId: string;
+  userId: string;
+}) {
   const event = await prisma.event.findFirst({
-    where: { id: eventId, ownerId: dbUser.id },
+    where: { id: eventId, ownerId: userId },
     select: {
       id: true,
       title: true,
@@ -60,11 +87,9 @@ export default async function EventLayout({
 
   const eventDateInfo = (() => {
     if (!event.eventDate) return null;
-    // eventDate is stored as midnight UTC (calendar date only — no timezone conversion)
     const d = event.eventDate;
     const formatted = formatInTimeZone(d, "UTC", "EEE, MMM d, yyyy");
     const now = new Date();
-    // Compare UTC date parts only
     const eventDay = Date.UTC(
       d.getUTCFullYear(),
       d.getUTCMonth(),
@@ -88,8 +113,7 @@ export default async function EventLayout({
   })();
 
   return (
-    <div className="flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden sm:h-dvh">
-      {/* Event header */}
+    <>
       <div className="border-b border-border bg-card px-3 py-2 sm:px-6 sm:py-3">
         {/* Title row — back link merged inline */}
         <div className="flex items-center gap-1.5">
@@ -160,8 +184,6 @@ export default async function EventLayout({
       </div>
 
       {status === "DRAFT" && <DraftBanner eventId={event.id} status={status} />}
-
-      <div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
-    </div>
+    </>
   );
 }

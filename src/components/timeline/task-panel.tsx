@@ -3,7 +3,15 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { format } from "date-fns";
-import { ChevronDown, Clock, Link2, Trash2, Check, X } from "lucide-react";
+import {
+  ChevronDown,
+  Clock,
+  Link2,
+  Trash2,
+  Check,
+  X,
+  Loader2,
+} from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -12,6 +20,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { SerializedTask } from "@/lib/types";
 
@@ -419,9 +428,12 @@ export function TaskPanel({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState("");
+  // Brief skeleton state while form initializes (Sheet animation)
+  const [formReady, setFormReady] = useState(false);
 
   // Reset form when the task prop changes (e.g., switching from create → edit)
   useEffect(() => {
+    setFormReady(false);
     setTitle(task?.title ?? "");
     setDescription(task?.description ?? "");
     setStartHHMM(
@@ -435,6 +447,15 @@ export function TaskPanel({
     setConfirmDelete(false);
     setError("");
   }, [task, timezone, open]);
+
+  // Mark form ready after first paint so skeleton hides
+  useEffect(() => {
+    if (!open) return;
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setFormReady(true));
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [open]);
 
   // Auto-fill times from parent's scheduledEnd when blocking task changes.
   function handleParentChange(pid: string) {
@@ -682,43 +703,53 @@ export function TaskPanel({
                 (optional)
               </span>
             </label>
-            <div className="relative">
-              <select
-                value={parentTaskId}
-                onChange={(e) => handleParentChange(e.target.value)}
-                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">None</option>
-                {eligiblePrereqs.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                    {t.scheduledEnd
-                      ? ` · ends ${utcToLocalHHMM(t.scheduledEnd, timezone)}`
-                      : ""}
-                    {t.status === "COMPLETED" ? " ✓" : ""}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            </div>
-            {!parentTaskId && (
-              <p className="text-xs text-muted-foreground">
-                Choose a task that must finish before this one can start. If
-                that task shifts, this one moves with it automatically.
-              </p>
-            )}
-            {parentTaskId && (
-              <p className="text-xs text-muted-foreground">
-                Can&apos;t start until{" "}
-                <span className="font-medium text-foreground">
-                  {parent?.title ?? "blocking task"}
-                </span>{" "}
-                finishes
-                {hasBuffer
-                  ? ` · ${bufferMins} min buffer after`
-                  : " — starts right after"}
-                . If that task runs late, this one shifts to stay in sequence.
-              </p>
+            {formReady ? (
+              <>
+                <div className="relative">
+                  <select
+                    value={parentTaskId}
+                    onChange={(e) => handleParentChange(e.target.value)}
+                    className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">None</option>
+                    {eligiblePrereqs.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.title}
+                        {t.scheduledEnd
+                          ? ` · ends ${utcToLocalHHMM(t.scheduledEnd, timezone)}`
+                          : ""}
+                        {t.status === "COMPLETED" ? " ✓" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                </div>
+                {!parentTaskId && (
+                  <p className="text-xs text-muted-foreground">
+                    Choose a task that must finish before this one can start. If
+                    that task shifts, this one moves with it automatically.
+                  </p>
+                )}
+                {parentTaskId && (
+                  <p className="text-xs text-muted-foreground">
+                    Can&apos;t start until{" "}
+                    <span className="font-medium text-foreground">
+                      {parent?.title ?? "blocking task"}
+                    </span>{" "}
+                    finishes
+                    {hasBuffer
+                      ? ` · ${bufferMins} min buffer after`
+                      : " — starts right after"}
+                    . If that task runs late, this one shifts to stay in
+                    sequence.
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="space-y-2">
+                <Skeleton className="h-10 w-full rounded-lg" />
+                <Skeleton className="h-4 w-64" />
+              </div>
             )}
           </div>
 
@@ -831,7 +862,16 @@ export function TaskPanel({
                 Cancel
               </Button>
               <Button type="submit" size="sm" disabled={saving || deleting}>
-                {saving ? "Saving…" : isEdit ? "Save changes" : "Create task"}
+                {saving ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Saving…
+                  </>
+                ) : isEdit ? (
+                  "Save changes"
+                ) : (
+                  "Create task"
+                )}
               </Button>
             </div>
           </div>
