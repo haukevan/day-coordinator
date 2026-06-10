@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback } from "react";
 import { List, BarChart2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTimelineView } from "./timeline-view-context";
 import { cn } from "@/lib/utils";
 
-export function TimelineToolbar() {
+export function TimelineToolbar({
+  userRole = "admin",
+}: {
+  userRole?: "admin" | "vendor";
+}) {
   const { view, setView, openCreatePanel } = useTimelineView();
 
   return (
@@ -40,10 +43,12 @@ export function TimelineToolbar() {
         </button>
       </div>
 
-      <Button size="lg" onClick={openCreatePanel} className="sm:px-3">
-        <Plus className="size-4 sm:mr-1" />
-        <span className="hidden sm:inline">Add task</span>
-      </Button>
+      {userRole === "admin" && (
+        <Button size="lg" onClick={openCreatePanel} className="sm:px-3">
+          <Plus className="size-4 sm:mr-1" />
+          <span className="hidden sm:inline">Add task</span>
+        </Button>
+      )}
     </div>
   );
 }

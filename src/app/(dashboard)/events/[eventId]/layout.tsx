@@ -176,7 +176,7 @@ async function EventHeaderContent({
             userRole="admin"
             rightContent={
               <Suspense fallback={null}>
-                <TimelineToolbar />
+                <TimelineToolbar userRole="admin" />
               </Suspense>
             }
           />

@@ -476,6 +476,7 @@ export function TaskPanel({
   onSaved,
   onRefresh,
   vendors,
+  readOnly = false,
 }: {
   eventId: string;
   tasks: SerializedTask[];
@@ -487,6 +488,7 @@ export function TaskPanel({
   onSaved: (task: SerializedTask) => void;
   onRefresh: () => void;
   vendors: SerializedVendor[];
+  readOnly?: boolean;
 }) {
   const isEdit = Boolean(task);
 
@@ -740,298 +742,415 @@ export function TaskPanel({
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <SheetHeader className="px-4">
-          <SheetTitle>{isEdit ? "Edit task" : "New task"}</SheetTitle>
+          <SheetTitle>
+            {readOnly
+              ? (task?.title ?? "Task details")
+              : isEdit
+                ? "Edit task"
+                : "New task"}
+          </SheetTitle>
         </SheetHeader>
 
-        <form
-          id="task-form"
-          onSubmit={handleSubmit}
-          className="flex flex-1 flex-col gap-4 overflow-y-auto px-4"
-        >
-          {/* Title */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-foreground">
-              Task name <span className="text-destructive">*</span>
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Bridal party photos"
-              required
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-
-          {/* Description */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-foreground">
-              Notes{" "}
-              <span className="font-normal text-muted-foreground">
-                (optional)
-              </span>
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add any relevant details..."
-              rows={2}
-              className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-
-          {/* Blocked by */}
-          <div className="flex flex-col gap-1.5">
-            <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-              <Link2 className="size-3.5 text-muted-foreground" />
-              Blocked by{" "}
-              <span className="font-normal text-muted-foreground">
-                (optional)
-              </span>
-            </label>
-            {formReady ? (
-              <>
-                <div className="relative">
-                  <select
-                    value={parentTaskId}
-                    onChange={(e) => handleParentChange(e.target.value)}
-                    className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="">None</option>
-                    {eligiblePrereqs.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.title}
-                        {t.scheduledEnd
-                          ? ` · ends ${utcToLocalHHMM(t.scheduledEnd, timezone)}`
-                          : ""}
-                        {t.status === "COMPLETED" ? " ✓" : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                </div>
-                {!parentTaskId && (
-                  <p className="text-xs text-muted-foreground">
-                    Choose a task that must finish before this one can start. If
-                    that task shifts, this one moves with it automatically.
-                  </p>
-                )}
-                {parentTaskId && (
-                  <p className="text-xs text-muted-foreground">
-                    Can&apos;t start until{" "}
-                    <span className="font-medium text-foreground">
-                      {parent?.title ?? "blocking task"}
-                    </span>{" "}
-                    finishes
-                    {hasBuffer
-                      ? ` · ${bufferMins} min buffer after`
-                      : " — starts right after"}
-                    . If that task runs late, this one shifts to stay in
-                    sequence.
-                  </p>
-                )}
-              </>
-            ) : (
-              <div className="space-y-2">
-                <Skeleton className="h-10 w-full rounded-lg" />
-                <Skeleton className="h-4 w-64" />
+        {readOnly ? (
+          /* ── Read-only vendor view ─────────────────────────────────────── */
+          <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4">
+            {/* Description */}
+            {task?.description && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Notes
+                </span>
+                <p className="text-sm text-foreground whitespace-pre-wrap">
+                  {task.description}
+                </p>
               </div>
             )}
-          </div>
 
-          {/* Start + End row */}
-          <div className="grid grid-cols-2 gap-2">
+            {/* Time */}
             <div className="flex flex-col gap-1.5">
-              <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                <Clock className="size-3.5 text-muted-foreground" />
-                Start time <span className="text-destructive">*</span>
-              </label>
-              <TimePickerPopover
-                value={startHHMM}
-                minInclusive={minInclusiveStartHHMM}
-                onChange={(hhmm) => {
-                  setStartHHMM(hhmm);
-                }}
-              />
-              {minInclusiveStartHHMM && (
+              <span className="text-xs font-medium text-muted-foreground">
+                Time
+              </span>
+              <p className="text-sm text-foreground">
+                {summaryLabel ?? (
+                  <>
+                    {startHHMM ? formatTimeDisplay(startHHMM) : "Not scheduled"}
+                    {startHHMM && endHHMM && (
+                      <> – {formatTimeDisplay(endHHMM)}</>
+                    )}
+                  </>
+                )}
+              </p>
+              {!Number.isNaN(durationMins) && (
                 <p className="text-xs text-muted-foreground">
-                  Start must be at or after{" "}
-                  {formatTimeDisplay(minInclusiveStartHHMM)}.
+                  Duration: {formatDurationLabel(durationMins)}
                 </p>
               )}
             </div>
+
+            {/* Status */}
             <div className="flex flex-col gap-1.5">
-              <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                <Clock className="size-3.5 text-muted-foreground" />
-                End time
-              </label>
-              <TimePickerPopover
-                value={endHHMM}
-                minInclusive={startHHMM || undefined}
-                onChange={(hhmm) => {
-                  setEndHHMM(hhmm);
-                }}
-                onClear={() => setEndHHMM("")}
-              />
-            </div>
-          </div>
-
-          {/* Summary: "12:00 PM - 1:00 PM (1hr)" */}
-          {summaryLabel && (
-            <p className="text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">
-                {summaryLabel}
+              <span className="text-xs font-medium text-muted-foreground">
+                Status
               </span>
-            </p>
-          )}
+              <p className="text-sm text-foreground capitalize">
+                {task?.status?.toLowerCase().replace(/_/g, " ") ?? "—"}
+              </p>
+            </div>
 
-          {/* Buffer info */}
-          {hasBuffer && (
-            <div className="flex items-start gap-2 rounded-lg border border-info/40 bg-info/5 px-3 py-2.5">
-              <Clock className="mt-0.5 size-3.5 shrink-0 text-info" />
-              <p className="text-xs text-foreground">
-                {bufferMins} min buffer after{" "}
-                <span className="font-medium">
-                  {parent?.title ?? "blocking task"}
+            {/* Blocked by */}
+            {parent && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Blocked by
                 </span>
-                . If that task shifts, the buffer stays the same.
-              </p>
-            </div>
-          )}
-
-          {/* Vendors */}
-          <div className="flex flex-col gap-2">
-            <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-              <User className="size-3.5 text-muted-foreground" />
-              Vendors{" "}
-              <span className="font-normal text-muted-foreground">
-                (optional)
-              </span>
-            </label>
-            <p className="text-xs text-muted-foreground">
-              Vendors who are responsible for this task.
-            </p>
-
-            {/* Add vendors button + popover */}
-            {vendors.length > 0 ? (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-fit gap-1.5"
-                  >
-                    <User className="size-3.5" />
-                    Add vendors
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-64 p-0"
-                  align="start"
-                  sideOffset={4}
-                >
-                  <div className="flex max-h-52 flex-col overflow-y-auto p-1">
-                    {vendors.map((vendor) => (
-                      <AvailableVendorRow
-                        key={vendor.id}
-                        vendor={vendor}
-                        selected={selectedVendorIds.includes(vendor.id)}
-                        onToggle={(id) =>
-                          selectedVendorIds.includes(id)
-                            ? handleRemoveVendor(id)
-                            : handleAddVendor(id)
-                        }
-                      />
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            ) : (
-              <p className="text-xs text-muted-foreground italic">
-                No vendors added to this event yet.
-              </p>
+                <p className="text-sm text-foreground">
+                  {parent.title}
+                  {hasBuffer
+                    ? ` · ${bufferMins} min buffer`
+                    : " · starts right after"}
+                </p>
+              </div>
             )}
 
-            {/* Selected vendor chips */}
+            {/* Vendors */}
             {selectedVendorIds.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {selectedVendorIds.map((vid) => {
-                  const vendor = vendors.find((v) => v.id === vid);
-                  if (!vendor) return null;
-                  return (
-                    <VendorChip
-                      key={vid}
-                      vendor={vendor}
-                      onRemove={() => handleRemoveVendor(vid)}
-                    />
-                  );
-                })}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Vendors
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedVendorIds.map((vid) => {
+                    const vendor = vendors.find((v) => v.id === vid);
+                    if (!vendor) return null;
+                    const displayName =
+                      vendor.firstName || vendor.lastName
+                        ? [vendor.firstName, vendor.lastName]
+                            .filter(Boolean)
+                            .join(" ")
+                        : vendor.email;
+                    return (
+                      <span
+                        key={vid}
+                        className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+                      >
+                        {displayName}
+                      </span>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
+        ) : (
+          /* ── Admin edit/create form ────────────────────────────────────── */
+          <form
+            id="task-form"
+            onSubmit={handleSubmit}
+            className="flex flex-1 flex-col gap-4 overflow-y-auto px-4"
+          >
+            {/* Title */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-foreground">
+                Task name <span className="text-destructive">*</span>
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Bridal party photos"
+                required
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
 
-          {/* Error */}
-          {error && <p className="text-xs text-destructive">{error}</p>}
-        </form>
+            {/* Description */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-foreground">
+                Notes{" "}
+                <span className="font-normal text-muted-foreground">
+                  (optional)
+                </span>
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Add any relevant details..."
+                rows={2}
+                className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+
+            {/* Blocked by */}
+            <div className="flex flex-col gap-1.5">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                <Link2 className="size-3.5 text-muted-foreground" />
+                Blocked by{" "}
+                <span className="font-normal text-muted-foreground">
+                  (optional)
+                </span>
+              </label>
+              {formReady ? (
+                <>
+                  <div className="relative">
+                    <select
+                      value={parentTaskId}
+                      onChange={(e) => handleParentChange(e.target.value)}
+                      className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="">None</option>
+                      {eligiblePrereqs.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.title}
+                          {t.scheduledEnd
+                            ? ` · ends ${utcToLocalHHMM(t.scheduledEnd, timezone)}`
+                            : ""}
+                          {t.status === "COMPLETED" ? " ✓" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  </div>
+                  {!parentTaskId && (
+                    <p className="text-xs text-muted-foreground">
+                      Choose a task that must finish before this one can start.
+                      If that task shifts, this one moves with it automatically.
+                    </p>
+                  )}
+                  {parentTaskId && (
+                    <p className="text-xs text-muted-foreground">
+                      Can&apos;t start until{" "}
+                      <span className="font-medium text-foreground">
+                        {parent?.title ?? "blocking task"}
+                      </span>{" "}
+                      finishes
+                      {hasBuffer
+                        ? ` · ${bufferMins} min buffer after`
+                        : " — starts right after"}
+                      . If that task runs late, this one shifts to stay in
+                      sequence.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <Skeleton className="h-10 w-full rounded-lg" />
+                  <Skeleton className="h-4 w-64" />
+                </div>
+              )}
+            </div>
+
+            {/* Start + End row */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1.5">
+                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                  <Clock className="size-3.5 text-muted-foreground" />
+                  Start time <span className="text-destructive">*</span>
+                </label>
+                <TimePickerPopover
+                  value={startHHMM}
+                  minInclusive={minInclusiveStartHHMM}
+                  onChange={(hhmm) => {
+                    setStartHHMM(hhmm);
+                  }}
+                />
+                {minInclusiveStartHHMM && (
+                  <p className="text-xs text-muted-foreground">
+                    Start must be at or after{" "}
+                    {formatTimeDisplay(minInclusiveStartHHMM)}.
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                  <Clock className="size-3.5 text-muted-foreground" />
+                  End time
+                </label>
+                <TimePickerPopover
+                  value={endHHMM}
+                  minInclusive={startHHMM || undefined}
+                  onChange={(hhmm) => {
+                    setEndHHMM(hhmm);
+                  }}
+                  onClear={() => setEndHHMM("")}
+                />
+              </div>
+            </div>
+
+            {/* Summary: "12:00 PM - 1:00 PM (1hr)" */}
+            {summaryLabel && (
+              <p className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">
+                  {summaryLabel}
+                </span>
+              </p>
+            )}
+
+            {/* Buffer info */}
+            {hasBuffer && (
+              <div className="flex items-start gap-2 rounded-lg border border-info/40 bg-info/5 px-3 py-2.5">
+                <Clock className="mt-0.5 size-3.5 shrink-0 text-info" />
+                <p className="text-xs text-foreground">
+                  {bufferMins} min buffer after{" "}
+                  <span className="font-medium">
+                    {parent?.title ?? "blocking task"}
+                  </span>
+                  . If that task shifts, the buffer stays the same.
+                </p>
+              </div>
+            )}
+
+            {/* Vendors */}
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                <User className="size-3.5 text-muted-foreground" />
+                Vendors{" "}
+                <span className="font-normal text-muted-foreground">
+                  (optional)
+                </span>
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Vendors who are responsible for this task.
+              </p>
+
+              {/* Add vendors button + popover */}
+              {vendors.length > 0 ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-fit gap-1.5"
+                    >
+                      <User className="size-3.5" />
+                      Add vendors
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-64 p-0"
+                    align="start"
+                    sideOffset={4}
+                  >
+                    <div className="flex max-h-52 flex-col overflow-y-auto p-1">
+                      {vendors.map((vendor) => (
+                        <AvailableVendorRow
+                          key={vendor.id}
+                          vendor={vendor}
+                          selected={selectedVendorIds.includes(vendor.id)}
+                          onToggle={(id) =>
+                            selectedVendorIds.includes(id)
+                              ? handleRemoveVendor(id)
+                              : handleAddVendor(id)
+                          }
+                        />
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">
+                  No vendors added to this event yet.
+                </p>
+              )}
+
+              {/* Selected vendor chips */}
+              {selectedVendorIds.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedVendorIds.map((vid) => {
+                    const vendor = vendors.find((v) => v.id === vid);
+                    if (!vendor) return null;
+                    return (
+                      <VendorChip
+                        key={vid}
+                        vendor={vendor}
+                        onRemove={() => handleRemoveVendor(vid)}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Error */}
+            {error && <p className="text-xs text-destructive">{error}</p>}
+          </form>
+        )}
 
         {/* Actions */}
         <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border bg-background px-4 py-4">
-          <div className="flex items-center">
-            {isEdit && (
+          {readOnly ? (
+            <div className="flex w-full justify-end">
               <Button
                 type="button"
-                variant={confirmDelete ? "destructive" : "ghost"}
-                size="icon"
-                aria-label={
-                  confirmDelete ? "Confirm delete task" : "Delete task"
-                }
-                title={
-                  confirmDelete ? "Tap again to confirm delete" : "Delete task"
-                }
-                onClick={handleDeleteTask}
-                disabled={saving || deleting}
+                variant="outline"
+                size="sm"
+                onClick={onClose}
               >
-                {confirmDelete ? (
-                  <Check className="size-4" />
-                ) : (
-                  <Trash2 className="size-4" />
-                )}
+                Done
               </Button>
-            )}
-          </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center">
+                {isEdit && (
+                  <Button
+                    type="button"
+                    variant={confirmDelete ? "destructive" : "ghost"}
+                    size="icon"
+                    aria-label={
+                      confirmDelete ? "Confirm delete task" : "Delete task"
+                    }
+                    title={
+                      confirmDelete
+                        ? "Tap again to confirm delete"
+                        : "Delete task"
+                    }
+                    onClick={handleDeleteTask}
+                    disabled={saving || deleting}
+                  >
+                    {confirmDelete ? (
+                      <Check className="size-4" />
+                    ) : (
+                      <Trash2 className="size-4" />
+                    )}
+                  </Button>
+                )}
+              </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setConfirmDelete(false);
-                onClose();
-              }}
-              disabled={saving || deleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={saving || deleting}
-              form="task-form"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Saving…
-                </>
-              ) : isEdit ? (
-                "Save changes"
-              ) : (
-                "Create task"
-              )}
-            </Button>
-          </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setConfirmDelete(false);
+                    onClose();
+                  }}
+                  disabled={saving || deleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={saving || deleting}
+                  form="task-form"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Saving…
+                    </>
+                  ) : isEdit ? (
+                    "Save changes"
+                  ) : (
+                    "Create task"
+                  )}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </SheetContent>
     </Sheet>

@@ -111,33 +111,32 @@ export function TimelineView({
         <TimelineList
           tasks={tasks}
           timezone={timezone}
-          onTaskClick={userRole === "admin" ? openEdit : undefined}
+          onTaskClick={openEdit}
         />
       ) : (
         <div className="flex-1 min-h-0">
           <TimelineGantt
             tasks={tasks}
             timezone={timezone}
-            onTaskClick={userRole === "admin" ? openEdit : undefined}
+            onTaskClick={openEdit}
           />
         </div>
       )}
 
       {/* Task slide-over panel */}
-      {userRole === "admin" && (
-        <TaskPanel
-          eventId={eventId}
-          tasks={tasks}
-          timezone={timezone}
-          eventDate={eventDate}
-          task={editingTask}
-          open={panelOpen}
-          onClose={() => setPanelOpen(false)}
-          onSaved={handleSaved}
-          onRefresh={refreshTasks}
-          vendors={vendors}
-        />
-      )}
+      <TaskPanel
+        eventId={eventId}
+        tasks={tasks}
+        timezone={timezone}
+        eventDate={eventDate}
+        task={editingTask}
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        onSaved={handleSaved}
+        onRefresh={refreshTasks}
+        vendors={vendors}
+        readOnly={userRole === "vendor"}
+      />
     </div>
   );
 }
