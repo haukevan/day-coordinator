@@ -108,16 +108,6 @@ export function TaskCard({
               Follows {parentTitle}
             </span>
           )}
-          {!parentTitle && dependencyMeta && (
-            <span
-              className={cn(
-                "inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
-                dependencyMeta.style.chipClass,
-              )}
-            >
-              {dependencyMeta.groupLabel}
-            </span>
-          )}
         </div>
       </div>
       <TaskStatusBadge status={task.status} />

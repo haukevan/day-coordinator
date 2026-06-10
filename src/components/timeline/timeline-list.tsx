@@ -132,17 +132,7 @@ export function TimelineList({
           <div
             key={task.id}
             style={{ paddingLeft: depth > 0 ? `${depth * 20}px` : undefined }}
-            className={depth > 0 ? "relative" : undefined}
           >
-            {depth > 0 && (
-              <div
-                className={
-                  dependencyMeta
-                    ? `absolute left-3 top-0 bottom-0 w-px ${dependencyMeta.style.lineClass}`
-                    : "absolute left-3 top-0 bottom-0 w-px bg-border/60"
-                }
-              />
-            )}
             <TaskCard
               task={task}
               timezone={timezone}
