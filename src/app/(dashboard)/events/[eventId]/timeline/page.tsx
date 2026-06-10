@@ -33,7 +33,27 @@ export default async function TimelinePage({
   const tasks = await prisma.task.findMany({
     where: { eventId },
     orderBy: [{ scheduledStart: "asc" }, { createdAt: "asc" }],
-    include: { parentTask: { select: { id: true, title: true } } },
+    include: {
+      parentTask: { select: { id: true, title: true } },
+      taskVendors: {
+        include: {
+          eventVendor: {
+            select: {
+              id: true,
+              company: true,
+              jobTitle: true,
+              vendorContact: {
+                select: {
+                  email: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 
   const serializedTasks: SerializedTask[] = tasks.map((t) => ({
@@ -55,6 +75,10 @@ export default async function TimelinePage({
     assignedToId: t.assignedToId,
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
+    taskVendors: t.taskVendors.map((tv) => ({
+      eventVendorId: tv.eventVendorId,
+      eventVendor: tv.eventVendor,
+    })),
   }));
 
   return (

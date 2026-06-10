@@ -37,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const body = await req.json();
-  const { title, description, scheduledEnd, scheduledStart, parentTaskId } =
+  const { title, description, scheduledEnd, scheduledStart, parentTaskId, vendorIds } =
     body;
 
   if (title !== undefined && !title?.trim()) {
@@ -112,7 +112,34 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     updateData.sequenceLabel =
       (body as Record<string, unknown>).sequenceLabel ?? null;
 
-  await prisma.task.update({ where: { id: taskId }, data: updateData });
+  // Sync vendor assignments if vendorIds provided
+  const changingVendors = "vendorIds" in body;
+  let vendorUpdate: object = {};
+  if (changingVendors) {
+    const vendorIdList: string[] = Array.isArray(vendorIds) ? vendorIds : [];
+    if (vendorIdList.length > 0) {
+      const validCount = await prisma.eventVendor.count({
+        where: { eventId, id: { in: vendorIdList } },
+      });
+      if (validCount !== vendorIdList.length) {
+        return NextResponse.json(
+          { error: "One or more vendor assignments are invalid for this event." },
+          { status: 400 },
+        );
+      }
+    }
+    vendorUpdate = {
+      taskVendors: {
+        deleteMany: {},
+        create: vendorIdList.map((eventVendorId) => ({ eventVendorId })),
+      },
+    };
+  }
+
+  await prisma.task.update({
+    where: { id: taskId },
+    data: { ...updateData, ...vendorUpdate },
+  });
 
   // Fallback: compute scheduledEnd from durationMins if end wasn't provided
   const endIsMissing = endDate !== undefined ? !endDate : !task.scheduledEnd;
@@ -144,7 +171,27 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const fresh = await prisma.task.findUnique({
     where: { id: taskId },
-    include: { parentTask: { select: { id: true, title: true } } },
+    include: {
+      parentTask: { select: { id: true, title: true } },
+      taskVendors: {
+        include: {
+          eventVendor: {
+            select: {
+              id: true,
+              company: true,
+              jobTitle: true,
+              vendorContact: {
+                select: {
+                  email: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 
   await emitEventUpdate(eventId, "task.updated", {

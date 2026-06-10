@@ -99,6 +99,7 @@ model Task {
   updatedAt        DateTime   @updatedAt
 
   activityLogs ActivityLog[]
+  taskVendors  TaskVendor[]
 }
 
 enum TaskStatus {
@@ -191,7 +192,21 @@ model EventVendor {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
+  taskVendors TaskVendor[]
+
   @@unique([eventId, vendorContactId])
+}
+
+// ─── Task-Vendor Join ─────────────────────────────────────────────────────
+
+model TaskVendor {
+  taskId        String
+  task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  eventVendorId String
+  eventVendor   EventVendor @relation(fields: [eventVendorId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, eventVendorId])
+  @@unique([taskId, eventVendorId])
 }
 
 // ─── Activity Log ─────────────────────────────────────────────────────────────

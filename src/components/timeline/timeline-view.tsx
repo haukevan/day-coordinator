@@ -7,7 +7,7 @@ import { TaskPanel } from "./task-panel";
 import { useTimelineView } from "./timeline-view-context";
 import { cn } from "@/lib/utils";
 import { TaskRowSkeletonList } from "@/components/ui/skeletons";
-import type { SerializedTask } from "@/lib/types";
+import type { SerializedTask, SerializedVendor } from "@/lib/types";
 
 export function TimelineView({
   eventId,
@@ -24,6 +24,7 @@ export function TimelineView({
 }) {
   const { view, createPanelTrigger } = useTimelineView();
   const [tasks, setTasks] = useState(initialTasks);
+  const [vendors, setVendors] = useState<SerializedVendor[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<SerializedTask | undefined>();
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -37,6 +38,21 @@ export function TimelineView({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createPanelTrigger]);
+
+  // Fetch event vendors for task assignment
+  useEffect(() => {
+    async function fetchVendors() {
+      try {
+        const res = await fetch(`/api/events/${eventId}/vendors`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setVendors(data.vendors ?? []);
+      } catch {
+        // non-critical
+      }
+    }
+    fetchVendors();
+  }, [eventId]);
 
   // Reload all tasks from the API (used after edits that may propagate)
   const refreshTasks = useCallback(async () => {
@@ -119,6 +135,7 @@ export function TimelineView({
           onClose={() => setPanelOpen(false)}
           onSaved={handleSaved}
           onRefresh={refreshTasks}
+          vendors={vendors}
         />
       )}
     </div>

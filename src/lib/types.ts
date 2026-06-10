@@ -1,3 +1,17 @@
+export type TaskVendorRef = {
+  eventVendorId: string;
+  eventVendor: {
+    id: string;
+    company: string | null;
+    jobTitle: string | null;
+    vendorContact: {
+      email: string;
+      firstName: string | null;
+      lastName: string | null;
+    };
+  };
+};
+
 export type SerializedTask = {
   id: string;
   title: string;
@@ -15,6 +29,7 @@ export type SerializedTask = {
   publicVisibility: boolean;
   eventId: string;
   assignedToId: string | null;
+  taskVendors?: TaskVendorRef[];
   createdAt: string;
   updatedAt: string;
 };

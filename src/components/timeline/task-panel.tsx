@@ -11,6 +11,7 @@ import {
   Check,
   X,
   Loader2,
+  User,
 } from "lucide-react";
 import {
   Sheet,
@@ -20,9 +21,14 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import type { SerializedTask } from "@/lib/types";
+import type { SerializedTask, SerializedVendor } from "@/lib/types";
 
 // ── Timezone helpers ──────────────────────────────────────────────────────────
 
@@ -236,19 +242,23 @@ function TimePickerPopover({
 
   return (
     <>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={handleTrigger}
-        className={cn(
-          "flex w-full items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring",
-          value ? "text-foreground" : "text-muted-foreground",
-        )}
-      >
-        <Clock className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="flex-1 text-left">
-          {value ? formatTimeDisplay(value) : "Select time"}
-        </span>
+      <div className="relative flex w-full rounded-lg border border-border bg-background focus-within:ring-2 focus-within:ring-ring">
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={handleTrigger}
+          className="flex flex-1 items-center gap-1 px-2.5 py-1.5 text-sm focus:outline-none"
+        >
+          <Clock className="size-3.5 shrink-0 text-muted-foreground" />
+          <span
+            className={cn(
+              "flex-1 text-left",
+              value ? "text-foreground" : "text-muted-foreground",
+            )}
+          >
+            {value ? formatTimeDisplay(value) : "Select time"}
+          </span>
+        </button>
         {onClear && value && (
           <button
             type="button"
@@ -257,12 +267,12 @@ function TimePickerPopover({
               e.stopPropagation();
               onClear();
             }}
-            className="-mr-1 flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="mr-1 flex shrink-0 items-center justify-center self-center rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none"
           >
             <X className="size-3.5" />
           </button>
         )}
-      </button>
+      </div>
 
       {open && pos && (
         <div
@@ -390,6 +400,69 @@ function formatDurationLabel(totalMins: number): string {
   return `${h}hr ${m}min`;
 }
 
+// ── VendorChip ─────────────────────────────────────────────────────────────
+
+function VendorChip({
+  vendor,
+  onRemove,
+}: Readonly<{
+  vendor: SerializedVendor;
+  onRemove: () => void;
+}>) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+      <span className="truncate max-w-[160px]">{vendor.email}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="flex size-4 shrink-0 items-center justify-center rounded-full text-primary/70 transition-colors hover:bg-primary/20 hover:text-primary"
+        aria-label={`Remove ${vendor.email}`}
+      >
+        <X className="size-3" />
+      </button>
+    </span>
+  );
+}
+
+// ── AvailableVendorRow ────────────────────────────────────────────────────
+
+function AvailableVendorRow({
+  vendor,
+  selected,
+  onToggle,
+}: Readonly<{
+  vendor: SerializedVendor;
+  selected: boolean;
+  onToggle: (id: string) => void;
+}>) {
+  const displayName =
+    vendor.firstName || vendor.lastName
+      ? [vendor.firstName, vendor.lastName].filter(Boolean).join(" ")
+      : vendor.email;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(vendor.id)}
+      className="flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+    >
+      {selected ? (
+        <Check className="size-3.5 shrink-0 text-primary" />
+      ) : (
+        <User className="size-3.5 shrink-0 text-muted-foreground" />
+      )}
+      <div className="flex flex-col min-w-0">
+        <span className="truncate text-xs font-medium">{displayName}</span>
+        {vendor.firstName || vendor.lastName ? (
+          <span className="truncate text-[11px] text-muted-foreground">
+            {vendor.email}
+          </span>
+        ) : null}
+      </div>
+    </button>
+  );
+}
+
 // ── TaskPanel ─────────────────────────────────────────────────────────────────
 
 export function TaskPanel({
@@ -402,6 +475,7 @@ export function TaskPanel({
   onClose,
   onSaved,
   onRefresh,
+  vendors,
 }: {
   eventId: string;
   tasks: SerializedTask[];
@@ -412,6 +486,7 @@ export function TaskPanel({
   onClose: () => void;
   onSaved: (task: SerializedTask) => void;
   onRefresh: () => void;
+  vendors: SerializedVendor[];
 }) {
   const isEdit = Boolean(task);
 
@@ -424,6 +499,9 @@ export function TaskPanel({
     task?.scheduledEnd ? utcToLocalHHMM(task.scheduledEnd, timezone) : "",
   );
   const [parentTaskId, setParentTaskId] = useState(task?.parentTaskId ?? "");
+  const [selectedVendorIds, setSelectedVendorIds] = useState<string[]>(
+    task?.taskVendors?.map((tv) => tv.eventVendorId) ?? [],
+  );
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -443,6 +521,9 @@ export function TaskPanel({
       task?.scheduledEnd ? utcToLocalHHMM(task.scheduledEnd, timezone) : "",
     );
     setParentTaskId(task?.parentTaskId ?? "");
+    setSelectedVendorIds(
+      task?.taskVendors?.map((tv) => tv.eventVendorId) ?? [],
+    );
     setDeleting(false);
     setConfirmDelete(false);
     setError("");
@@ -549,6 +630,14 @@ export function TaskPanel({
 
   const eligiblePrereqs = tasks.filter((t) => !ineligiblePrereqIds.has(t.id));
 
+  function handleAddVendor(id: string) {
+    setSelectedVendorIds((prev) => [...prev, id]);
+  }
+
+  function handleRemoveVendor(id: string) {
+    setSelectedVendorIds((prev) => prev.filter((vid) => vid !== id));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) {
@@ -573,6 +662,7 @@ export function TaskPanel({
       scheduledStart: scheduledStartISO,
       scheduledEnd: scheduledEndISO,
       parentTaskId: parentTaskId || null,
+      vendorIds: selectedVendorIds,
     };
 
     const url = isEdit
@@ -651,16 +741,12 @@ export function TaskPanel({
       >
         <SheetHeader className="px-4">
           <SheetTitle>{isEdit ? "Edit task" : "New task"}</SheetTitle>
-          <SheetDescription>
-            {isEdit
-              ? "Update task details, schedule, and duration."
-              : "Create a new task with a title, schedule, and duration."}
-          </SheetDescription>
         </SheetHeader>
 
         <form
+          id="task-form"
           onSubmit={handleSubmit}
-          className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
+          className="flex flex-1 flex-col gap-4 overflow-y-auto px-4"
         >
           {/* Title */}
           <div className="flex flex-col gap-1.5">
@@ -813,69 +899,140 @@ export function TaskPanel({
             </div>
           )}
 
+          {/* Vendors */}
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+              <User className="size-3.5 text-muted-foreground" />
+              Vendors{" "}
+              <span className="font-normal text-muted-foreground">
+                (optional)
+              </span>
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Vendors who are responsible for this task.
+            </p>
+
+            {/* Add vendors button + popover */}
+            {vendors.length > 0 ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-fit gap-1.5"
+                  >
+                    <User className="size-3.5" />
+                    Add vendors
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-64 p-0"
+                  align="start"
+                  sideOffset={4}
+                >
+                  <div className="flex max-h-52 flex-col overflow-y-auto p-1">
+                    {vendors.map((vendor) => (
+                      <AvailableVendorRow
+                        key={vendor.id}
+                        vendor={vendor}
+                        selected={selectedVendorIds.includes(vendor.id)}
+                        onToggle={(id) =>
+                          selectedVendorIds.includes(id)
+                            ? handleRemoveVendor(id)
+                            : handleAddVendor(id)
+                        }
+                      />
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">
+                No vendors added to this event yet.
+              </p>
+            )}
+
+            {/* Selected vendor chips */}
+            {selectedVendorIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {selectedVendorIds.map((vid) => {
+                  const vendor = vendors.find((v) => v.id === vid);
+                  if (!vendor) return null;
+                  return (
+                    <VendorChip
+                      key={vid}
+                      vendor={vendor}
+                      onRemove={() => handleRemoveVendor(vid)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Error */}
           {error && <p className="text-xs text-destructive">{error}</p>}
+        </form>
 
-          {/* Actions */}
-          <div
-            className={cn(
-              "mt-auto flex items-center justify-between gap-2 border-t border-border pt-4",
-            )}
-          >
-            <div className="flex items-center">
-              {isEdit && (
-                <Button
-                  type="button"
-                  variant={confirmDelete ? "destructive" : "ghost"}
-                  size="icon"
-                  aria-label={
-                    confirmDelete ? "Confirm delete task" : "Delete task"
-                  }
-                  title={
-                    confirmDelete
-                      ? "Tap again to confirm delete"
-                      : "Delete task"
-                  }
-                  onClick={handleDeleteTask}
-                  disabled={saving || deleting}
-                >
-                  {confirmDelete ? (
-                    <Check className="size-4" />
-                  ) : (
-                    <Trash2 className="size-4" />
-                  )}
-                </Button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
+        {/* Actions */}
+        <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border bg-background px-4 py-4">
+          <div className="flex items-center">
+            {isEdit && (
               <Button
                 type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setConfirmDelete(false);
-                  onClose();
-                }}
+                variant={confirmDelete ? "destructive" : "ghost"}
+                size="icon"
+                aria-label={
+                  confirmDelete ? "Confirm delete task" : "Delete task"
+                }
+                title={
+                  confirmDelete ? "Tap again to confirm delete" : "Delete task"
+                }
+                onClick={handleDeleteTask}
                 disabled={saving || deleting}
               >
-                Cancel
-              </Button>
-              <Button type="submit" size="sm" disabled={saving || deleting}>
-                {saving ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Saving…
-                  </>
-                ) : isEdit ? (
-                  "Save changes"
+                {confirmDelete ? (
+                  <Check className="size-4" />
                 ) : (
-                  "Create task"
+                  <Trash2 className="size-4" />
                 )}
               </Button>
-            </div>
+            )}
           </div>
-        </form>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setConfirmDelete(false);
+                onClose();
+              }}
+              disabled={saving || deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={saving || deleting}
+              form="task-form"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Saving…
+                </>
+              ) : isEdit ? (
+                "Save changes"
+              ) : (
+                "Create task"
+              )}
+            </Button>
+          </div>
+        </div>
       </SheetContent>
     </Sheet>
   );

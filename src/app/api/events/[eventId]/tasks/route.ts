@@ -37,6 +37,24 @@ export async function GET(_req: NextRequest, { params }: Params) {
     include: {
       parentTask: { select: { id: true, title: true } },
       _count: { select: { childTasks: true } },
+      taskVendors: {
+        include: {
+          eventVendor: {
+            select: {
+              id: true,
+              company: true,
+              jobTitle: true,
+              vendorContact: {
+                select: {
+                  email: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -65,7 +83,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
-  const { title, description, scheduledEnd, parentTaskId, scheduledStart } =
+  const { title, description, scheduledEnd, parentTaskId, scheduledStart, vendorIds } =
     body;
 
   if (!title?.trim()) {
@@ -111,6 +129,20 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   }
 
+  // Validate vendorIds — each must belong to this event
+  const vendorIdList: string[] = Array.isArray(vendorIds) ? vendorIds : [];
+  if (vendorIdList.length > 0) {
+    const validCount = await prisma.eventVendor.count({
+      where: { eventId, id: { in: vendorIdList } },
+    });
+    if (validCount !== vendorIdList.length) {
+      return NextResponse.json(
+        { error: "One or more vendor assignments are invalid for this event." },
+        { status: 400 },
+      );
+    }
+  }
+
   const task = await prisma.task.create({
     data: {
       eventId,
@@ -120,6 +152,13 @@ export async function POST(req: NextRequest, { params }: Params) {
       scheduledEnd: endDate,
       parentTaskId: parentTaskId ?? null,
       scheduledStart: startDate,
+      taskVendors: vendorIdList.length > 0
+        ? {
+            createMany: {
+              data: vendorIdList.map((eventVendorId) => ({ eventVendorId })),
+            },
+          }
+        : undefined,
     },
   });
 
@@ -150,7 +189,27 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const fresh = await prisma.task.findUnique({
     where: { id: task.id },
-    include: { parentTask: { select: { id: true, title: true } } },
+    include: {
+      parentTask: { select: { id: true, title: true } },
+      taskVendors: {
+        include: {
+          eventVendor: {
+            select: {
+              id: true,
+              company: true,
+              jobTitle: true,
+              vendorContact: {
+                select: {
+                  email: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
   return NextResponse.json({ task: fresh }, { status: 201 });
 }
