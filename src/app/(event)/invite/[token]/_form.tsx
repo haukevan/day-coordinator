@@ -227,37 +227,33 @@ export function VendorJoinForm({
                 </div>
               </div>
 
-              {/* Phone — only shown for new users */}
-              {!onboarded && (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-foreground">
-                    Phone{" "}
-                    <span className="text-xs font-normal text-muted-foreground">
-                      (optional)
-                    </span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-[42px] items-center rounded-lg border border-border bg-muted px-3 text-sm text-muted-foreground select-none">
-                      +1
-                    </span>
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      autoComplete="tel-national"
-                      value={formatPhone(phoneDigits)}
-                      onChange={handlePhoneChange}
-                      className={inputClass}
-                      placeholder="(555) 123-4567"
-                      maxLength={14}
-                    />
-                  </div>
-                  {phoneError && (
-                    <p className="mt-1 text-xs text-destructive">
-                      {phoneError}
-                    </p>
-                  )}
+              {/* Phone */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-foreground">
+                  Phone{" "}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    (optional)
+                  </span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="flex h-[42px] items-center rounded-lg border border-border bg-muted px-3 text-sm text-muted-foreground select-none">
+                    +1
+                  </span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    value={formatPhone(phoneDigits)}
+                    onChange={handlePhoneChange}
+                    className={inputClass}
+                    placeholder="(555) 123-4567"
+                    maxLength={14}
+                  />
                 </div>
-              )}
+                {phoneError && (
+                  <p className="mt-1 text-xs text-destructive">{phoneError}</p>
+                )}
+              </div>
 
               {/* Company */}
               <div>

@@ -26,6 +26,8 @@ export default async function VendorVendorsPage({
   });
   if (!membership) notFound();
 
+  const isCoordinator = membership.role === "COORDINATOR";
+
   const eventVendors = await prisma.eventVendor.findMany({
     where: { eventId },
     include: { vendorContact: true },
@@ -47,6 +49,7 @@ export default async function VendorVendorsPage({
     company: ev.company,
     jobTitle: ev.jobTitle,
     status: ev.status,
+    role: ev.role,
     inviteSentAt: ev.inviteSentAt?.toISOString() ?? null,
     joinedAt: ev.joinedAt?.toISOString() ?? null,
     createdAt: ev.createdAt.toISOString(),
@@ -57,5 +60,11 @@ export default async function VendorVendorsPage({
     phone: ev.vendorContact.phone,
   }));
 
-  return <VendorList eventId={eventId} vendors={vendors} userRole="vendor" />;
+  return (
+    <VendorList
+      eventId={eventId}
+      vendors={vendors}
+      userRole={isCoordinator ? "admin" : "vendor"}
+    />
+  );
 }

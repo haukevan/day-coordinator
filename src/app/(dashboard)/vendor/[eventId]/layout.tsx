@@ -8,9 +8,33 @@ import { TimelineViewProvider } from "@/components/timeline/timeline-view-contex
 import { EventHeaderSkeleton } from "@/components/ui/skeletons";
 import Link from "next/link";
 import { Suspense } from "react";
-import { ChevronLeft, CalendarDays } from "lucide-react";
+import { ChevronLeft, CalendarDays, ShieldX } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
 import { cn } from "@/lib/utils";
+
+function NoAccessMessage() {
+  return (
+    <div className="flex min-h-full flex-col items-center justify-center px-4 py-16 text-center">
+      <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-muted">
+        <ShieldX className="size-7 text-muted-foreground" />
+      </div>
+      <h2 className="text-lg font-semibold text-foreground">
+        You don&apos;t have access to this event
+      </h2>
+      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+        You may have been removed from this event, or your invitation may have
+        expired. Contact the event owner if you believe this is a mistake.
+      </p>
+      <Link
+        href="/dashboard"
+        className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+      >
+        <ChevronLeft className="size-4" />
+        Back to dashboard
+      </Link>
+    </div>
+  );
+}
 
 export default async function VendorEventLayout({
   children,
@@ -33,11 +57,27 @@ export default async function VendorEventLayout({
   });
   if (!dbUser) redirect("/login");
 
+  // Verify vendor membership early so we can show a friendly message instead of a 404
+  const membership = await prisma.eventVendor.findFirst({
+    where: { eventId, userId: dbUser.id, status: "ACCEPTED" },
+    select: { role: true },
+  });
+
+  if (!membership) {
+    return <NoAccessMessage />;
+  }
+
+  const isCoordinator = membership.role === "COORDINATOR";
+
   return (
     <TimelineViewProvider>
       <div className="flex min-h-full flex-col">
         <Suspense fallback={<EventHeaderSkeleton />}>
-          <VendorHeaderContent eventId={eventId} userId={dbUser.id} />
+          <VendorHeaderContent
+            eventId={eventId}
+            userId={dbUser.id}
+            isCoordinator={isCoordinator}
+          />
         </Suspense>
         <div className="flex-1">{children}</div>
       </div>
@@ -48,39 +88,37 @@ export default async function VendorEventLayout({
 async function VendorHeaderContent({
   eventId,
   userId,
+  isCoordinator,
 }: {
   eventId: string;
   userId: string;
+  isCoordinator: boolean;
 }) {
-  const eventVendor = await prisma.eventVendor.findFirst({
-    where: { eventId, userId, status: "ACCEPTED" },
-    include: {
-      event: {
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: {
+      id: true,
+      title: true,
+      eventDate: true,
+      timezone: true,
+      venue: {
         select: {
-          id: true,
-          title: true,
-          eventDate: true,
-          timezone: true,
-          venue: {
-            select: {
-              name: true,
-              address: true,
-              description: true,
-              ownerName: true,
-              ownerPhone: true,
-              ownerEmail: true,
-            },
-          },
+          name: true,
+          address: true,
+          description: true,
+          ownerName: true,
+          ownerPhone: true,
+          ownerEmail: true,
         },
       },
     },
   });
 
-  if (!eventVendor) notFound();
+  if (!event) notFound();
 
   const eventDateInfo = (() => {
-    if (!eventVendor.event.eventDate) return null;
-    const d = eventVendor.event.eventDate;
+    if (!event.eventDate) return null;
+    const d = event.eventDate;
     const formatted = formatInTimeZone(d, "UTC", "EEE, MMM d, yyyy");
     const now = new Date();
     const eventDay = Date.UTC(
@@ -115,11 +153,9 @@ async function VendorHeaderContent({
         Dashboard
       </Link>
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-lg font-semibold text-foreground">
-          {eventVendor.event.title}
-        </h1>
+        <h1 className="text-lg font-semibold text-foreground">{event.title}</h1>
         <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-          Vendor
+          {isCoordinator ? "Coordinator" : "Vendor"}
         </span>
       </div>
 
@@ -149,21 +185,21 @@ async function VendorHeaderContent({
             </span>
           </span>
         )}
-        {eventVendor.event.venue && (
+        {event.venue && (
           <VenueChipPopup
-            name={eventVendor.event.venue.name}
-            address={eventVendor.event.venue.address}
-            description={eventVendor.event.venue.description}
-            ownerName={eventVendor.event.venue.ownerName}
-            ownerPhone={eventVendor.event.venue.ownerPhone}
-            ownerEmail={eventVendor.event.venue.ownerEmail}
+            name={event.venue.name}
+            address={event.venue.address}
+            description={event.venue.description}
+            ownerName={event.venue.ownerName}
+            ownerPhone={event.venue.ownerPhone}
+            ownerEmail={event.venue.ownerEmail}
           />
         )}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <EventTabs eventId={eventId} userRole="vendor" />
-        <TimelineToolbar userRole="vendor" />
+        <TimelineToolbar userRole={isCoordinator ? "admin" : "vendor"} />
       </div>
     </div>
   );

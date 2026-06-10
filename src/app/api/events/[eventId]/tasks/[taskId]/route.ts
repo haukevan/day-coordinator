@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
+import { canManageEvent } from "@/lib/db/permissions";
 import { emitEventUpdate } from "@/lib/realtime";
 import {
   computeScheduledEnd,
@@ -30,15 +31,30 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     where: { id: eventId, ownerId: dbUser.id },
     select: { id: true },
   });
-  if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const allowed = event || (await canManageEvent(eventId, dbUser.id));
+  if (!allowed)
+    return NextResponse.json(
+      {
+        error:
+          "You don't have permission to manage tasks for this event. Your access may have been changed — try reloading the page.",
+      },
+      { status: 403 },
+    );
 
   const task = await prisma.task.findFirst({ where: { id: taskId, eventId } });
   if (!task)
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const body = await req.json();
-  const { title, description, scheduledEnd, scheduledStart, parentTaskId, vendorIds } =
-    body;
+  const {
+    title,
+    description,
+    scheduledEnd,
+    scheduledStart,
+    parentTaskId,
+    vendorIds,
+  } = body;
 
   if (title !== undefined && !title?.trim()) {
     return NextResponse.json({ error: "Title is required." }, { status: 400 });
@@ -123,7 +139,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       });
       if (validCount !== vendorIdList.length) {
         return NextResponse.json(
-          { error: "One or more vendor assignments are invalid for this event." },
+          {
+            error: "One or more vendor assignments are invalid for this event.",
+          },
           { status: 400 },
         );
       }
@@ -223,7 +241,16 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     where: { id: eventId, ownerId: dbUser.id },
     select: { id: true },
   });
-  if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const allowed = event || (await canManageEvent(eventId, dbUser.id));
+  if (!allowed)
+    return NextResponse.json(
+      {
+        error:
+          "You don't have permission to manage tasks for this event. Your access may have been changed — try reloading the page.",
+      },
+      { status: 403 },
+    );
 
   const task = await prisma.task.findFirst({ where: { id: taskId, eventId } });
   if (!task)

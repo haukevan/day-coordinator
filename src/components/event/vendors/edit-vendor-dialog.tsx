@@ -41,6 +41,9 @@ export function EditVendorDialog({
   const [phoneDigits, setPhoneDigits] = useState(existingDigits);
   const [company, setCompany] = useState(vendor.company ?? "");
   const [jobTitle, setJobTitle] = useState(vendor.jobTitle ?? "");
+  const [isCoordinator, setIsCoordinator] = useState(
+    vendor.role === "COORDINATOR",
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [phoneError, setPhoneError] = useState("");
@@ -59,6 +62,7 @@ export function EditVendorDialog({
         phone: phoneDigits.length === 10 ? `+1${phoneDigits}` : null,
         company: company.trim() || null,
         jobTitle: jobTitle.trim() || null,
+        role: isCoordinator ? "COORDINATOR" : "VENDOR",
       }),
     });
 
@@ -169,6 +173,27 @@ export function EditVendorDialog({
               placeholder="Lead Florist"
               maxLength={128}
             />
+          </div>
+
+          {/* Coordinator toggle */}
+          <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isCoordinator}
+                onChange={(e) => setIsCoordinator(e.target.checked)}
+                className="mt-0.5 size-4 rounded border-border accent-primary"
+              />
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-foreground">
+                  Coordinator
+                </span>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Coordinators can add, edit, and delete tasks and vendors for
+                  this event. They cannot access event settings.
+                </p>
+              </div>
+            </label>
           </div>
 
           {error && (

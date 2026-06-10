@@ -42,6 +42,7 @@ export default async function AdminVendorsPage({
     company: ev.company,
     jobTitle: ev.jobTitle,
     status: ev.status,
+    role: ev.role,
     inviteSentAt: ev.inviteSentAt?.toISOString() ?? null,
     joinedAt: ev.joinedAt?.toISOString() ?? null,
     createdAt: ev.createdAt.toISOString(),

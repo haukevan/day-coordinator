@@ -31,6 +31,8 @@ export default async function VendorTimelinePage({
   });
   if (!eventVendor) notFound();
 
+  const isCoordinator = eventVendor.role === "COORDINATOR";
+
   const tasks = await prisma.task.findMany({
     where: { eventId },
     orderBy: [{ scheduledStart: "asc" }, { createdAt: "asc" }],
@@ -69,7 +71,7 @@ export default async function VendorTimelinePage({
             ? eventVendor.event.eventDate.toISOString()
             : null
         }
-        userRole="vendor"
+        userRole={isCoordinator ? "admin" : "vendor"}
       />
     </Suspense>
   );

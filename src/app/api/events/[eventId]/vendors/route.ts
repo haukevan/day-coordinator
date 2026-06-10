@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
+import { canManageEvent } from "@/lib/db/permissions";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import { sendVendorInviteEmail } from "@/lib/notifications/vendor-invite";
@@ -19,6 +20,7 @@ const addVendorSchema = z.object({
     .nullable(),
   company: z.string().max(128).optional().nullable(),
   jobTitle: z.string().max(128).optional().nullable(),
+  role: z.enum(["VENDOR", "COORDINATOR"]).optional().default("VENDOR"),
 });
 
 function serializeVendor(ev: {
@@ -32,6 +34,7 @@ function serializeVendor(ev: {
   company: string | null;
   jobTitle: string | null;
   status: string;
+  role: string;
   inviteSentAt: Date | null;
   joinedAt: Date | null;
   createdAt: Date;
@@ -52,6 +55,7 @@ function serializeVendor(ev: {
     company: ev.company,
     jobTitle: ev.jobTitle,
     status: ev.status,
+    role: ev.role,
     inviteSentAt: ev.inviteSentAt?.toISOString() ?? null,
     joinedAt: ev.joinedAt?.toISOString() ?? null,
     createdAt: ev.createdAt.toISOString(),
@@ -81,7 +85,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const event = await prisma.event.findFirst({
     where: { id: eventId, ownerId: dbUser.id },
   });
-  if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const allowed = event || (await canManageEvent(eventId, dbUser.id));
+  if (!allowed)
+    return NextResponse.json(
+      {
+        error:
+          "You don't have permission to manage vendors for this event. Your access may have been changed — try reloading the page.",
+      },
+      { status: 403 },
+    );
 
   const vendors = await prisma.eventVendor.findMany({
     where: { eventId },
@@ -115,7 +127,25 @@ export async function POST(req: NextRequest, { params }: Params) {
   const event = await prisma.event.findFirst({
     where: { id: eventId, ownerId: dbUser.id },
   });
-  if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const allowed = event || (await canManageEvent(eventId, dbUser.id));
+  if (!allowed)
+    return NextResponse.json(
+      {
+        error:
+          "You don't have permission to manage vendors for this event. Your access may have been changed — try reloading the page.",
+      },
+      { status: 403 },
+    );
+
+  // Resolve event status for invite-send decision
+  const eventStatus =
+    event?.status ??
+    (
+      await prisma.event.findUnique({
+        where: { id: eventId },
+        select: { status: true },
+      })
+    )?.status;
 
   let body: unknown;
   try {
@@ -132,7 +162,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     );
   }
 
-  const { email, firstName, lastName, phone, company, jobTitle } = parsed.data;
+  const { email, firstName, lastName, phone, company, jobTitle, role } =
+    parsed.data;
 
   // Upsert the admin's contact book entry
   const vendorContact = await prisma.vendorContact.upsert({
@@ -177,6 +208,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       vendorContactId: vendorContact.id,
       company: company ?? null,
       jobTitle: jobTitle ?? null,
+      role,
       inviteToken,
       inviteTokenExpiresAt,
     },
@@ -198,7 +230,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   });
 
   // Send invite immediately if event is SCHEDULED or LIVE
-  if (event.status === "SCHEDULED" || event.status === "LIVE") {
+  if (eventStatus === "SCHEDULED" || eventStatus === "LIVE") {
     try {
       await sendVendorInviteEmail(eventVendor.id);
     } catch {

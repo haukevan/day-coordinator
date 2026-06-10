@@ -43,6 +43,7 @@ export type SerializedVendor = {
   company: string | null;
   jobTitle: string | null;
   status: string;
+  role: string;
   inviteSentAt: string | null;
   joinedAt: string | null;
   createdAt: string;

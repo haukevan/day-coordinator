@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { SerializedVendor, SerializedVendorContact } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Check, Search } from "lucide-react";
+import { Check, Search, Shield } from "lucide-react";
 
 interface Props {
   eventId: string;
@@ -14,10 +19,16 @@ interface Props {
   onAdded: (vendors: SerializedVendor[]) => void;
 }
 
-export function AddExistingVendorDialog({ eventId, existingVendorEmails, onClose, onAdded }: Props) {
+export function AddExistingVendorDialog({
+  eventId,
+  existingVendorEmails,
+  onClose,
+  onAdded,
+}: Props) {
   const [contacts, setContacts] = useState<SerializedVendorContact[]>([]);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set()); // Set of contact ids
+  const [coordinatorIds, setCoordinatorIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState("");
@@ -45,6 +56,24 @@ export function AddExistingVendorDialog({ eventId, existingVendorEmails, onClose
     if (existingVendorEmails.has(email.toLowerCase())) return; // already added
     setSelected((prev) => {
       const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+        // Also remove from coordinators when deselecting
+        setCoordinatorIds((c) => {
+          const updated = new Set(c);
+          updated.delete(id);
+          return updated;
+        });
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function toggleCoordinator(id: string) {
+    setCoordinatorIds((prev) => {
+      const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
@@ -71,6 +100,7 @@ export function AddExistingVendorDialog({ eventId, existingVendorEmails, onClose
           phone: contact.phone ?? null,
           company: contact.company ?? null,
           jobTitle: contact.jobTitle ?? null,
+          role: coordinatorIds.has(contact.id) ? "COORDINATOR" : "VENDOR",
         }),
       });
       const data = await res.json();
@@ -123,24 +153,28 @@ export function AddExistingVendorDialog({ eventId, existingVendorEmails, onClose
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-              {contacts.length === 0 ? "No contacts in your address book yet." : "No contacts match your search."}
+              {contacts.length === 0
+                ? "No contacts in your address book yet."
+                : "No contacts match your search."}
             </div>
           ) : (
             <ul>
               {filtered.map((contact, i) => {
-                const isAdded = existingVendorEmails.has(contact.email.toLowerCase());
+                const isAdded = existingVendorEmails.has(
+                  contact.email.toLowerCase(),
+                );
                 const isSelected = selected.has(contact.id);
                 const displayName =
-                  [contact.firstName, contact.lastName].filter(Boolean).join(" ") ||
-                  contact.email;
-                const subtitle = [contact.jobTitle, contact.company].filter(Boolean).join(" · ");
+                  [contact.firstName, contact.lastName]
+                    .filter(Boolean)
+                    .join(" ") || contact.email;
+                const subtitle = [contact.jobTitle, contact.company]
+                  .filter(Boolean)
+                  .join(" · ");
 
                 return (
                   <li key={contact.id}>
-                    <button
-                      type="button"
-                      disabled={isAdded}
-                      onClick={() => toggleContact(contact.id, contact.email)}
+                    <div
                       className={cn(
                         "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
                         i > 0 && "border-t border-border",
@@ -151,38 +185,83 @@ export function AddExistingVendorDialog({ eventId, existingVendorEmails, onClose
                             : "hover:bg-muted",
                       )}
                     >
-                      {/* Checkbox */}
-                      <span
-                        className={cn(
-                          "flex size-4 shrink-0 items-center justify-center rounded border",
-                          isAdded
-                            ? "border-border bg-muted"
-                            : isSelected
-                              ? "border-primary bg-primary"
-                              : "border-border bg-background",
-                        )}
+                      <button
+                        type="button"
+                        disabled={isAdded}
+                        onClick={() => toggleContact(contact.id, contact.email)}
+                        className="flex flex-1 items-center gap-3 min-w-0"
                       >
-                        {(isAdded || isSelected) && (
-                          <Check className="size-2.5 text-white" strokeWidth={3} />
+                        {/* Checkbox */}
+                        <span
+                          className={cn(
+                            "flex size-4 shrink-0 items-center justify-center rounded border",
+                            isAdded
+                              ? "border-border bg-muted"
+                              : isSelected
+                                ? "border-primary bg-primary"
+                                : "border-border bg-background",
+                          )}
+                        >
+                          {isAdded && (
+                            <Check
+                              className="size-2.5 text-muted-foreground"
+                              strokeWidth={3}
+                            />
+                          )}
+                          {isSelected && (
+                            <Check
+                              className="size-2.5 text-primary-foreground"
+                              strokeWidth={3}
+                            />
+                          )}
+                        </span>
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-foreground">
+                            {displayName}
+                          </span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {contact.email}
+                            {subtitle && ` · ${subtitle}`}
+                          </span>
+                        </span>
+
+                        {isAdded && (
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            Already added
+                          </span>
                         )}
-                      </span>
+                      </button>
 
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-foreground">
-                          {displayName}
-                        </span>
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {contact.email}
-                          {subtitle && ` · ${subtitle}`}
-                        </span>
-                      </span>
-
-                      {isAdded && (
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          Already added
-                        </span>
+                      {/* Coordinator checkbox — appears when selected */}
+                      {isSelected && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCoordinator(contact.id);
+                          }}
+                          className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <span
+                            className={cn(
+                              "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                              coordinatorIds.has(contact.id)
+                                ? "border-primary bg-primary"
+                                : "border-border bg-background",
+                            )}
+                          >
+                            {coordinatorIds.has(contact.id) && (
+                              <Check
+                                className="size-2.5 text-primary-foreground"
+                                strokeWidth={3}
+                              />
+                            )}
+                          </span>
+                          Coordinator
+                        </button>
                       )}
-                    </button>
+                    </div>
                   </li>
                 );
               })}
@@ -196,16 +275,34 @@ export function AddExistingVendorDialog({ eventId, existingVendorEmails, onClose
           </p>
         )}
 
+        {/* Coordinator warning — shown when any contact is marked as coordinator */}
+        {coordinatorIds.size > 0 && (
+          <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2">
+            <Shield className="mt-0.5 size-3.5 shrink-0 text-warning" />
+            <p className="text-xs text-foreground">
+              Coordinators can add, edit, and delete tasks and vendors for this
+              event. They cannot access event settings.
+            </p>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-2 pt-1">
           <span className="text-xs text-muted-foreground">
-            {selectedCount > 0 ? `${selectedCount} selected` : "Select contacts to add"}
+            {selectedCount > 0
+              ? `${selectedCount} selected`
+              : "Select contacts to add"}
           </span>
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={loading || selectedCount === 0}>
-              {loading ? "Adding…" : `Add ${selectedCount > 0 ? selectedCount : ""} vendor${selectedCount !== 1 ? "s" : ""}`}
+            <Button
+              onClick={handleSubmit}
+              disabled={loading || selectedCount === 0}
+            >
+              {loading
+                ? "Adding…"
+                : `Add ${selectedCount > 0 ? selectedCount : ""} vendor${selectedCount !== 1 ? "s" : ""}`}
             </Button>
           </div>
         </div>

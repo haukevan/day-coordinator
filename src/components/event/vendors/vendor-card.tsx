@@ -91,6 +91,7 @@ export function VendorCard({
     vendor.email;
   const status = getVendorStatus(vendor);
   const resendLabel = getInviteButtonLabel(vendor, resending);
+  const isCoordinator = vendor.isEventOwner || vendor.role === "COORDINATOR";
 
   async function handleRemove() {
     if (!confirm(`Remove ${displayName} from this event?`)) return;
@@ -126,6 +127,11 @@ export function VendorCard({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {isCoordinator && (
+            <span className="inline-flex items-center rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-accent-foreground">
+              Coordinator
+            </span>
+          )}
           {status.showPendingHint ? (
             <Tooltip>
               <TooltipTrigger asChild>

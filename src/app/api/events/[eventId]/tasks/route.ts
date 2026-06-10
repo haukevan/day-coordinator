@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
+import { canManageEvent } from "@/lib/db/permissions";
 import { emitEventUpdate } from "@/lib/realtime";
 import {
   computeScheduledEnd,
@@ -29,7 +30,16 @@ export async function GET(_req: NextRequest, { params }: Params) {
     where: { id: eventId, ownerId: dbUser.id },
     select: { id: true },
   });
-  if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const allowed = event || (await canManageEvent(eventId, dbUser.id));
+  if (!allowed)
+    return NextResponse.json(
+      {
+        error:
+          "You don't have permission to manage tasks for this event. Your access may have been changed — try reloading the page.",
+      },
+      { status: 403 },
+    );
 
   const tasks = await prisma.task.findMany({
     where: { eventId },
@@ -80,11 +90,26 @@ export async function POST(req: NextRequest, { params }: Params) {
     where: { id: eventId, ownerId: dbUser.id },
     select: { id: true },
   });
-  if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const allowed = event || (await canManageEvent(eventId, dbUser.id));
+  if (!allowed)
+    return NextResponse.json(
+      {
+        error:
+          "You don't have permission to manage tasks for this event. Your access may have been changed — try reloading the page.",
+      },
+      { status: 403 },
+    );
 
   const body = await req.json();
-  const { title, description, scheduledEnd, parentTaskId, scheduledStart, vendorIds } =
-    body;
+  const {
+    title,
+    description,
+    scheduledEnd,
+    parentTaskId,
+    scheduledStart,
+    vendorIds,
+  } = body;
 
   if (!title?.trim()) {
     return NextResponse.json({ error: "Title is required." }, { status: 400 });
@@ -152,13 +177,14 @@ export async function POST(req: NextRequest, { params }: Params) {
       scheduledEnd: endDate,
       parentTaskId: parentTaskId ?? null,
       scheduledStart: startDate,
-      taskVendors: vendorIdList.length > 0
-        ? {
-            createMany: {
-              data: vendorIdList.map((eventVendorId) => ({ eventVendorId })),
-            },
-          }
-        : undefined,
+      taskVendors:
+        vendorIdList.length > 0
+          ? {
+              createMany: {
+                data: vendorIdList.map((eventVendorId) => ({ eventVendorId })),
+              },
+            }
+          : undefined,
     },
   });
 

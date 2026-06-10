@@ -33,6 +33,7 @@ export function AddVendorDialog({ eventId, onClose, onAdded }: Props) {
   const [phoneDigits, setPhoneDigits] = useState("");
   const [company, setCompany] = useState("");
   const [jobTitle, setJobTitle] = useState("");
+  const [isCoordinator, setIsCoordinator] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [emailError, setEmailError] = useState("");
@@ -53,6 +54,7 @@ export function AddVendorDialog({ eventId, onClose, onAdded }: Props) {
         phone: phoneDigits.length === 10 ? `+1${phoneDigits}` : null,
         company: company.trim() || null,
         jobTitle: jobTitle.trim() || null,
+        role: isCoordinator ? "COORDINATOR" : "VENDOR",
       }),
     });
 
@@ -188,6 +190,27 @@ export function AddVendorDialog({ eventId, onClose, onAdded }: Props) {
               placeholder="Lead Florist"
               maxLength={128}
             />
+          </div>
+
+          {/* Coordinator toggle */}
+          <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isCoordinator}
+                onChange={(e) => setIsCoordinator(e.target.checked)}
+                className="mt-0.5 size-4 rounded border-border accent-primary"
+              />
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-foreground">
+                  Make coordinator
+                </span>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Coordinators can add, edit, and delete tasks and vendors for
+                  this event. They cannot access event settings.
+                </p>
+              </div>
+            </label>
           </div>
 
           {error && (
