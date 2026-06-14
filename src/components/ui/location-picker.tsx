@@ -278,7 +278,7 @@ export function LocationPicker({ value, onChange, className }: Props) {
   return (
     <div className={cn("space-y-3", className)}>
       {/* Search bar */}
-      <div className="relative z-[2000]">
+      <div className="relative z-10">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -309,33 +309,45 @@ export function LocationPicker({ value, onChange, className }: Props) {
 
         {/* Results dropdown */}
         {showResults && results.length > 0 && (
-          <div className="absolute z-[50] mt-1 w-full rounded-md border border-border bg-popover shadow-lg">
-            <ul className="max-h-48 overflow-auto py-1">
-              {results.map((r) => {
-                const parts = r.display_name.split(",").map((s) => s.trim());
-                return (
-                  <li key={r.place_id}>
-                    <button
-                      type="button"
-                      onClick={() => selectResult(r)}
-                      className="flex w-full items-start gap-2 px-3 py-2.5 text-left text-sm hover:bg-hover"
-                      style={{ minHeight: "44px" }}
-                    >
-                      <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-foreground">
-                          {buildDisplayName(parts)}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {buildSubtitle(parts, r)}
-                        </p>
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+          <>
+            {/* Click-away backdrop */}
+            <button
+              type="button"
+              className="fixed inset-0 z-20 cursor-default"
+              onClick={() => setShowResults(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setShowResults(false);
+              }}
+              aria-label="Close search results"
+            />
+            <div className="absolute z-30 mt-1 w-full rounded-md border border-border bg-popover shadow-lg">
+              <ul className="max-h-48 overflow-auto py-1">
+                {results.map((r) => {
+                  const parts = r.display_name.split(",").map((s) => s.trim());
+                  return (
+                    <li key={r.place_id}>
+                      <button
+                        type="button"
+                        onClick={() => selectResult(r)}
+                        className="flex w-full items-start gap-2 px-3 py-2.5 text-left text-sm hover:bg-hover"
+                        style={{ minHeight: "44px" }}
+                      >
+                        <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-foreground">
+                            {buildDisplayName(parts)}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {buildSubtitle(parts, r)}
+                          </p>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </>
         )}
       </div>
 
@@ -343,7 +355,7 @@ export function LocationPicker({ value, onChange, className }: Props) {
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       {/* Map — always render container so Leaflet can mount; overlay loading */}
-      <div className="relative overflow-hidden rounded-lg border border-border">
+      <div className="relative z-0 overflow-hidden rounded-lg border border-border">
         <div ref={mapContainerRef} className="h-[280px] w-full sm:h-[320px]" />
         {!mapReady && (
           <div className="absolute inset-0 flex items-center justify-center bg-muted/40">

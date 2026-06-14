@@ -370,11 +370,20 @@ export function SubtaskItem({
           <Popover open={showStatusInfo} onOpenChange={setShowStatusInfo}>
             <PopoverTrigger asChild>
               <span
-                onMouseEnter={() => setShowStatusInfo(true)}
-                onMouseLeave={() => setShowStatusInfo(false)}
-                onClick={() => setShowStatusInfo(!showStatusInfo)}
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowStatusInfo(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setShowStatusInfo(true);
+                  }
+                }}
                 className={cn(
-                  "text-[11px] font-medium whitespace-nowrap cursor-default select-none",
+                  "text-[11px] font-medium whitespace-nowrap select-none",
                   "hover:underline decoration-dotted underline-offset-2",
                   status === "IN_PROGRESS" && "text-warning",
                   status === "COMPLETED" && "text-success",
@@ -487,7 +496,7 @@ export function SubtaskItem({
       </div>
 
       {/* ── Row 2: Title (full width, wraps) ──────────────────────────── */}
-      <div className="pl-[30px]">
+      <div className="pl-[30px] pt-1">
         {userRole === "admin" && editingTitle ? (
           <input
             type="text"
@@ -497,7 +506,7 @@ export function SubtaskItem({
             onKeyDown={handleTitleKeyDown}
             maxLength={200}
             autoFocus
-            className="w-full bg-transparent text-sm text-foreground border-b border-primary pb-0.5 outline-none"
+            className="w-full bg-transparent text-base text-foreground border-b border-primary pb-0.5 outline-none"
           />
         ) : (
           <button

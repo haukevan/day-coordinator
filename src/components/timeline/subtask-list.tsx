@@ -472,7 +472,7 @@ export function SubtaskList({
   return (
     <div className="flex flex-col">
       {/* Sticky header area — always visible */}
-      <div className="sticky top-0 z-10 bg-popover pb-0.5">
+      <div className="sticky top-0 z-10 bg-popover pb-2">
         {/* Header */}
         <div className="flex items-center justify-between px-1 py-1">
           <div className="flex items-center gap-1.5">
@@ -510,7 +510,12 @@ export function SubtaskList({
               onChange={(e) => setNewTitle(e.target.value)}
               onKeyDown={handleAddKeyDown}
               onBlur={() => {
-                if (!newTitle.trim()) setAdding(false);
+                const trimmed = newTitle.trim();
+                if (trimmed) {
+                  handleAddSubTask();
+                } else {
+                  setAdding(false);
+                }
               }}
               placeholder="Checklist item…"
               autoFocus

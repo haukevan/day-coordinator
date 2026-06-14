@@ -97,7 +97,7 @@ export function CreateVenueDialog({ open, onOpenChange, onCreated }: Props) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="max-h-[90dvh] overflow-auto sm:max-w-md"
+        className="max-h-[90dvh] overflow-y-auto overflow-x-hidden sm:max-w-md min-w-0"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>
