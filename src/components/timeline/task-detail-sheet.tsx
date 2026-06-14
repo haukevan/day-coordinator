@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 import { toZonedTime } from "date-fns-tz";
 import { format } from "date-fns";
-import { Clock, Link2, Pencil, User } from "lucide-react";
+import { ArrowLeft, Clock, Link2, Pencil, User } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -137,15 +137,24 @@ export function TaskDetailSheet({
       <SheetContent
         side="right"
         className="flex !w-full flex-col sm:!w-3/4 sm:max-w-xl"
+        showCloseButton={false}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {/* ── Header ─────────────────────────────────────────────────── */}
         <SheetHeader className="px-4 pt-3 pb-0">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex shrink-0 items-center justify-center size-8 -ml-1.5 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="size-5" />
+            </button>
             <div className="flex-1 min-w-0">
               <SheetTitle className="truncate text-lg">{task.title}</SheetTitle>
             </div>
-            <div className="mr-7 shrink-0">
+            <div className="shrink-0">
               <TaskStatusBadge status={task.status} />
             </div>
           </div>

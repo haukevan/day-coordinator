@@ -355,23 +355,35 @@ export function LocationPicker({ value, onChange, className }: Props) {
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       {/* Map — always render container so Leaflet can mount; overlay loading */}
-      <div className="relative z-0 overflow-hidden rounded-lg border border-border">
-        <div ref={mapContainerRef} className="h-[280px] w-full sm:h-[320px]" />
-        {!mapReady && (
-          <div className="absolute inset-0 flex items-center justify-center bg-muted/40">
-            <p className="text-sm text-muted-foreground">Loading map…</p>
-          </div>
-        )}
+      <div className="relative z-0">
+        <div className="overflow-hidden rounded-lg border border-border">
+          <div
+            ref={mapContainerRef}
+            className="h-[280px] w-full sm:h-[320px]"
+          />
+          {!mapReady && (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted/40">
+              <p className="text-sm text-muted-foreground">Loading map…</p>
+            </div>
+          )}
+        </div>
         {value && mapReady && (
           <button
             type="button"
             onClick={clearLocation}
-            className="absolute right-2 top-2 z-[1000] rounded-full bg-background/90 p-1.5 text-muted-foreground shadow-sm hover:bg-background hover:text-foreground"
+            className="absolute right-3 top-3 z-20 rounded-full bg-background/90 p-1.5 text-muted-foreground shadow-sm hover:bg-background hover:text-foreground"
             aria-label="Clear location"
           >
             <X className="size-4" />
           </button>
         )}
+        {/* Promote Leaflet zoom controls above tile GPU layer */}
+        <style>{`
+          .leaflet-control-zoom {
+            z-index: 1000 !important;
+            transform: translateZ(0);
+          }
+        `}</style>
       </div>
 
       {/* Selected location summary */}
