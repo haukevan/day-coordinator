@@ -146,6 +146,27 @@ function TimePickerPopover({
     return hhmmToMinutes(to24h(h, 55, p)) >= minInclusiveMinutes;
   }
 
+  /** Check if *any* time in the given period is selectable. */
+  function isPeriodSelectable(p: "AM" | "PM") {
+    if (minInclusiveMinutes === null) return true;
+    // AM runs from 12:00 AM (0 min) to 11:55 AM (715 min)
+    // PM runs from 12:00 PM (720 min) to 11:55 PM (1435 min)
+    if (p === "AM") return minInclusiveMinutes <= 715;
+    return true;
+  }
+
+  /** Find the first valid (hour, minute) in a period, or null. */
+  function findFirstValidInPeriod(
+    p: "AM" | "PM",
+  ): { h: number; m: number } | null {
+    for (const h of HOURS_12) {
+      if (!isHourSelectable(h, p)) continue;
+      const m = MINUTES_5.find((mm) => isSelectable(h, mm, p));
+      if (m !== undefined) return { h, m };
+    }
+    return null;
+  }
+
   useEffect(() => {
     if (value) {
       const { h, m, period } = to12h(value);
@@ -188,6 +209,18 @@ function TimePickerPopover({
     if (open) {
       setOpen(false);
       return;
+    }
+    // Auto-correct selection to the first valid time if current selection is invalid
+    if (minInclusiveMinutes !== null && !isSelectable(selH, selM, selPeriod)) {
+      for (const p of ["AM", "PM"] as const) {
+        const first = findFirstValidInPeriod(p);
+        if (first) {
+          setSelH(first.h);
+          setSelM(first.m);
+          setSelPeriod(p);
+          break;
+        }
+      }
     }
     if (triggerRef.current) {
       const r = triggerRef.current.getBoundingClientRect();
@@ -358,7 +391,7 @@ function TimePickerPopover({
           <div className="flex flex-col p-1">
             {(["AM", "PM"] as const).map((p) =>
               (() => {
-                const selectable = isSelectable(selH, selM, p);
+                const selectable = isPeriodSelectable(p);
                 return (
                   <button
                     key={p}
@@ -366,8 +399,16 @@ function TimePickerPopover({
                     disabled={!selectable}
                     onClick={() => {
                       setSelPeriod(p);
-                      commit(selH, selM, p);
-                      setOpen(false);
+                      if (isSelectable(selH, selM, p)) {
+                        commit(selH, selM, p);
+                      } else {
+                        const first = findFirstValidInPeriod(p);
+                        if (first) {
+                          setSelH(first.h);
+                          setSelM(first.m);
+                          commit(first.h, first.m, p);
+                        }
+                      }
                     }}
                     className={cn(
                       "rounded-md px-3 py-1.5 text-sm transition-colors",
@@ -640,6 +681,48 @@ export function TaskPanel({
     setSelectedVendorIds((prev) => prev.filter((vid) => vid !== id));
   }
 
+  // Compare current form state with original task to detect unsaved changes
+  const hasChanges = useMemo(() => {
+    if (!isEdit || !task) return true; // create mode: always allow submit
+    const origTitle = task.title ?? "";
+    const origDesc = task.description ?? "";
+    const origStart = task.scheduledStart
+      ? utcToLocalHHMM(task.scheduledStart, timezone)
+      : "";
+    const origEnd = task.scheduledEnd
+      ? utcToLocalHHMM(task.scheduledEnd, timezone)
+      : "";
+    const origParentId = task.parentTaskId ?? "";
+    const origVendorIds = (
+      task.taskVendors?.map((tv) => tv.eventVendorId) ?? []
+    )
+      .slice()
+      .sort((a, b) => a.localeCompare(b));
+    const curVendorIds = selectedVendorIds
+      .slice()
+      .sort((a, b) => a.localeCompare(b));
+
+    return (
+      title !== origTitle ||
+      description !== origDesc ||
+      startHHMM !== origStart ||
+      endHHMM !== origEnd ||
+      parentTaskId !== origParentId ||
+      curVendorIds.length !== origVendorIds.length ||
+      curVendorIds.some((id, i) => id !== origVendorIds[i])
+    );
+  }, [
+    isEdit,
+    task,
+    title,
+    description,
+    startHHMM,
+    endHHMM,
+    parentTaskId,
+    selectedVendorIds,
+    timezone,
+  ]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) {
@@ -732,6 +815,8 @@ export function TaskPanel({
 
     onRefresh();
     onClose();
+    // Full navigation to ensure all sheets/state are reset after delete
+    window.location.href = `/events/${eventId}/timeline`;
   }
 
   return (
@@ -860,7 +945,7 @@ export function TaskPanel({
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Bridal party photos"
                 required
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
 
@@ -877,7 +962,7 @@ export function TaskPanel({
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Add any relevant details..."
                 rows={2}
-                className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
 
@@ -896,7 +981,7 @@ export function TaskPanel({
                     <select
                       value={parentTaskId}
                       onChange={(e) => handleParentChange(e.target.value)}
-                      className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                       <option value="">None</option>
                       {eligiblePrereqs.map((t) => (
@@ -1091,63 +1176,85 @@ export function TaskPanel({
               </Button>
             </div>
           ) : (
+            /* ── Admin actions ─────────────────────────────────────── */
             <>
               <div className="flex items-center">
                 {isEdit && (
                   <Button
                     type="button"
                     variant={confirmDelete ? "destructive" : "ghost"}
-                    size="icon"
+                    size="sm"
+                    className="overflow-hidden transition-all duration-200 ease-in-out"
                     aria-label={
                       confirmDelete ? "Confirm delete task" : "Delete task"
                     }
-                    title={
-                      confirmDelete
-                        ? "Tap again to confirm delete"
-                        : "Delete task"
-                    }
+                    title="Delete task"
                     onClick={handleDeleteTask}
                     disabled={saving || deleting}
                   >
-                    {confirmDelete ? (
-                      <Check className="size-4" />
+                    {deleting ? (
+                      <Loader2 className="size-4 shrink-0 animate-spin" />
                     ) : (
-                      <Trash2 className="size-4" />
+                      <Trash2 className="size-4 shrink-0" />
                     )}
+                    <span
+                      className={cn(
+                        "whitespace-nowrap transition-all duration-200 ease-in-out",
+                        confirmDelete
+                          ? "max-w-[120px] ml-1.5 opacity-100"
+                          : "max-w-0 ml-0 opacity-0",
+                      )}
+                    >
+                      {deleting ? "Deleting…" : "Delete task"}
+                    </span>
                   </Button>
                 )}
               </div>
 
               <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setConfirmDelete(false);
-                    onClose();
-                  }}
-                  disabled={saving || deleting}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={saving || deleting}
-                  form="task-form"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" />
-                      Saving…
-                    </>
-                  ) : isEdit ? (
-                    "Save changes"
-                  ) : (
-                    "Create task"
-                  )}
-                </Button>
+                {confirmDelete ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfirmDelete(false)}
+                    disabled={saving || deleting}
+                  >
+                    Cancel
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setConfirmDelete(false);
+                        onClose();
+                      }}
+                      disabled={saving || deleting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={saving || deleting || (isEdit && !hasChanges)}
+                      form="task-form"
+                    >
+                      {saving ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" />
+                          Saving…
+                        </>
+                      ) : isEdit ? (
+                        "Save changes"
+                      ) : (
+                        "Create task"
+                      )}
+                    </Button>
+                  </>
+                )}
               </div>
             </>
           )}

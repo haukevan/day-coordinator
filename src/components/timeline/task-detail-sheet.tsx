@@ -30,6 +30,8 @@ interface TaskDetailSheetProps {
   userRole: "admin" | "vendor";
   /** Whether the current user is an accepted vendor assigned to this task (controls checklist visibility) */
   canViewSubTasks: boolean;
+  /** The current vendor's EventVendor ID — used to restrict subtask status toggling */
+  currentVendorEventId?: string | null;
   onClose: () => void;
   onEdit: (task: SerializedTask) => void;
 }
@@ -58,6 +60,7 @@ export function TaskDetailSheet({
   open,
   userRole,
   canViewSubTasks,
+  currentVendorEventId,
   onClose,
   onEdit,
 }: TaskDetailSheetProps) {
@@ -264,6 +267,7 @@ export function TaskDetailSheet({
               allEventVendors={parentTaskVendors}
               taskId={task.id}
               eventId={eventId}
+              currentVendorEventId={currentVendorEventId ?? null}
               onSubTasksChange={setSubTasks}
             />
           )}

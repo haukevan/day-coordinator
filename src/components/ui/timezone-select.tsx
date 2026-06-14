@@ -52,7 +52,7 @@ export function TimezoneSelect({
   const groups = useMemo(() => buildGroups(), []);
 
   const selectClass = cn(
-    "w-full appearance-none rounded-md border border-input bg-background py-2 pl-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+    "w-full appearance-none rounded-md border border-input bg-background py-2 pl-3 pr-8 text-base text-foreground focus:outline-none focus:ring-1 focus:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
     className,
   );
 

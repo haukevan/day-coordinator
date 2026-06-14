@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { CalendarIcon, ExternalLink, Trash2 } from "lucide-react";
@@ -66,6 +66,21 @@ export function EventSettingsForm({ event }: { event: EventData }) {
     event.status === "COMPLETED" ||
     event.status === "ARCHIVED";
 
+  // Compare form state with original event to detect unsaved changes
+  const hasChanges = useMemo(() => {
+    const origDateStr = event.eventDate ? event.eventDate.split("T")[0] : "";
+    const formDateStr = eventDate ? format(eventDate, "yyyy-MM-dd") : "";
+
+    return (
+      title !== event.title ||
+      description !== (event.description ?? "") ||
+      formDateStr !== origDateStr ||
+      timezone !== event.timezone ||
+      slug !== (event.slug ?? "") ||
+      venueId !== (event.venueId ?? null)
+    );
+  }, [event, title, description, eventDate, timezone, slug, venueId]);
+
   async function handlePublicToggle(checked: boolean) {
     setPublicTimeline(checked);
     await fetch(`/api/events/${event.id}`, {
@@ -116,7 +131,7 @@ export function EventSettingsForm({ event }: { event: EventData }) {
     setSaving(false);
 
     if (res.ok) {
-      // Local state already reflects changes; header data will be fresh on next navigation
+      router.push(`/events/${event.id}/timeline`);
     } else {
       const data = await res.json();
       setSaveError(data.error ?? "Failed to save.");
@@ -296,7 +311,7 @@ export function EventSettingsForm({ event }: { event: EventData }) {
             Event details are locked while the event is live.
           </p>
         )}
-        <Button type="submit" disabled={saving || isLive}>
+        <Button type="submit" disabled={saving || isLive || !hasChanges}>
           {saving ? "Saving…" : "Save changes"}
         </Button>
       </form>

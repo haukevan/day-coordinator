@@ -15,6 +15,8 @@ interface SubtaskListProps {
   allEventVendors: SerializedVendor[];
   taskId: string;
   eventId: string;
+  /** The current vendor's EventVendor ID — used to restrict subtask status toggling */
+  currentVendorEventId?: string | null;
   onSubTasksChange: (subTasks: SerializedSubTask[]) => void;
 }
 
@@ -25,6 +27,7 @@ export function SubtaskList({
   allEventVendors,
   taskId,
   eventId,
+  currentVendorEventId,
   onSubTasksChange,
 }: SubtaskListProps) {
   const [adding, setAdding] = useState(false);
@@ -512,7 +515,7 @@ export function SubtaskList({
               placeholder="Checklist item…"
               autoFocus
               disabled={creating}
-              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground border-b border-border pb-0.5 outline-none focus:border-primary"
+              className="flex-1 bg-transparent text-base text-foreground placeholder:text-muted-foreground border-b border-border pb-0.5 outline-none focus:border-primary"
             />
             {creating && (
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
@@ -530,44 +533,54 @@ export function SubtaskList({
             {userRole === "admin" && ' Tap "Add" to create one.'}
           </p>
         ) : (
-          subTasks.map((st) => (
-            <SubtaskItem
-              key={st.id}
-              subTask={st}
-              userRole={userRole}
-              parentTaskVendors={parentTaskVendors}
-              allEventVendors={allEventVendors}
-              onStatusChange={handleStatusChange}
-              onTitleChange={handleTitleChange}
-              onVendorsChange={handleVendorsChange}
-              onDelete={handleDelete}
-              itemId={st.id}
-              isDragging={draggedId === st.id}
-              dropIndicator={dragOverId === st.id ? dragOverPosition : null}
-              onDragStart={
-                userRole === "admin"
-                  ? (e: React.DragEvent) => handleDragStart(e, st.id)
-                  : undefined
-              }
-              onTouchStart={
-                userRole === "admin"
-                  ? (e: React.TouchEvent) => handleTouchStart(e, st.id)
-                  : undefined
-              }
-              onDragOver={
-                userRole === "admin"
-                  ? (e: React.DragEvent) => handleDragOver(e, st.id)
-                  : undefined
-              }
-              onDragLeave={userRole === "admin" ? handleDragLeave : undefined}
-              onDrop={
-                userRole === "admin"
-                  ? (e: React.DragEvent) => handleDrop(e, st.id)
-                  : undefined
-              }
-              onDragEnd={userRole === "admin" ? handleDragEnd : undefined}
-            />
-          ))
+          subTasks.map((st) => {
+            // Vendor can only toggle status if assigned to this specific subtask
+            const isAssignedToSubtask =
+              userRole === "admin" ||
+              (currentVendorEventId != null &&
+                (st.subTaskVendors ?? []).some(
+                  (sv) => sv.eventVendorId === currentVendorEventId,
+                ));
+            return (
+              <SubtaskItem
+                key={st.id}
+                subTask={st}
+                userRole={userRole}
+                parentTaskVendors={parentTaskVendors}
+                allEventVendors={allEventVendors}
+                canToggleStatus={isAssignedToSubtask}
+                onStatusChange={handleStatusChange}
+                onTitleChange={handleTitleChange}
+                onVendorsChange={handleVendorsChange}
+                onDelete={handleDelete}
+                itemId={st.id}
+                isDragging={draggedId === st.id}
+                dropIndicator={dragOverId === st.id ? dragOverPosition : null}
+                onDragStart={
+                  userRole === "admin"
+                    ? (e: React.DragEvent) => handleDragStart(e, st.id)
+                    : undefined
+                }
+                onTouchStart={
+                  userRole === "admin"
+                    ? (e: React.TouchEvent) => handleTouchStart(e, st.id)
+                    : undefined
+                }
+                onDragOver={
+                  userRole === "admin"
+                    ? (e: React.DragEvent) => handleDragOver(e, st.id)
+                    : undefined
+                }
+                onDragLeave={userRole === "admin" ? handleDragLeave : undefined}
+                onDrop={
+                  userRole === "admin"
+                    ? (e: React.DragEvent) => handleDrop(e, st.id)
+                    : undefined
+                }
+                onDragEnd={userRole === "admin" ? handleDragEnd : undefined}
+              />
+            );
+          })
         )}
       </div>
     </div>

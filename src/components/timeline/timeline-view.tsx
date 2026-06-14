@@ -17,6 +17,7 @@ export function TimelineView({
   eventDate,
   userRole = "admin",
   currentUserId,
+  vendorEventVendorId,
 }: {
   eventId: string;
   tasks: SerializedTask[];
@@ -25,6 +26,8 @@ export function TimelineView({
   userRole?: "admin" | "vendor";
   /** The current user's database ID. Used to check sub-task visibility for vendors. */
   currentUserId?: string;
+  /** The vendor's EventVendor ID (server-provided). Used when userRole is "vendor" to bypass the vendors API for canViewSubTasks. */
+  vendorEventVendorId?: string;
 }) {
   const { view, createPanelTrigger } = useTimelineView();
   const [tasks, setTasks] = useState(initialTasks);
@@ -119,18 +122,24 @@ export function TimelineView({
     setDetailTask((prev) => (prev?.id === saved.id ? saved : prev));
   }
 
-  // Compute if the current user can view sub-tasks for the detail task
+  // Compute if the current user can view sub-tasks for the detail task.
+  // For vendors, we use the server-provided vendorEventVendorId to check
+  // directly against the task's vendor assignments — no vendors API needed.
   const canViewSubTasks = useMemo(() => {
     if (userRole === "admin") return true;
-    if (!detailTask || !currentUserId) return false;
-    // Vendor can view sub-tasks if they are assigned to the parent task
-    return (detailTask.taskVendors ?? []).some((tv) => {
-      // We need to check if the vendor's userId matches. The taskVendor includes
-      // eventVendor which may have userId. We need to check via the vendors list.
-      const vendor = vendors.find((v) => v.id === tv.eventVendorId);
-      return vendor?.userId === currentUserId;
-    });
-  }, [userRole, detailTask, currentUserId, vendors]);
+    if (!detailTask || !vendorEventVendorId) return false;
+    // Vendor can view sub-tasks if their EventVendor ID is in the task's vendor list
+    return (detailTask.taskVendors ?? []).some(
+      (tv) => tv.eventVendorId === vendorEventVendorId,
+    );
+  }, [userRole, detailTask, vendorEventVendorId]);
+
+  // The current vendor's EventVendor ID — used to restrict subtask status toggling.
+  // For vendors, this comes directly from the server; for admins it's not needed.
+  const currentVendorEventId = useMemo(() => {
+    if (userRole !== "vendor") return null;
+    return vendorEventVendorId ?? null;
+  }, [userRole, vendorEventVendorId]);
 
   return (
     <div
@@ -167,6 +176,7 @@ export function TimelineView({
         open={detailOpen}
         userRole={userRole}
         canViewSubTasks={canViewSubTasks}
+        currentVendorEventId={currentVendorEventId}
         onClose={() => setDetailOpen(false)}
         onEdit={openEditFromDetail}
       />

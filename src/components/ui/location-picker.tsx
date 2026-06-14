@@ -132,7 +132,7 @@ function shortSummary(addr: string): string {
 // ─── component ───────────────────────────────────────────────────────────────
 
 const inputClass =
-  "w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50";
+  "w-full rounded-md border border-border bg-background px-3 py-2 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50";
 
 export function LocationPicker({ value, onChange, className }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -253,6 +253,10 @@ export function LocationPicker({ value, onChange, className }: Props) {
       setShowResults(false);
       setResults([]);
       onChange(loc);
+      // Zoom into the selected location
+      if (mapRef.current) {
+        mapRef.current.setView([loc.lat, loc.lng], 15);
+      }
     },
     [onChange],
   );
@@ -274,7 +278,7 @@ export function LocationPicker({ value, onChange, className }: Props) {
   return (
     <div className={cn("space-y-3", className)}>
       {/* Search bar */}
-      <div className="relative z-1000">
+      <div className="relative z-[2000]">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -294,7 +298,8 @@ export function LocationPicker({ value, onChange, className }: Props) {
           </div>
           <Button
             type="button"
-            size="sm"
+            size="lg"
+            className="h-auto py-2"
             onClick={handleSearch}
             disabled={searching || query.trim().length < 3}
           >
@@ -304,7 +309,7 @@ export function LocationPicker({ value, onChange, className }: Props) {
 
         {/* Results dropdown */}
         {showResults && results.length > 0 && (
-          <div className="absolute z-20 mt-1 w-full rounded-md border border-border bg-popover shadow-lg">
+          <div className="absolute z-[50] mt-1 w-full rounded-md border border-border bg-popover shadow-lg">
             <ul className="max-h-48 overflow-auto py-1">
               {results.map((r) => {
                 const parts = r.display_name.split(",").map((s) => s.trim());

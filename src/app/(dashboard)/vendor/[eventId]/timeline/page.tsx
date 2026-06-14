@@ -103,6 +103,7 @@ export default async function VendorTimelinePage({
         }
         userRole={isCoordinator ? "admin" : "vendor"}
         currentUserId={dbUser.id}
+        vendorEventVendorId={isCoordinator ? undefined : eventVendor.id}
       />
     </Suspense>
   );

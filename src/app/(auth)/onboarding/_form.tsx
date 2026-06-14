@@ -82,7 +82,7 @@ export function OnboardingForm({
   }
 
   const inputClass =
-    "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+    "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4 bg-background">

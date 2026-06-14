@@ -141,7 +141,7 @@ export function AddExistingVendorDialog({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name, email, or company…"
-            className="w-full rounded-lg border border-border bg-background py-2 pl-8 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full rounded-lg border border-border bg-background py-2 pl-8 pr-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
 

@@ -159,6 +159,8 @@ interface SubtaskItemProps {
   parentTaskVendors: SerializedVendor[];
   /** All event vendors for the admin vendor picker (constrained subset shown in UI) */
   allEventVendors: SerializedVendor[];
+  /** Whether the current user can toggle this subtask's status (vendor must be assigned) */
+  canToggleStatus?: boolean;
   onStatusChange: (
     subTaskId: string,
     status: SubTaskStatus,
@@ -189,6 +191,7 @@ export function SubtaskItem({
   userRole,
   parentTaskVendors,
   allEventVendors,
+  canToggleStatus = true,
   onStatusChange,
   onTitleChange,
   onVendorsChange,
@@ -324,19 +327,36 @@ export function SubtaskItem({
           </div>
         )}
 
-        {/* Status circle — only the circle toggles */}
+        {/* Status circle — only the circle toggles; restricted to assigned vendors */}
         <button
           type="button"
-          onClick={handleStatusToggle}
-          disabled={pending}
-          aria-label={`Status: ${config.label}. Tap to change.`}
-          className="flex shrink-0 items-center justify-center size-5 focus:outline-none focus:ring-2 focus:ring-ring rounded-full transition-colors"
+          onClick={canToggleStatus ? handleStatusToggle : undefined}
+          disabled={pending || !canToggleStatus}
+          aria-label={
+            canToggleStatus
+              ? `Status: ${config.label}. Tap to change.`
+              : `Status: ${config.label}. Only assigned vendors can change.`
+          }
+          title={
+            !canToggleStatus && userRole === "vendor"
+              ? "Only vendors assigned to this checklist item can update its status"
+              : undefined
+          }
+          className={cn(
+            "flex shrink-0 items-center justify-center size-5 rounded-full transition-colors",
+            canToggleStatus
+              ? "focus:outline-none focus:ring-2 focus:ring-ring"
+              : "cursor-not-allowed opacity-40",
+          )}
         >
           {pending ? (
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
           ) : (
             <Icon
-              className={cn("size-5 transition-colors", config.className)}
+              className={cn(
+                "size-5 transition-colors",
+                canToggleStatus ? config.className : "text-muted-foreground/30",
+              )}
             />
           )}
         </button>
