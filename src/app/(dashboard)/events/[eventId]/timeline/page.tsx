@@ -89,6 +89,7 @@ export default async function TimelinePage({
         timezone={event.timezone}
         eventDate={event.eventDate ? event.eventDate.toISOString() : null}
         userRole="admin"
+        currentUserId={dbUser.id}
       />
     </Suspense>
   );

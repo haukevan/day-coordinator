@@ -5,6 +5,7 @@
  *
  * Events:
  *   task.created | task.updated | task.started | task.completed | task.delayed
+ *   subtask.created | subtask.updated | subtask.deleted
  */
 
 import { supabase } from "./supabase";
@@ -16,7 +17,7 @@ import { supabase } from "./supabase";
 export async function emitEventUpdate(
   eventId: string,
   eventName: string,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
 ): Promise<void> {
   await supabase.channel(`event-${eventId}`).send({
     type: "broadcast",

@@ -93,3 +93,37 @@ export type LinkedEvent = {
   title: string;
   status: string;
 };
+
+// ─── SubTask Types ────────────────────────────────────────────────────────────
+
+export type SubTaskVendorRef = {
+  eventVendorId: string;
+  eventVendor: {
+    id: string;
+    company: string | null;
+    jobTitle: string | null;
+    vendorContact: {
+      email: string;
+      firstName: string | null;
+      lastName: string | null;
+    };
+  };
+};
+
+export type SerializedSubTask = {
+  id: string;
+  taskId: string;
+  title: string;
+  status: string; // NOT_STARTED | IN_PROGRESS | COMPLETED
+  sortOrder: number;
+  subTaskVendors?: SubTaskVendorRef[];
+  completedById?: string | null;
+  completedByName?: string | null;
+  completedBy?: {
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+};

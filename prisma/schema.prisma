@@ -32,6 +32,7 @@ model User {
   activityLogs      ActivityLog[]
   vendorContacts    VendorContact[] @relation("VendorContacts")
   vendorMemberships EventVendor[]   @relation("VendorMemberships")
+  completedSubTasks SubTask[]
 }
 
 // ─── Event ───────────────────────────────────────────────────────────────────
@@ -100,6 +101,7 @@ model Task {
 
   activityLogs ActivityLog[]
   taskVendors  TaskVendor[]
+  subTasks     SubTask[]
 }
 
 enum TaskStatus {
@@ -198,7 +200,8 @@ model EventVendor {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
-  taskVendors TaskVendor[]
+  taskVendors    TaskVendor[]
+  subTaskVendors SubTaskVendor[]
 
   @@unique([eventId, vendorContactId])
 }
@@ -215,19 +218,58 @@ model TaskVendor {
   @@unique([taskId, eventVendorId])
 }
 
+// ─── SubTask ──────────────────────────────────────────────────────────────────
+
+enum SubTaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  NOT_APPLICABLE
+}
+
+model SubTask {
+  id              String        @id @default(cuid())
+  taskId          String
+  task            Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title           String
+  status          SubTaskStatus @default(NOT_STARTED)
+  sortOrder       Int           @default(0)
+  completedById   String?
+  completedBy     User?         @relation(fields: [completedById], references: [id])
+  completedByName String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  subTaskVendors SubTaskVendor[]
+  activityLogs   ActivityLog[]
+}
+
+// ─── SubTask-Vendor Join ─────────────────────────────────────────────────────
+
+model SubTaskVendor {
+  subTaskId     String
+  subTask       SubTask     @relation(fields: [subTaskId], references: [id], onDelete: Cascade)
+  eventVendorId String
+  eventVendor   EventVendor @relation(fields: [eventVendorId], references: [id], onDelete: Cascade)
+
+  @@id([subTaskId, eventVendorId])
+}
+
 // ─── Activity Log ─────────────────────────────────────────────────────────────
 
 model ActivityLog {
-  id        String   @id @default(cuid())
-  eventId   String
-  event     Event    @relation(fields: [eventId], references: [id])
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
-  taskId    String?
-  task      Task?    @relation(fields: [taskId], references: [id])
-  action    String
-  metadata  Json?
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  eventId    String
+  event      Event    @relation(fields: [eventId], references: [id])
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  taskId     String?
+  task       Task?    @relation(fields: [taskId], references: [id])
+  subTaskId  String?
+  subTask    SubTask? @relation(fields: [subTaskId], references: [id])
+  action     String
+  metadata   Json?
+  createdAt  DateTime @default(now())
 }
 
 // ─── Venue ───────────────────────────────────────────────────────────────────
