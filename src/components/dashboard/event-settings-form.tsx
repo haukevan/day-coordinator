@@ -66,6 +66,8 @@ export function EventSettingsForm({ event }: { event: EventData }) {
     event.status === "COMPLETED" ||
     event.status === "ARCHIVED";
 
+  const isArchived = event.status === "ARCHIVED";
+
   // Compare form state with original event to detect unsaved changes
   const hasChanges = useMemo(() => {
     const origDateStr = event.eventDate ? event.eventDate.split("T")[0] : "";
@@ -267,6 +269,7 @@ export function EventSettingsForm({ event }: { event: EventData }) {
                   <Switch
                     checked={publicTimeline}
                     onCheckedChange={handlePublicToggle}
+                    disabled={isArchived}
                   />
                 </div>
                 {publicTimeline && (
@@ -306,9 +309,15 @@ export function EventSettingsForm({ event }: { event: EventData }) {
           </div>
         </div>
         {saveError && <p className="text-xs text-destructive">{saveError}</p>}
-        {isLive && (
+        {isArchived && (
           <p className="text-xs text-muted-foreground">
-            Event details are locked while the event is live.
+            This event has been archived and is now read-only. You can still
+            view or delete it.
+          </p>
+        )}
+        {isLive && !isArchived && (
+          <p className="text-xs text-muted-foreground">
+            Event details are locked while the event is live or completed.
           </p>
         )}
         <Button type="submit" disabled={saving || isLive || !hasChanges}>

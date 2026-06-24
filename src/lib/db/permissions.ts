@@ -60,6 +60,24 @@ export async function isVendorAssignedToSubTask(
 }
 
 /**
+ * Check if a user can perform live-mode actions on a task (start, complete, delay).
+ * Returns true if the user is the event owner, an accepted coordinator, or an
+ * accepted vendor assigned to this specific task.
+ */
+export async function canActOnTask(
+  eventId: string,
+  taskId: string,
+  userId: string,
+): Promise<boolean> {
+  // Owner or coordinator
+  const canManage = await canManageEvent(eventId, userId);
+  if (canManage) return true;
+
+  // Assigned vendor
+  return isVendorAssignedToTask(taskId, userId);
+}
+
+/**
  * Get the EventVendor id for an accepted vendor user in an event.
  * Returns null if the user is not an accepted vendor.
  */

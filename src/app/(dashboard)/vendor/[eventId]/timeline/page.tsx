@@ -26,7 +26,9 @@ export default async function VendorTimelinePage({
   const eventVendor = await prisma.eventVendor.findFirst({
     where: { eventId, userId: dbUser.id, status: "ACCEPTED" },
     include: {
-      event: { select: { id: true, timezone: true, eventDate: true } },
+      event: {
+        select: { id: true, timezone: true, eventDate: true, status: true },
+      },
     },
   });
   if (!eventVendor) notFound();
@@ -70,6 +72,7 @@ export default async function VendorTimelinePage({
     actualStart: t.actualStart ? t.actualStart.toISOString() : null,
     actualEnd: t.actualEnd ? t.actualEnd.toISOString() : null,
     durationMins: t.durationMins,
+    delayAmountMins: t.delayAmountMins,
     manualOverride: t.manualOverride,
     sequenceLabel: t.sequenceLabel,
     parentTaskId: t.parentTaskId,
@@ -103,6 +106,7 @@ export default async function VendorTimelinePage({
         }
         userRole={isCoordinator ? "admin" : "vendor"}
         currentUserId={dbUser.id}
+        eventStatus={eventVendor.event.status}
         vendorEventVendorId={isCoordinator ? undefined : eventVendor.id}
       />
     </Suspense>

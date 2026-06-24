@@ -1,6 +1,7 @@
 import { TaskCard } from "./task-card";
 import { buildDependencyGroupMeta } from "./dependency-groups";
 import type { SerializedTask } from "@/lib/types";
+import type { LiveStatus } from "@/lib/scheduler/live-status";
 
 /** Build an ordered list that places children immediately after their parent,
  *  indented. Tasks without parents (roots) are sorted by scheduledStart then
@@ -97,10 +98,31 @@ export function TimelineList({
   tasks,
   timezone,
   onTaskClick,
+  isLive = false,
+  liveStatuses,
+  canActMap,
+  overdueIds,
+  onOptimisticUpdate,
+  onStatusChange,
 }: {
   tasks: SerializedTask[];
   timezone: string;
   onTaskClick?: (task: SerializedTask) => void;
+  /** Whether the event is in LIVE mode */
+  isLive?: boolean;
+  /** Map of taskId → LiveStatus for day-of labels */
+  liveStatuses?: Map<string, LiveStatus>;
+  /** Map of taskId → boolean for canAct permission */
+  canActMap?: Map<string, boolean>;
+  /** Set of overdue task IDs */
+  overdueIds?: Set<string>;
+  /** Optimistic local state update before API call */
+  onOptimisticUpdate?: (
+    taskId: string,
+    changes: Partial<SerializedTask>,
+  ) => void;
+  /** Callback when a task status changes (silently refetches) */
+  onStatusChange?: () => void;
 }) {
   if (tasks.length === 0) {
     return (
@@ -131,7 +153,10 @@ export function TimelineList({
         return (
           <div
             key={task.id}
-            style={{ paddingLeft: depth > 0 ? `${depth * 20}px` : undefined }}
+            style={{
+              paddingLeft:
+                depth > 0 ? `${Math.min(depth, 1) * 20}px` : undefined,
+            }}
           >
             <TaskCard
               task={task}
@@ -140,6 +165,13 @@ export function TimelineList({
               parentStatus={parentStatus}
               dependencyMeta={dependencyMeta}
               onTaskClick={onTaskClick}
+              isLive={isLive}
+              liveStatus={liveStatuses?.get(task.id)}
+              canAct={canActMap?.get(task.id) ?? false}
+              isOverdue={overdueIds?.has(task.id) ?? false}
+              showLiveButtons={isLive}
+              onOptimisticUpdate={onOptimisticUpdate}
+              onStatusChange={onStatusChange}
             />
           </div>
         );

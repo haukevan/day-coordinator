@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Calendar, Users, Bell } from "lucide-react";
+import { Calendar, Users, Bell, Lock } from "lucide-react";
 
 type Props = {
   eventId: string;
@@ -22,15 +22,17 @@ type Props = {
 export function UpgradeModal({ eventId, open, onClose, onUpgraded }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [password, setPassword] = useState("");
 
-  async function handleBypass() {
+  async function handleUpgrade(e: React.FormEvent) {
+    e.preventDefault();
     setLoading(true);
     setError("");
 
     const res = await fetch(`/api/events/${eventId}/status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "SCHEDULED" }),
+      body: JSON.stringify({ status: "SCHEDULED", password }),
     });
 
     setLoading(false);
@@ -92,21 +94,53 @@ export function UpgradeModal({ eventId, open, onClose, onUpgraded }: Props) {
           </div>
         </div>
 
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        {/* Access code — placeholder for Stripe payment */}
+        <form onSubmit={handleUpgrade} className="space-y-3">
+          <div>
+            <label
+              htmlFor="upgrade-password"
+              className="mb-1.5 block text-xs font-medium text-muted-foreground"
+            >
+              Access code
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                id="upgrade-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter access code"
+                autoComplete="off"
+                className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
+              />
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              A payment step will be added here in the future.
+            </p>
+          </div>
 
-        <DialogFooter className="flex-col gap-2 sm:flex-row">
-          <Button className="w-full sm:w-auto" disabled>
-            Upgrade — coming soon
-          </Button>
-          <Button
-            variant="ghost"
-            className="w-full text-muted-foreground sm:w-auto"
-            onClick={handleBypass}
-            disabled={loading}
-          >
-            {loading ? "Scheduling…" : "Skip for now"}
-          </Button>
-        </DialogFooter>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+
+          <DialogFooter className="flex-col gap-2 sm:flex-row pt-2">
+            <Button
+              type="submit"
+              className="w-full sm:w-auto"
+              disabled={loading || !password.trim()}
+            >
+              {loading ? "Scheduling…" : "Schedule event"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full text-muted-foreground sm:w-auto"
+              onClick={onClose}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -106,6 +106,18 @@ export async function POST(req: NextRequest, { params }: Params) {
       { status: 403 },
     );
 
+  // ARCHIVED events are read-only
+  const event = await prisma.event.findFirst({
+    where: { id: eventId },
+    select: { status: true },
+  });
+  if (event?.status === "ARCHIVED") {
+    return NextResponse.json(
+      { error: "Cannot modify checklist items in an archived event." },
+      { status: 422 },
+    );
+  }
+
   // Verify task belongs to event
   const task = await prisma.task.findFirst({
     where: { id: taskId, eventId },

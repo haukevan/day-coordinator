@@ -6,15 +6,20 @@ import { TimelineGantt } from "./timeline-gantt";
 import { TaskPanel } from "./task-panel";
 import { TaskDetailSheet } from "./task-detail-sheet";
 import { useTimelineView } from "./timeline-view-context";
+import {
+  computeLiveStatuses,
+  isTaskBlocked,
+} from "@/lib/scheduler/live-status";
 import { cn } from "@/lib/utils";
-import { TaskRowSkeletonList } from "@/components/ui/skeletons";
 import type { SerializedTask, SerializedVendor } from "@/lib/types";
+import type { LiveStatus } from "@/lib/scheduler/live-status";
 
 export function TimelineView({
   eventId,
   tasks: initialTasks,
   timezone,
   eventDate,
+  eventStatus,
   userRole = "admin",
   currentUserId,
   vendorEventVendorId,
@@ -23,6 +28,8 @@ export function TimelineView({
   tasks: SerializedTask[];
   timezone: string;
   eventDate: string | null;
+  /** The current event status — used to detect LIVE mode */
+  eventStatus?: string;
   userRole?: "admin" | "vendor";
   /** The current user's database ID. Used to check sub-task visibility for vendors. */
   currentUserId?: string;
@@ -34,11 +41,20 @@ export function TimelineView({
   const [vendors, setVendors] = useState<SerializedVendor[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<SerializedTask | undefined>();
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Detail sheet state (new flow: click task → detail sheet)
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailTask, setDetailTask] = useState<SerializedTask | undefined>();
+
+  // Keep detailTask in sync when tasks refresh (after status changes)
+  useEffect(() => {
+    if (detailOpen && detailTask) {
+      const updated = tasks.find((t) => t.id === detailTask.id);
+      if (updated) {
+        setDetailTask(updated);
+      }
+    }
+  }, [tasks, detailOpen, detailTask?.id]);
 
   // Open create panel instantly when toolbar triggers it via context
   const prevTrigger = useRef(createPanelTrigger);
@@ -65,9 +81,8 @@ export function TimelineView({
     fetchVendors();
   }, [eventId]);
 
-  // Reload all tasks from the API (used after edits that may propagate)
+  // Reload all tasks silently from the API (used after status changes)
   const refreshTasks = useCallback(async () => {
-    setIsRefreshing(true);
     try {
       const res = await fetch(`/api/events/${eventId}/tasks`);
       if (!res.ok) return;
@@ -82,10 +97,20 @@ export function TimelineView({
           parentTask: t.parentTask ?? null,
         })),
       );
-    } finally {
-      setIsRefreshing(false);
+    } catch {
+      // silent
     }
   }, [eventId]);
+
+  /** Optimistically update a task in local state for instant UI feedback. */
+  const optimisticUpdateTask = useCallback(
+    (taskId: string, changes: Partial<SerializedTask>) => {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, ...changes } : t)),
+      );
+    },
+    [],
+  );
 
   function openCreate() {
     setEditingTask(undefined);
@@ -141,6 +166,55 @@ export function TimelineView({
     return vendorEventVendorId ?? null;
   }, [userRole, vendorEventVendorId]);
 
+  // ── Live mode computations ───────────────────────────────────────────
+  const isLive = eventStatus === "LIVE";
+
+  const tasksWithLiveStatus = useMemo(
+    () => (isLive ? computeLiveStatuses(tasks) : []),
+    [isLive, tasks],
+  );
+
+  const liveStatuses = useMemo(() => {
+    if (!isLive) return undefined;
+    const map = new Map<string, LiveStatus>();
+    for (const t of tasksWithLiveStatus) map.set(t.id, t.liveStatus);
+    return map;
+  }, [isLive, tasksWithLiveStatus]);
+
+  const overdueIds = useMemo(() => {
+    if (!isLive) return undefined;
+    return new Set(
+      tasksWithLiveStatus.filter((t) => t.isOverdue).map((t) => t.id),
+    );
+  }, [isLive, tasksWithLiveStatus]);
+
+  const canActMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const task of tasks) {
+      if (userRole === "admin") {
+        // Admin/coordinator can act on all tasks
+        map.set(task.id, true);
+      } else if (userRole === "vendor" && vendorEventVendorId) {
+        // Vendor can act only on tasks they're assigned to
+        const assigned = (task.taskVendors ?? []).some(
+          (tv) => tv.eventVendorId === vendorEventVendorId,
+        );
+        map.set(task.id, assigned);
+      } else {
+        map.set(task.id, false);
+      }
+    }
+    return map;
+  }, [tasks, userRole, vendorEventVendorId]);
+
+  const blockedMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const task of tasks) {
+      map.set(task.id, isTaskBlocked(task, tasks));
+    }
+    return map;
+  }, [tasks]);
+
   return (
     <div
       className={cn(
@@ -150,13 +224,17 @@ export function TimelineView({
       )}
     >
       {/* View content */}
-      {isRefreshing && tasks.length > 0 ? (
-        <TaskRowSkeletonList count={4} />
-      ) : view === "list" ? (
+      {view === "list" ? (
         <TimelineList
           tasks={tasks}
           timezone={timezone}
           onTaskClick={openDetail}
+          isLive={isLive}
+          liveStatuses={liveStatuses}
+          canActMap={canActMap}
+          overdueIds={overdueIds}
+          onOptimisticUpdate={optimisticUpdateTask}
+          onStatusChange={refreshTasks}
         />
       ) : (
         <div className="flex-1 min-h-0">
@@ -177,6 +255,13 @@ export function TimelineView({
         userRole={userRole}
         canViewSubTasks={canViewSubTasks}
         currentVendorEventId={currentVendorEventId}
+        isLive={isLive}
+        canAct={detailTask ? (canActMap.get(detailTask.id) ?? false) : false}
+        isBlocked={
+          detailTask ? (blockedMap.get(detailTask.id) ?? false) : false
+        }
+        onOptimisticUpdate={optimisticUpdateTask}
+        onStatusChange={refreshTasks}
         onClose={() => setDetailOpen(false)}
         onEdit={openEditFromDetail}
       />

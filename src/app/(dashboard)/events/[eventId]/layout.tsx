@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
+import { reconcileEventStatus } from "@/lib/scheduler";
 import { EventStatusButton } from "@/components/event/event-status-button";
 import { DraftBanner, DraftWarningIcon } from "@/components/event/draft-banner";
+import { ArchiveCountdownBanner } from "@/components/event/archive-countdown-banner";
 import { VenueChipPopup } from "@/components/event/venue-chip-popup";
 import { EventTabs } from "@/components/dashboard/event-tabs";
 import { TimelineToolbar } from "@/components/timeline/timeline-toolbar";
@@ -83,7 +85,11 @@ async function EventHeaderContent({
 
   if (!event) notFound();
 
-  const status = event.status as EventStatus;
+  // Reconcile event status on page load — handles transitions that would
+  // normally be triggered by cron, so things still work without a scheduler.
+  const currentStatus = await reconcileEventStatus(event.id);
+
+  const status = currentStatus as EventStatus;
 
   const eventDateInfo = (() => {
     if (!event.eventDate) return null;
@@ -184,6 +190,7 @@ async function EventHeaderContent({
       </div>
 
       {status === "DRAFT" && <DraftBanner eventId={event.id} status={status} />}
+      <ArchiveCountdownBanner eventId={event.id} eventStatus={status} />
     </>
   );
 }

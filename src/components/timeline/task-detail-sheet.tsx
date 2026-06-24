@@ -4,7 +4,17 @@ import { useState, useEffect } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 import { toZonedTime } from "date-fns-tz";
 import { format } from "date-fns";
-import { ArrowLeft, Clock, Link2, Pencil, User } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Clock,
+  ClockAlert,
+  Link2,
+  Pencil,
+  User,
+  AlertTriangle,
+  Undo2,
+} from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -15,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SubtaskList } from "./subtask-list";
 import { TaskStatusBadge } from "./task-status-badge";
+import { LiveActionButtons } from "./live-action-buttons";
 import { cn } from "@/lib/utils";
 import type {
   SerializedTask,
@@ -32,6 +43,19 @@ interface TaskDetailSheetProps {
   canViewSubTasks: boolean;
   /** The current vendor's EventVendor ID — used to restrict subtask status toggling */
   currentVendorEventId?: string | null;
+  /** Whether the event is in LIVE mode */
+  isLive?: boolean;
+  /** Whether the current user can act on this task (start/complete/delay) */
+  canAct?: boolean;
+  /** Callback to refetch tasks after a status change */
+  onStatusChange?: () => void;
+  /** Whether the task is blocked by an uncompleted parent */
+  isBlocked?: boolean;
+  /** Optimistic local state update before API call */
+  onOptimisticUpdate?: (
+    taskId: string,
+    changes: Record<string, unknown>,
+  ) => void;
   onClose: () => void;
   onEdit: (task: SerializedTask) => void;
 }
@@ -61,6 +85,11 @@ export function TaskDetailSheet({
   userRole,
   canViewSubTasks,
   currentVendorEventId,
+  isLive = false,
+  canAct = false,
+  isBlocked = false,
+  onOptimisticUpdate,
+  onStatusChange,
   onClose,
   onEdit,
 }: TaskDetailSheetProps) {
@@ -155,7 +184,10 @@ export function TaskDetailSheet({
               <SheetTitle className="truncate text-lg">{task.title}</SheetTitle>
             </div>
             <div className="shrink-0">
-              <TaskStatusBadge status={task.status} />
+              <TaskStatusBadge
+                status={task.status}
+                delayAmountMins={task.delayAmountMins}
+              />
             </div>
           </div>
         </SheetHeader>
@@ -186,6 +218,48 @@ export function TaskDetailSheet({
               {formatDateInZone(task.scheduledStart, timezone)}
             </p>
           )}
+
+          {/* Actual completion time (when done) */}
+          {task.status === "COMPLETED" && task.actualEnd && (
+            <div className="flex items-center gap-2 text-sm">
+              <Check className="size-4 shrink-0 text-success" />
+              <span className="text-foreground">
+                Completed {formatTimeInZone(task.actualEnd, timezone)}
+              </span>
+            </div>
+          )}
+
+          {/* Delay history note */}
+          {task.delayAmountMins != null &&
+            task.delayAmountMins > 0 &&
+            (() => {
+              const delayLabel = formatDuration(task.delayAmountMins);
+              let note = "";
+              if (task.status === "DELAYED") {
+                note = `Delayed ${delayLabel}`;
+              } else if (task.status === "COMPLETED") {
+                note = `Delay marked ${delayLabel}`;
+                if (task.actualEnd && task.scheduledEnd) {
+                  const originalEnd =
+                    new Date(task.scheduledEnd).getTime() -
+                    task.delayAmountMins * 60 * 1000;
+                  const actualMs =
+                    new Date(task.actualEnd).getTime() - originalEnd;
+                  const actualMins = Math.round(actualMs / 60 / 1000);
+                  const actualLabel =
+                    actualMins > 0 ? formatDuration(actualMins) : "on time";
+                  note += ` · Actually completed: ${actualLabel} late`;
+                }
+              } else {
+                note = `Delay: ${delayLabel}`;
+              }
+              return (
+                <div className="flex items-center gap-2 text-sm text-warning">
+                  <ClockAlert className="size-4 shrink-0" />
+                  <span>{note}</span>
+                </div>
+              );
+            })()}
 
           {/* Description */}
           {hasDescription && (
@@ -241,6 +315,89 @@ export function TaskDetailSheet({
               <Pencil className="size-3.5" />
               Edit task
             </Button>
+          )}
+
+          {/* Live mode: overdue warning + action buttons for all non-done tasks */}
+          {isLive &&
+            task.status !== "COMPLETED" &&
+            task.status !== "SKIPPED" && (
+              <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3">
+                {/* Overdue warning */}
+                {task.scheduledEnd &&
+                  new Date(task.scheduledEnd) < new Date() && (
+                    <div className="flex items-center gap-2 text-sm text-warning">
+                      <AlertTriangle className="size-4" />
+                      <span>This task is overdue</span>
+                    </div>
+                  )}
+                {/* Action buttons (always shown in detail sheet for non-done tasks) */}
+                {canAct && (
+                  <LiveActionButtons
+                    taskId={task.id}
+                    taskTitle={task.title}
+                    taskStatus={task.status}
+                    eventId={eventId}
+                    isBlocked={isBlocked}
+                    scheduledEnd={task.scheduledEnd}
+                    delayAmountMins={task.delayAmountMins}
+                    onOptimisticUpdate={onOptimisticUpdate}
+                    onStatusChanged={onStatusChange ?? (() => {})}
+                  />
+                )}
+                {/* Reset option for started or delayed tasks */}
+                {canAct &&
+                  (task.status === "IN_PROGRESS" ||
+                    task.status === "DELAYED") && (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className="text-muted-foreground hover:text-foreground gap-1.5 w-fit"
+                      onClick={async () => {
+                        const res = await fetch(
+                          `/api/events/${eventId}/tasks/${task.id}/status`,
+                          {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ status: "PENDING" }),
+                          },
+                        );
+                        if (res.ok) {
+                          onStatusChange?.();
+                        }
+                      }}
+                    >
+                      <Undo2 className="size-3.5" />
+                      Reset status to pending
+                    </Button>
+                  )}
+              </div>
+            )}
+
+          {/* Reset option for completed tasks (shown outside the main actions block) */}
+          {isLive && task.status === "COMPLETED" && canAct && (
+            <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3">
+              <Button
+                variant="ghost"
+                size="xs"
+                className="text-muted-foreground hover:text-foreground gap-1.5 w-fit"
+                onClick={async () => {
+                  const res = await fetch(
+                    `/api/events/${eventId}/tasks/${task.id}/status`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ status: "PENDING" }),
+                    },
+                  );
+                  if (res.ok) {
+                    onStatusChange?.();
+                  }
+                }}
+              >
+                <Undo2 className="size-3.5" />
+                Reset status to pending
+              </Button>
+            </div>
           )}
         </div>
 

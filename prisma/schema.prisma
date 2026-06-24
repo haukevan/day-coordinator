@@ -88,6 +88,7 @@ model Task {
   actualStart      DateTime?
   actualEnd        DateTime?
   durationMins     Int?
+  delayAmountMins  Int?
   manualOverride   Boolean    @default(false)
   sequenceLabel    String?
   publicVisibility Boolean    @default(false)

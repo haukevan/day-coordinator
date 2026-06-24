@@ -88,7 +88,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, ownerId: dbUser.id },
-    select: { id: true },
+    select: { id: true, status: true },
   });
 
   const allowed = event || (await canManageEvent(eventId, dbUser.id));
@@ -100,6 +100,14 @@ export async function POST(req: NextRequest, { params }: Params) {
       },
       { status: 403 },
     );
+
+  // ARCHIVED events are read-only — no task creation or editing
+  if (event && event.status === "ARCHIVED") {
+    return NextResponse.json(
+      { error: "Cannot modify tasks in an archived event." },
+      { status: 422 },
+    );
+  }
 
   const body = await req.json();
   const {

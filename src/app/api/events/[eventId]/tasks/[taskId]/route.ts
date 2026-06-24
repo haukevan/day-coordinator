@@ -29,7 +29,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, ownerId: dbUser.id },
-    select: { id: true },
+    select: { id: true, status: true },
   });
 
   const allowed = event || (await canManageEvent(eventId, dbUser.id));
@@ -41,6 +41,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       },
       { status: 403 },
     );
+
+  // ARCHIVED events are read-only — no task editing
+  if (event && event.status === "ARCHIVED") {
+    return NextResponse.json(
+      { error: "Cannot modify tasks in an archived event." },
+      { status: 422 },
+    );
+  }
 
   const task = await prisma.task.findFirst({ where: { id: taskId, eventId } });
   if (!task)
@@ -239,7 +247,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, ownerId: dbUser.id },
-    select: { id: true },
+    select: { id: true, status: true },
   });
 
   const allowed = event || (await canManageEvent(eventId, dbUser.id));
@@ -251,6 +259,14 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       },
       { status: 403 },
     );
+
+  // ARCHIVED events are read-only — no task deletion
+  if (event && event.status === "ARCHIVED") {
+    return NextResponse.json(
+      { error: "Cannot delete tasks from an archived event." },
+      { status: 422 },
+    );
+  }
 
   const task = await prisma.task.findFirst({ where: { id: taskId, eventId } });
   if (!task)

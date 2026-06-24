@@ -60,12 +60,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     venueId,
   } = body;
 
-  const isLocked =
-    event.status === "LIVE" ||
-    event.status === "COMPLETED" ||
-    event.status === "ARCHIVED";
+  // ARCHIVED events are fully read-only — no field may be edited.
+  if (event.status === "ARCHIVED") {
+    return NextResponse.json(
+      {
+        error:
+          "Archived events cannot be edited. You can still view or delete this event.",
+      },
+      { status: 403 },
+    );
+  }
 
-  // publicTimeline is the only field editable in any status
+  // LIVE and COMPLETED events are partially locked — only publicTimeline is editable.
+  const isLocked = event.status === "LIVE" || event.status === "COMPLETED";
   if (isLocked && Object.keys(body).some((k) => k !== "publicTimeline")) {
     return NextResponse.json(
       {

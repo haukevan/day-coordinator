@@ -7,11 +7,15 @@ import type { EventStatus } from "@/generated/prisma/client";
 
 type Params = { params: Promise<{ eventId: string }> };
 
+// Manual transitions are restricted: users can only upgrade from DRAFT → SCHEDULED.
+// After SCHEDULED, the system owns the lifecycle:
+//   SCHEDULED → LIVE (auto-cron on event date)
+//   LIVE → ARCHIVED (auto-cron 24h after last task ends)
 const VALID_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
   DRAFT: ["SCHEDULED", "ARCHIVED"],
-  SCHEDULED: ["LIVE", "ARCHIVED"],
-  LIVE: ["COMPLETED"],
-  COMPLETED: ["ARCHIVED"],
+  SCHEDULED: [],
+  LIVE: [],
+  COMPLETED: [],
   ARCHIVED: [],
 };
 
@@ -42,7 +46,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   });
   if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { status: targetStatus } = await req.json();
+  const { status: targetStatus, password } = await req.json();
   const allowed = VALID_TRANSITIONS[event.status as EventStatus] ?? [];
 
   if (!allowed.includes(targetStatus as EventStatus)) {
@@ -50,6 +54,16 @@ export async function POST(req: NextRequest, { params }: Params) {
       { error: `Cannot transition from ${event.status} to ${targetStatus}.` },
       { status: 422 },
     );
+  }
+
+  // Password gate for DRAFT → SCHEDULED (placeholder for Stripe payment)
+  if (event.status === "DRAFT" && targetStatus === "SCHEDULED") {
+    if (!password || password !== process.env.UPGRADE_PASSWORD) {
+      return NextResponse.json(
+        { error: "Invalid access code." },
+        { status: 403 },
+      );
+    }
   }
 
   const updated = await prisma.event.update({
@@ -77,12 +91,23 @@ export async function POST(req: NextRequest, { params }: Params) {
   // When going SCHEDULED, send queued invite emails to all PENDING vendors
   if (targetStatus === "SCHEDULED") {
     const pendingVendors = await prisma.eventVendor.findMany({
-      where: { eventId, status: "PENDING", inviteSentAt: null, inviteToken: { not: null } },
+      where: {
+        eventId,
+        status: "PENDING",
+        inviteSentAt: null,
+        inviteToken: { not: null },
+      },
       select: { id: true },
     });
     for (const v of pendingVendors) {
-      try { await sendVendorInviteEmail(v.id); } catch (err) {
-        console.error("[vendor-invite] Failed to send invite for eventVendor", v.id, err);
+      try {
+        await sendVendorInviteEmail(v.id);
+      } catch (err) {
+        console.error(
+          "[vendor-invite] Failed to send invite for eventVendor",
+          v.id,
+          err,
+        );
       }
     }
   }

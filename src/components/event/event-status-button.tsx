@@ -35,11 +35,10 @@ type Transition = {
   destructive?: boolean;
 };
 
+// After an event is SCHEDULED, the system owns the lifecycle.
+// Users can only manually transition DRAFT → SCHEDULED.
 const transitions: Partial<Record<EventStatus, Transition[]>> = {
   DRAFT: [{ to: "SCHEDULED", label: "Upgrade to Scheduled" }],
-  SCHEDULED: [{ to: "LIVE", label: "Go Live" }],
-  LIVE: [{ to: "COMPLETED", label: "Mark Completed" }],
-  COMPLETED: [{ to: "ARCHIVED", label: "Archive", destructive: true }],
 };
 
 type Props = {

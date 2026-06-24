@@ -90,6 +90,18 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     );
   }
 
+  // ARCHIVED events are read-only — only allow status reads
+  const event = await prisma.event.findFirst({
+    where: { id: eventId },
+    select: { status: true },
+  });
+  if (event?.status === "ARCHIVED") {
+    return NextResponse.json(
+      { error: "Cannot modify checklist items in an archived event." },
+      { status: 422 },
+    );
+  }
+
   const body = await req.json();
 
   // If user is only a vendor (not admin/coordinator), restrict to status-only
@@ -316,6 +328,18 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       { error: "Only coordinators can delete checklist items." },
       { status: 403 },
     );
+
+  // ARCHIVED events are read-only
+  const event = await prisma.event.findFirst({
+    where: { id: eventId },
+    select: { status: true },
+  });
+  if (event?.status === "ARCHIVED") {
+    return NextResponse.json(
+      { error: "Cannot delete checklist items from an archived event." },
+      { status: 422 },
+    );
+  }
 
   // Verify checklist item exists and belongs to the task & event
   const subTask = await prisma.subTask.findFirst({

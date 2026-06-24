@@ -22,6 +22,7 @@ export type SerializedTask = {
   actualStart: string | null;
   actualEnd: string | null;
   durationMins: number | null;
+  delayAmountMins: number | null;
   manualOverride: boolean;
   sequenceLabel: string | null;
   parentTaskId: string | null;

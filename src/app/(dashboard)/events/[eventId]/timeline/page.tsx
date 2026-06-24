@@ -25,7 +25,7 @@ export default async function TimelinePage({
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, ownerId: dbUser.id },
-    select: { id: true, timezone: true, eventDate: true },
+    select: { id: true, timezone: true, eventDate: true, status: true },
   });
 
   if (!event) notFound();
@@ -66,6 +66,7 @@ export default async function TimelinePage({
     actualStart: t.actualStart ? t.actualStart.toISOString() : null,
     actualEnd: t.actualEnd ? t.actualEnd.toISOString() : null,
     durationMins: t.durationMins,
+    delayAmountMins: t.delayAmountMins,
     manualOverride: t.manualOverride,
     sequenceLabel: t.sequenceLabel,
     parentTaskId: t.parentTaskId,
@@ -88,6 +89,7 @@ export default async function TimelinePage({
         tasks={serializedTasks}
         timezone={event.timezone}
         eventDate={event.eventDate ? event.eventDate.toISOString() : null}
+        eventStatus={event.status}
         userRole="admin"
         currentUserId={dbUser.id}
       />
