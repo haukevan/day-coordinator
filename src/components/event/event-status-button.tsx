@@ -44,9 +44,14 @@ const transitions: Partial<Record<EventStatus, Transition[]>> = {
 type Props = {
   eventId: string;
   status: EventStatus;
+  eventDate: string | null;
 };
 
-export function EventStatusButton({ eventId, status: initialStatus }: Props) {
+export function EventStatusButton({
+  eventId,
+  status: initialStatus,
+  eventDate,
+}: Props) {
   const [status, setStatus] = useState(initialStatus);
   const config = statusConfig[status] ?? statusConfig.DRAFT;
   const available = transitions[status] ?? [];
@@ -128,6 +133,7 @@ export function EventStatusButton({ eventId, status: initialStatus }: Props) {
 
       <UpgradeModal
         eventId={eventId}
+        eventDate={eventDate}
         open={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
         onUpgraded={() => setStatus("SCHEDULED")}

@@ -64,6 +64,14 @@ export async function POST(req: NextRequest, { params }: Params) {
         { status: 403 },
       );
     }
+
+    // Require an event date before scheduling
+    if (!event.eventDate) {
+      return NextResponse.json(
+        { error: "Please set an event date in settings before scheduling." },
+        { status: 422 },
+      );
+    }
   }
 
   const updated = await prisma.event.update({

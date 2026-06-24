@@ -9,13 +9,14 @@ import { cn } from "@/lib/utils";
 type Props = {
   eventId: string;
   status: string;
+  eventDate: string | null;
 };
 
 function storageKey(eventId: string) {
   return `dc-draft-dismissed-${eventId}`;
 }
 
-export function DraftBanner({ eventId, status }: Props) {
+export function DraftBanner({ eventId, status, eventDate }: Props) {
   const [dismissed, setDismissed] = useState(true); // start hidden to avoid hydration flash
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
@@ -76,6 +77,7 @@ export function DraftBanner({ eventId, status }: Props) {
 
       <UpgradeModal
         eventId={eventId}
+        eventDate={eventDate}
         open={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
       />

@@ -138,7 +138,11 @@ async function EventHeaderContent({
 
         {/* Metadata row — status, date, venue */}
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          <EventStatusButton eventId={event.id} status={status} />
+          <EventStatusButton
+            eventId={event.id}
+            status={status}
+            eventDate={event.eventDate ? event.eventDate.toISOString() : null}
+          />
           {eventDateInfo && (
             <span
               className={cn(
@@ -189,7 +193,13 @@ async function EventHeaderContent({
         </div>
       </div>
 
-      {status === "DRAFT" && <DraftBanner eventId={event.id} status={status} />}
+      {status === "DRAFT" && (
+        <DraftBanner
+          eventId={event.id}
+          status={status}
+          eventDate={event.eventDate ? event.eventDate.toISOString() : null}
+        />
+      )}
       <ArchiveCountdownBanner eventId={event.id} eventStatus={status} />
     </>
   );
