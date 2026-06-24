@@ -22,6 +22,17 @@ export default async function EventSettingsPage({
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, ownerId: dbUser.id },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      eventDate: true,
+      timezone: true,
+      slug: true,
+      status: true,
+      publicTimeline: true,
+      venueId: true,
+    },
   });
 
   if (!event) notFound();

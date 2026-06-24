@@ -59,6 +59,10 @@ model Event {
   notifications Notification[]
   activityLogs  ActivityLog[]
   eventVendors  EventVendor[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([venueId])
 }
 
 enum EventStatus {
@@ -103,6 +107,10 @@ model Task {
   activityLogs ActivityLog[]
   taskVendors  TaskVendor[]
   subTasks     SubTask[]
+
+  @@index([eventId])
+  @@index([parentTaskId])
+  @@index([assignedToId])
 }
 
 enum TaskStatus {
@@ -129,6 +137,9 @@ model Notification {
   sentAt         DateTime?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
+
+  @@index([eventId])
+  @@index([status])
 }
 
 enum NotificationType {
@@ -205,6 +216,11 @@ model EventVendor {
   subTaskVendors SubTaskVendor[]
 
   @@unique([eventId, vendorContactId])
+  @@index([eventId])
+  @@index([userId])
+  @@index([vendorContactId])
+  @@index([status])
+  @@index([role])
 }
 
 // ─── Task-Vendor Join ─────────────────────────────────────────────────────
@@ -217,6 +233,7 @@ model TaskVendor {
 
   @@id([taskId, eventVendorId])
   @@unique([taskId, eventVendorId])
+  @@index([eventVendorId])
 }
 
 // ─── SubTask ──────────────────────────────────────────────────────────────────
@@ -243,6 +260,9 @@ model SubTask {
 
   subTaskVendors SubTaskVendor[]
   activityLogs   ActivityLog[]
+
+  @@index([taskId])
+  @@index([completedById])
 }
 
 // ─── SubTask-Vendor Join ─────────────────────────────────────────────────────
@@ -254,6 +274,7 @@ model SubTaskVendor {
   eventVendor   EventVendor @relation(fields: [eventVendorId], references: [id], onDelete: Cascade)
 
   @@id([subTaskId, eventVendorId])
+  @@index([eventVendorId])
 }
 
 // ─── Activity Log ─────────────────────────────────────────────────────────────
@@ -271,6 +292,10 @@ model ActivityLog {
   action     String
   metadata   Json?
   createdAt  DateTime @default(now())
+
+  @@index([eventId])
+  @@index([taskId])
+  @@index([userId])
 }
 
 // ─── Venue ───────────────────────────────────────────────────────────────────
@@ -292,5 +317,7 @@ model Venue {
   updatedAt   DateTime @updatedAt
 
   events Event[]
+
+  @@index([creatorId])
 }
 

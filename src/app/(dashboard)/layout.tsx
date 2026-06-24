@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { prisma } from "@/lib/db/prisma";
+import { getDbUser } from "@/lib/db/user";
 import { Logo } from "@/components/ui/logo";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { MobileNavSheet } from "@/components/dashboard/mobile-nav-sheet";
@@ -38,17 +38,7 @@ export default async function DashboardLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const dbUser = await prisma.user.findUnique({
-    where: { supabaseId: user.id },
-    select: {
-      id: true,
-      name: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-      onboarded: true,
-    },
-  });
+  const dbUser = await getDbUser(user.id);
 
   if (!dbUser) redirect("/login");
   if (!dbUser.onboarded) redirect("/onboarding");

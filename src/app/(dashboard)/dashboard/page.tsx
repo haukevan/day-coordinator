@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getDbUser } from "@/lib/db/user";
 import { prisma } from "@/lib/db/prisma";
 import { EventCard } from "@/components/dashboard/event-card";
 import { VendorEventCard } from "@/components/dashboard/vendor-event-card";
@@ -15,9 +16,7 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const dbUser = await prisma.user.findUnique({
-    where: { supabaseId: user.id },
-  });
+  const dbUser = await getDbUser(user.id);
   if (!dbUser) redirect("/login");
 
   const events = await prisma.event.findMany({

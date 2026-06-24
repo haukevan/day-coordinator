@@ -84,6 +84,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, ownerId: dbUser.id },
+    select: { id: true },
   });
   const allowed = event || (await canManageEvent(eventId, dbUser.id));
   if (!allowed)
@@ -126,6 +127,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, ownerId: dbUser.id },
+    select: { id: true, status: true },
   });
   const allowed = event || (await canManageEvent(eventId, dbUser.id));
   if (!allowed)
