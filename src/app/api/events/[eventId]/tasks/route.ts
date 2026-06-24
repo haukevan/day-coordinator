@@ -8,6 +8,21 @@ import {
   propagateSchedule,
   detectCycle,
 } from "@/lib/scheduler";
+import { checkTaskLimit } from "@/lib/db/limits";
+import { z } from "zod";
+
+const createTaskSchema = z.object({
+  title: z.string().min(1, "Title is required").max(256),
+  description: z.string().max(2000).optional().nullable(),
+  scheduledStart: z
+    .string()
+    .datetime({ message: "Start time must be a valid ISO date" }),
+  scheduledEnd: z.string().datetime().optional().nullable(),
+  parentTaskId: z.string().optional().nullable(),
+  vendorIds: z.array(z.string()).optional().default([]),
+  sequenceLabel: z.string().max(64).optional().nullable(),
+  assignedToId: z.string().optional().nullable(),
+});
 
 type Params = { params: Promise<{ eventId: string }> };
 
@@ -109,7 +124,32 @@ export async function POST(req: NextRequest, { params }: Params) {
     );
   }
 
-  const body = await req.json();
+  // Enforce per-event task limit
+  const taskLimit = await checkTaskLimit(eventId);
+  if (!taskLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: `This event has reached the maximum of ${taskLimit.max} tasks.`,
+      },
+      { status: 429 },
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = createTaskSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+      { status: 422 },
+    );
+  }
+
   const {
     title,
     description,
@@ -117,18 +157,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     parentTaskId,
     scheduledStart,
     vendorIds,
-  } = body;
-
-  if (!title?.trim()) {
-    return NextResponse.json({ error: "Title is required." }, { status: 400 });
-  }
-
-  if (!scheduledStart) {
-    return NextResponse.json(
-      { error: "Start time is required." },
-      { status: 400 },
-    );
-  }
+  } = parsed.data;
 
   // Compute durationMins from scheduledEnd and scheduledStart
   const startDate = new Date(scheduledStart);

@@ -5,8 +5,13 @@ import { canActOnTask } from "@/lib/db/permissions";
 import { emitEventUpdate } from "@/lib/realtime";
 import { propagateDelay } from "@/lib/scheduler/delay";
 import { computeScheduledEnd } from "@/lib/scheduler";
+import { z } from "zod";
 
 type Params = { params: Promise<{ eventId: string; taskId: string }> };
+
+const delayTaskSchema = z.object({
+  delayMinutes: z.number().int().min(1).max(1440),
+});
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { eventId, taskId } = await params;
@@ -61,29 +66,22 @@ export async function POST(req: NextRequest, { params }: Params) {
     );
   }
 
-  const body = await req.json();
-  const { delayMinutes } = body as { delayMinutes: number };
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
-  if (
-    typeof delayMinutes !== "number" ||
-    !Number.isFinite(delayMinutes) ||
-    delayMinutes <= 0
-  ) {
+  const parsed = delayTaskSchema.safeParse(body);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "delayMinutes must be a positive number." },
-      { status: 400 },
+      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+      { status: 422 },
     );
   }
 
-  if (delayMinutes > 1440) {
-    return NextResponse.json(
-      { error: "Delay cannot exceed 24 hours (1440 minutes)." },
-      { status: 400 },
-    );
-  }
-
-  // Round to nearest minute
-  const roundedDelay = Math.round(delayMinutes);
+  const roundedDelay = parsed.data.delayMinutes;
   const previousStatus = task.status;
   const originalEnd = task.scheduledEnd;
   const originalDuration = task.durationMins;

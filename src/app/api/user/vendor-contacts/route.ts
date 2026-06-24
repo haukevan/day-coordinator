@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import type { SerializedVendorContact } from "@/lib/types";
+import { checkVendorContactLimit } from "@/lib/db/limits";
 
 const createVendorContactSchema = z.object({
   email: z.string().email("Valid email is required.").max(254),
@@ -79,6 +80,17 @@ export async function POST(req: NextRequest) {
   });
   if (!dbUser)
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  // Enforce per-user vendor contact limit
+  const contactLimit = await checkVendorContactLimit(dbUser.id);
+  if (!contactLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: `You've reached the maximum of ${contactLimit.max} saved contacts.`,
+      },
+      { status: 429 },
+    );
+  }
 
   let body: unknown;
   try {

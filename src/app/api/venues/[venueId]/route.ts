@@ -1,8 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
+import { z } from "zod";
 
 type Params = { params: Promise<{ venueId: string }> };
+
+const updateVenueSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  address: z.string().min(1).max(500).optional(),
+  description: z.string().max(1000).optional().nullable(),
+  ownerName: z.string().max(128).optional().nullable(),
+  ownerPhone: z.string().max(20).optional().nullable(),
+  ownerEmail: z
+    .string()
+    .email()
+    .max(254)
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  lat: z.number().optional().nullable(),
+  lng: z.number().optional().nullable(),
+  placeId: z.string().max(128).optional().nullable(),
+});
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { venueId } = await params;
@@ -34,31 +53,37 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const data = body as Record<string, unknown>;
+  const parsed = updateVenueSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+      { status: 422 },
+    );
+  }
+
+  const data = parsed.data;
 
   const updated = await prisma.venue.update({
     where: { id: venueId },
     data: {
-      ...(data.name !== undefined && { name: String(data.name).trim() }),
-      ...(data.address !== undefined && {
-        address: String(data.address).trim(),
-      }),
+      ...(data.name !== undefined && { name: data.name.trim() }),
+      ...(data.address !== undefined && { address: data.address.trim() }),
       ...(data.description !== undefined && {
-        description: data.description ? String(data.description).trim() : null,
+        description: data.description?.trim() ?? null,
       }),
       ...(data.ownerName !== undefined && {
-        ownerName: data.ownerName ? String(data.ownerName).trim() : null,
+        ownerName: data.ownerName?.trim() ?? null,
       }),
       ...(data.ownerPhone !== undefined && {
-        ownerPhone: data.ownerPhone ? String(data.ownerPhone).trim() : null,
+        ownerPhone: data.ownerPhone?.trim() ?? null,
       }),
       ...(data.ownerEmail !== undefined && {
-        ownerEmail: data.ownerEmail ? String(data.ownerEmail).trim() : null,
+        ownerEmail: data.ownerEmail?.trim() || null,
       }),
-      ...(data.lat !== undefined && { lat: data.lat as number | null }),
-      ...(data.lng !== undefined && { lng: data.lng as number | null }),
+      ...(data.lat !== undefined && { lat: data.lat }),
+      ...(data.lng !== undefined && { lng: data.lng }),
       ...(data.placeId !== undefined && {
-        placeId: data.placeId ? String(data.placeId).trim() : null,
+        placeId: data.placeId?.trim() ?? null,
       }),
     },
   });

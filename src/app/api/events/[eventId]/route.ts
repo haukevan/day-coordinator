@@ -2,8 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { emitEventUpdate } from "@/lib/realtime";
+import { z } from "zod";
 
 type Params = { params: Promise<{ eventId: string }> };
+
+const updateEventSchema = z.object({
+  title: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).optional().nullable(),
+  eventDate: z.string().optional().nullable(),
+  timezone: z.string().optional(),
+  slug: z.string().max(100).optional().nullable(),
+  publicTimeline: z.boolean().optional(),
+  venueId: z.string().optional().nullable(),
+});
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const { eventId } = await params;
@@ -49,7 +60,21 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   });
   if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const body = await req.json();
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = updateEventSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+      { status: 422 },
+    );
+  }
+
   const {
     title,
     description,
@@ -58,7 +83,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     slug,
     publicTimeline,
     venueId,
-  } = body;
+  } = parsed.data;
 
   // ARCHIVED events are fully read-only — no field may be edited.
   if (event.status === "ARCHIVED") {
@@ -73,7 +98,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   // LIVE and COMPLETED events are partially locked — only publicTimeline is editable.
   const isLocked = event.status === "LIVE" || event.status === "COMPLETED";
-  if (isLocked && Object.keys(body).some((k) => k !== "publicTimeline")) {
+  if (
+    isLocked &&
+    Object.keys(body as Record<string, unknown>).some(
+      (k) => k !== "publicTimeline",
+    )
+  ) {
     return NextResponse.json(
       {
         error: `Event details cannot be edited in ${event.status.toLowerCase()} status.`,
@@ -121,7 +151,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       eventId,
       userId: dbUser.id,
       action: "event.updated",
-      metadata: { fields: Object.keys(body) },
+      metadata: { fields: Object.keys(body as Record<string, unknown>) },
     },
   });
 

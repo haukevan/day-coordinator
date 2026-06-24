@@ -4,10 +4,14 @@ import { prisma } from "@/lib/db/prisma";
 import { canActOnTask } from "@/lib/db/permissions";
 import { emitEventUpdate } from "@/lib/realtime";
 import { reconcileDelay } from "@/lib/scheduler/delay";
+import { z } from "zod";
 
 type Params = { params: Promise<{ eventId: string; taskId: string }> };
 
-const ALLOWED_STATUSES = ["IN_PROGRESS", "COMPLETED", "PENDING"] as const;
+const updateTaskStatusSchema = z.object({
+  status: z.enum(["IN_PROGRESS", "COMPLETED", "PENDING"]),
+  actualEnd: z.string().datetime().optional().nullable(),
+});
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { eventId, taskId } = await params;
@@ -55,22 +59,22 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!task)
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
-  const body = await req.json();
-  const { status: targetStatus, actualEnd: rawActualEnd } = body as {
-    status: string;
-    actualEnd?: string | null;
-  };
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
-  if (
-    !ALLOWED_STATUSES.includes(
-      targetStatus as (typeof ALLOWED_STATUSES)[number],
-    )
-  ) {
+  const parsed = updateTaskStatusSchema.safeParse(body);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: `Invalid status. Allowed: ${ALLOWED_STATUSES.join(", ")}` },
-      { status: 400 },
+      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+      { status: 422 },
     );
   }
+
+  const { status: targetStatus, actualEnd: rawActualEnd } = parsed.data;
 
   // ── Transition to IN_PROGRESS ──────────────────────────────────────────
   if (targetStatus === "IN_PROGRESS") {

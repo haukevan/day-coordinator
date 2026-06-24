@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { canManageEvent, isVendorAssignedToTask } from "@/lib/db/permissions";
 import { emitEventUpdate } from "@/lib/realtime";
 import { z } from "zod";
+import { checkSubtaskLimit } from "@/lib/db/limits";
 
 type Params = { params: Promise<{ eventId: string; taskId: string }> };
 
@@ -125,6 +126,17 @@ export async function POST(req: NextRequest, { params }: Params) {
   });
   if (!task)
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
+
+  // Enforce per-task subtask limit
+  const subtaskLimit = await checkSubtaskLimit(taskId);
+  if (!subtaskLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: `This task has reached the maximum of ${subtaskLimit.max} checklist items.`,
+      },
+      { status: 429 },
+    );
+  }
 
   const body = await req.json();
   const parsed = createSubTaskSchema.safeParse(body);

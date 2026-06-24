@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
+import { checkVenueLimit } from "@/lib/db/limits";
 
 const createVenueSchema = z.object({
   name: z.string().min(1, "Venue name is required.").max(200),
@@ -62,6 +63,15 @@ export async function POST(req: NextRequest) {
   });
   if (!dbUser)
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  // Enforce per-user venue limit
+  const venueLimit = await checkVenueLimit(dbUser.id);
+  if (!venueLimit.allowed) {
+    return NextResponse.json(
+      { error: `You've reached the maximum of ${venueLimit.max} venues.` },
+      { status: 429 },
+    );
+  }
 
   let body: unknown;
   try {

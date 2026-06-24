@@ -8,8 +8,19 @@ import {
   propagateSchedule,
   detectCycle,
 } from "@/lib/scheduler";
+import { z } from "zod";
 
 type Params = { params: Promise<{ eventId: string; taskId: string }> };
+
+const updateTaskSchema = z.object({
+  title: z.string().min(1).max(256).optional(),
+  description: z.string().max(2000).optional().nullable(),
+  scheduledStart: z.string().datetime().optional().nullable(),
+  scheduledEnd: z.string().datetime().optional().nullable(),
+  parentTaskId: z.string().optional().nullable(),
+  vendorIds: z.array(z.string()).optional(),
+  sequenceLabel: z.string().max(64).optional().nullable(),
+});
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { eventId, taskId } = await params;
@@ -54,7 +65,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!task)
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
-  const body = await req.json();
+  const rawBody = await req.json().catch(() => null);
+  if (!rawBody || typeof rawBody !== "object") {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const body = rawBody as Record<string, unknown>;
+
+  const parsed = updateTaskSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+      { status: 422 },
+    );
+  }
+
   const {
     title,
     description,
@@ -62,11 +86,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     scheduledStart,
     parentTaskId,
     vendorIds,
-  } = body;
-
-  if (title !== undefined && !title?.trim()) {
-    return NextResponse.json({ error: "Title is required." }, { status: 400 });
-  }
+  } = parsed.data;
 
   // Resolve the effective new parentTaskId (undefined = not changing)
   const changingParent = "parentTaskId" in body;
@@ -133,8 +153,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (endDate !== undefined) updateData.scheduledEnd = endDate;
   if (newParentId !== undefined) updateData.parentTaskId = newParentId;
   if ("sequenceLabel" in body)
-    updateData.sequenceLabel =
-      (body as Record<string, unknown>).sequenceLabel ?? null;
+    updateData.sequenceLabel = body.sequenceLabel ?? null;
 
   // Sync vendor assignments if vendorIds provided
   const changingVendors = "vendorIds" in body;

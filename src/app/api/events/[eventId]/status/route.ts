@@ -7,6 +7,7 @@ import {
   sendVendorInviteEmailBatch,
 } from "@/lib/notifications/vendor-invite";
 import type { EventStatus } from "@/generated/prisma/client";
+import { z } from "zod";
 
 type Params = { params: Promise<{ eventId: string }> };
 
@@ -21,6 +22,11 @@ const VALID_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
   COMPLETED: [],
   ARCHIVED: [],
 };
+
+const updateEventStatusSchema = z.object({
+  status: z.enum(["DRAFT", "SCHEDULED", "LIVE", "COMPLETED", "ARCHIVED"]),
+  password: z.string().optional(),
+});
 
 const ACTION_MAP: Record<string, string> = {
   SCHEDULED: "event.scheduled",
@@ -49,7 +55,22 @@ export async function POST(req: NextRequest, { params }: Params) {
   });
   if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { status: targetStatus, password } = await req.json();
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = updateEventStatusSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+      { status: 422 },
+    );
+  }
+
+  const { status: targetStatus, password } = parsed.data;
   const allowed = VALID_TRANSITIONS[event.status as EventStatus] ?? [];
 
   if (!allowed.includes(targetStatus as EventStatus)) {

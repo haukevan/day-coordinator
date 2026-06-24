@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { emitEventUpdate } from "@/lib/realtime";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { checkEventLimit } from "@/lib/db/limits";
 
 const createEventSchema = z.object({
   title: z.string().min(1, "Title is required.").max(100),
@@ -47,6 +48,15 @@ export async function POST(req: NextRequest) {
   });
   if (!dbUser)
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  // Enforce per-user event limit
+  const eventLimit = await checkEventLimit(dbUser.id);
+  if (!eventLimit.allowed) {
+    return NextResponse.json(
+      { error: `You've reached the maximum of ${eventLimit.max} events.` },
+      { status: 429 },
+    );
+  }
 
   let body: unknown;
   try {

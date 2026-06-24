@@ -43,8 +43,9 @@ export default async function PublicEventPage({ params }: Props) {
     },
   });
 
-  // Draft events and missing events both return not-found
-  if (!event || event.status === "DRAFT") notFound();
+  // Only publicly shared, scheduled/live/completed events are visible
+  if (!event || event.status === "DRAFT" || event.status === "ARCHIVED")
+    notFound();
 
   const label = STATUS_LABELS[event.status] ?? event.status;
   const badgeClass =

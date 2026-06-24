@@ -3,33 +3,22 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { storePkceCookies } from "@/lib/auth/pkce-store";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const schema = z.object({
   email: z.string().email(),
   next: z.string().optional(),
 });
 
-// In-memory rate limiter: max 3 requests per IP per 15 minutes
-const ipRequests = new Map<string, { count: number; resetAt: number }>();
-const WINDOW_MS = 15 * 60 * 1000;
-const MAX_PER_WINDOW = 3;
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const entry = ipRequests.get(ip);
-  if (!entry || now > entry.resetAt) {
-    ipRequests.set(ip, { count: 1, resetAt: now + WINDOW_MS });
-    return false;
-  }
-  if (entry.count >= MAX_PER_WINDOW) return true;
-  entry.count++;
-  return false;
-}
-
 export async function POST(request: NextRequest) {
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
-  if (isRateLimited(ip)) {
+  // DB-backed rate limiter: 3 requests per IP per 15 minutes
+  const ip = getClientIp(request);
+  const { allowed } = await checkRateLimit(
+    `magiclink:${ip}`,
+    3,
+    15 * 60 * 1000,
+  );
+  if (!allowed) {
     return NextResponse.json(
       { error: "Too many requests. Please wait before trying again." },
       { status: 429 },

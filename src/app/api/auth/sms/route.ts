@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const sendSchema = z.object({
   action: z.literal("send"),
@@ -23,9 +24,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
+  const ip = getClientIp(request);
+  const action = parsed.data.action;
+
+  // Rate limit: 5 sends per 10 min, 10 verifies per 10 min per IP
+  const rateLimitKey = `sms:${action}:${ip}`;
+  const maxRequests = action === "send" ? 5 : 10;
+  const { allowed } = await checkRateLimit(
+    rateLimitKey,
+    maxRequests,
+    10 * 60 * 1000,
+  );
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please wait before trying again." },
+      { status: 429 },
+    );
+  }
+
   const supabase = await createSupabaseServerClient();
 
-  if (parsed.data.action === "send") {
+  if (action === "send") {
     const { phone } = parsed.data;
 
     const { error } = await supabase.auth.signInWithOtp({ phone });

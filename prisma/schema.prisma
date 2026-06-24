@@ -321,3 +321,12 @@ model Venue {
   @@index([creatorId])
 }
 
+// ─── Rate Limiting ───────────────────────────────────────────────────────────
+
+model RateLimit {
+  key         String   @id
+  count       Int      @default(1)
+  windowStart DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+

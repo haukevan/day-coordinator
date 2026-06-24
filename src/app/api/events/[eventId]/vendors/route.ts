@@ -6,6 +6,7 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import { sendVendorInviteEmail } from "@/lib/notifications/vendor-invite";
 import type { SerializedVendor } from "@/lib/types";
+import { checkVendorLimit, checkVendorInviteThrottle } from "@/lib/db/limits";
 
 type Params = { params: Promise<{ eventId: string }> };
 
@@ -149,6 +150,17 @@ export async function POST(req: NextRequest, { params }: Params) {
       })
     )?.status;
 
+  // Enforce per-event vendor limit
+  const vendorLimit = await checkVendorLimit(eventId);
+  if (!vendorLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: `This event has reached the maximum of ${vendorLimit.max} vendors.`,
+      },
+      { status: 429 },
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -233,10 +245,14 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // Send invite immediately if event is SCHEDULED or LIVE
   if (eventStatus === "SCHEDULED" || eventStatus === "LIVE") {
-    try {
-      await sendVendorInviteEmail(eventVendor.id);
-    } catch {
-      /* non-fatal */
+    // Throttle invite sends: max 20 per 5 min per event
+    const inviteThrottle = await checkVendorInviteThrottle(eventId);
+    if (inviteThrottle.allowed) {
+      try {
+        await sendVendorInviteEmail(eventVendor.id);
+      } catch {
+        /* non-fatal */
+      }
     }
     // Re-fetch so the response reflects the updated inviteSentAt
     const fresh = await prisma.eventVendor.findUnique({
