@@ -97,6 +97,7 @@ function buildSortedList(
 export function TimelineList({
   tasks,
   timezone,
+  eventDate,
   onTaskClick,
   isLive = false,
   liveStatuses,
@@ -107,6 +108,7 @@ export function TimelineList({
 }: {
   tasks: SerializedTask[];
   timezone: string;
+  eventDate?: string | null;
   onTaskClick?: (task: SerializedTask) => void;
   /** Whether the event is in LIVE mode */
   isLive?: boolean;
@@ -161,6 +163,7 @@ export function TimelineList({
             <TaskCard
               task={task}
               timezone={timezone}
+              eventDate={eventDate}
               parentTitle={parentTitle}
               parentStatus={parentStatus}
               dependencyMeta={dependencyMeta}

@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useEffect, useRef, useState } from "react";
-import { toZonedTime } from "date-fns-tz";
-import { getHours, getMinutes } from "date-fns";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
+import { getHours, getMinutes, format } from "date-fns";
 import { Link2, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buildDependencyGroupMeta } from "./dependency-groups";
@@ -12,29 +12,48 @@ import type { SerializedTask } from "@/lib/types";
 const HOUR_HEIGHT = 80; // px per hour
 const LABEL_WIDTH = 52; // px for left hour-label column
 const MIN_BLOCK_HEIGHT = 24; // minimum task block height in px
+const MAX_EVENT_HOURS = 36; // event day midnight to noon next day = 36-hour window
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
-/** Convert a UTC ISO string to minutes-since-midnight in the given timezone. */
-function toMinuteOfDay(iso: string, timezone: string): number {
-  const zoned = toZonedTime(new Date(iso), timezone);
-  return getHours(zoned) * 60 + getMinutes(zoned);
+/** Convert a UTC ISO string to minutes elapsed since the event date midnight
+ *  (in the event timezone). Handles next-day tasks naturally — returns values
+ *  beyond 1440 for tasks on the following calendar day. */
+function toMinutesFromEventMidnight(
+  iso: string,
+  timezone: string,
+  eventDateIso: string,
+): number {
+  const eventDate = new Date(eventDateIso);
+  // Get the date string in the event timezone (YYYY-MM-DD)
+  const datePart = format(toZonedTime(eventDate, timezone), "yyyy-MM-dd");
+  // Create midnight in that timezone and convert to UTC
+  const midnightUtc = fromZonedTime(`${datePart}T00:00:00`, timezone);
+  const taskUtc = new Date(iso);
+  return (taskUtc.getTime() - midnightUtc.getTime()) / 60_000;
 }
 
-/** Format a minute-of-day value as a 12-hour time string, e.g. "9:30 AM". */
+/** Format a minute-of-day value as a 12-hour time string, e.g. "9:30 AM".
+ *  Minutes beyond 1440 (next day) are handled with modulo. */
 function fmtMin(min: number): string {
-  const h = Math.floor(min / 60) % 24;
-  const m = min % 60;
+  const displayMin = min % (24 * 60);
+  const h = Math.floor(displayMin / 60) % 24;
+  const m = displayMin % 60;
   const period = h >= 12 ? "PM" : "AM";
   const h12 = h % 12 || 12;
   return `${h12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
-/** Format an hour number as a label, e.g. "9 AM", "12 PM". */
-function fmtHour(hour: number): string {
-  if (hour === 0) return "12 AM";
-  if (hour === 12) return "12 PM";
-  return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
+/** Format an hour number as a label. Hours 0-23 get standard labels.
+ *  Hours 24+ get a two-line display: time on top, "+1d" below. */
+function fmtHourLabel(hour: number): { time: string; sub?: string } {
+  const isNextDay = hour >= 24;
+  const displayHour = hour % 24;
+  let time: string;
+  if (displayHour === 0) time = "12 AM";
+  else if (displayHour === 12) time = "12 PM";
+  else time = displayHour < 12 ? `${displayHour} AM` : `${displayHour - 12} PM`;
+  return isNextDay ? { time, sub: "+1d" } : { time };
 }
 
 // ── Layout algorithm ──────────────────────────────────────────────────────────
@@ -50,11 +69,16 @@ type PositionedTask = {
 function layoutTasks(
   tasks: SerializedTask[],
   timezone: string,
+  eventDateIso: string,
 ): PositionedTask[] {
   const timed = tasks.filter((t) => t.scheduledStart != null);
 
   const items: PositionedTask[] = timed.map((task) => {
-    const startMin = toMinuteOfDay(task.scheduledStart!, timezone);
+    const startMin = toMinutesFromEventMidnight(
+      task.scheduledStart!,
+      timezone,
+      eventDateIso,
+    );
     const dur = task.durationMins ?? 30;
     return {
       task,
@@ -141,20 +165,28 @@ function layoutTasks(
 function getTimeRange(
   tasks: SerializedTask[],
   timezone: string,
+  eventDateIso: string,
 ): { startHour: number; endHour: number } {
   const timed = tasks.filter((t) => t.scheduledStart != null);
   if (timed.length === 0) return { startHour: 8, endHour: 18 };
 
   const startMins = timed.map((t) =>
-    toMinuteOfDay(t.scheduledStart!, timezone),
+    toMinutesFromEventMidnight(t.scheduledStart!, timezone, eventDateIso),
   );
   const endMins = timed.map((t) => {
-    const s = toMinuteOfDay(t.scheduledStart!, timezone);
+    const s = toMinutesFromEventMidnight(
+      t.scheduledStart!,
+      timezone,
+      eventDateIso,
+    );
     return s + (t.durationMins ?? 30);
   });
 
   const startHour = Math.max(0, Math.floor(Math.min(...startMins) / 60) - 1);
-  const endHour = Math.min(24, Math.ceil(Math.max(...endMins) / 60) + 1);
+  const endHour = Math.min(
+    MAX_EVENT_HOURS,
+    Math.ceil(Math.max(...endMins) / 60) + 1,
+  );
   return { startHour, endHour };
 }
 
@@ -174,15 +206,19 @@ const STATUS_BLOCK: Record<string, string> = {
 export function TimelineGantt({
   tasks,
   timezone,
+  eventDate,
   onTaskClick,
 }: {
   tasks: SerializedTask[];
   timezone: string;
+  eventDate: string | null;
   onTaskClick?: (task: SerializedTask) => void;
 }) {
+  const eventDateIso = eventDate ?? new Date().toISOString();
+
   const { startHour, endHour } = useMemo(
-    () => getTimeRange(tasks, timezone),
-    [tasks, timezone],
+    () => getTimeRange(tasks, timezone, eventDateIso),
+    [tasks, timezone, eventDateIso],
   );
 
   const hours = useMemo(
@@ -194,8 +230,8 @@ export function TimelineGantt({
   const totalHeight = totalMinutes * (HOUR_HEIGHT / 60);
 
   const positioned = useMemo(
-    () => layoutTasks(tasks, timezone),
-    [tasks, timezone],
+    () => layoutTasks(tasks, timezone, eventDateIso),
+    [tasks, timezone, eventDateIso],
   );
 
   const dependencyMetaByTask = useMemo(
@@ -209,13 +245,17 @@ export function TimelineGantt({
   const [nowMin, setNowMin] = useState<number | null>(null);
   useEffect(() => {
     function update() {
-      const min = toMinuteOfDay(new Date().toISOString(), timezone);
+      const min = toMinutesFromEventMidnight(
+        new Date().toISOString(),
+        timezone,
+        eventDateIso,
+      );
       setNowMin(min);
     }
     update();
     const id = setInterval(update, 60_000);
     return () => clearInterval(id);
-  }, [timezone]);
+  }, [timezone, eventDateIso]);
 
   // Auto-scroll to first task or current time on mount
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -223,7 +263,11 @@ export function TimelineGantt({
     if (!scrollRef.current) return;
     const firstTimed = tasks.find((t) => t.scheduledStart);
     const scrollToMin = firstTimed
-      ? toMinuteOfDay(firstTimed.scheduledStart!, timezone) - 60
+      ? toMinutesFromEventMidnight(
+          firstTimed.scheduledStart!,
+          timezone,
+          eventDateIso,
+        ) - 60
       : nowMin !== null
         ? nowMin - 60
         : startHour * 60;
@@ -269,17 +313,31 @@ export function TimelineGantt({
             className="flex-shrink-0 select-none"
             style={{ width: `${LABEL_WIDTH}px` }}
           >
-            {hours.map((hour) => (
-              <div
-                key={hour}
-                className="relative flex items-start justify-end pr-2.5 pt-1"
-                style={{ height: `${HOUR_HEIGHT}px` }}
-              >
-                <span className="text-[11px] leading-none text-muted-foreground">
-                  {fmtHour(hour)}
-                </span>
-              </div>
-            ))}
+            {hours.map((hour) => {
+              const label = fmtHourLabel(hour);
+              return (
+                <div
+                  key={hour}
+                  className="relative flex items-start justify-end pr-2.5 pt-1"
+                  style={{ height: `${HOUR_HEIGHT}px` }}
+                >
+                  {label.sub ? (
+                    <div className="flex flex-col items-end leading-none">
+                      <span className="text-[11px] text-muted-foreground">
+                        {label.time}
+                      </span>
+                      <span className="text-[9px] font-medium text-warning">
+                        {label.sub}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-[11px] leading-none text-muted-foreground">
+                      {label.time}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Task grid */}
@@ -304,6 +362,21 @@ export function TimelineGantt({
                 style={{ top: `${i * HOUR_HEIGHT + HOUR_HEIGHT / 2}px` }}
               />
             ))}
+
+            {/* Midnight divider — shown when tasks span into the next day */}
+            {endHour > 24 && (
+              <div
+                className="pointer-events-none absolute left-0 right-0 z-10"
+                style={{
+                  top: `${(24 - startHour) * HOUR_HEIGHT}px`,
+                }}
+              >
+                <div className="mx-2 border-t-2 border-dashed border-warning/60" />
+                <span className="absolute -top-2.5 right-2 rounded border border-warning/30 bg-card px-1.5 py-0.5 text-[10px] font-medium text-warning">
+                  Midnight
+                </span>
+              </div>
+            )}
 
             {/* Live time indicator */}
             {showNow && (

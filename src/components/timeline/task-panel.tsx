@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 import {
   ChevronDown,
   Clock,
@@ -27,6 +27,7 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import type { SerializedTask, SerializedVendor } from "@/lib/types";
 
@@ -38,12 +39,37 @@ function utcToLocalHHMM(iso: string, timezone: string): string {
   return format(zoned, "HH:mm");
 }
 
+/** Determine the calendar day offset (0 or 1) of a UTC ISO timestamp
+ *  relative to the event date in the event timezone. */
+function getDayOffset(
+  iso: string,
+  eventDateISO: string | null,
+  timezone: string,
+): number {
+  if (!eventDateISO) return 0;
+  const taskDay = format(toZonedTime(new Date(iso), timezone), "yyyy-MM-dd");
+  const eventDay = format(
+    toZonedTime(new Date(eventDateISO), timezone),
+    "yyyy-MM-dd",
+  );
+  if (taskDay === eventDay) return 0;
+  // Compute signed day difference
+  const taskDate = new Date(taskDay + "T12:00:00");
+  const eventDate = new Date(eventDay + "T12:00:00");
+  const diff = Math.round(
+    (taskDate.getTime() - eventDate.getTime()) / (24 * 60 * 60 * 1000),
+  );
+  return diff;
+}
+
 /** Convert an event-local HH:mm time to a UTC ISO string.
- *  Uses eventDate as the calendar date (in the event timezone). */
+ *  Uses eventDate as the calendar date (in the event timezone).
+ *  @param dayOffset number of days to add to the event date (0 = event day, 1 = next day) */
 function localHHMMToUtcISO(
   eventDateISO: string | null,
   hhmm: string,
   timezone: string,
+  dayOffset = 0,
 ): string {
   // Derive the calendar date in the event timezone from eventDate.
   // We use noon UTC of the eventDate to avoid midnight-boundary mismatches
@@ -54,7 +80,15 @@ function localHHMMToUtcISO(
   const baseDate = new Date(baseMs);
 
   // Get the date string in the event timezone (YYYY-MM-DD)
-  const datePart = format(toZonedTime(baseDate, timezone), "yyyy-MM-dd");
+  let datePart = format(toZonedTime(baseDate, timezone), "yyyy-MM-dd");
+
+  // Apply day offset (e.g., +1 for next-day tasks)
+  if (dayOffset !== 0) {
+    datePart = format(
+      addDays(new Date(datePart + "T12:00:00"), dayOffset),
+      "yyyy-MM-dd",
+    );
+  }
 
   // Combine date + user-entered time as a local datetime string, then convert
   // to UTC using the event timezone.
@@ -105,11 +139,13 @@ function TimePickerPopover({
   onChange,
   minInclusive,
   onClear,
+  onlyAM = false,
 }: Readonly<{
   value: string;
   onChange: (hhmm: string) => void;
   minInclusive?: string | null;
   onClear?: () => void;
+  onlyAM?: boolean;
 }>) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{
@@ -148,6 +184,8 @@ function TimePickerPopover({
 
   /** Check if *any* time in the given period is selectable. */
   function isPeriodSelectable(p: "AM" | "PM") {
+    // Next-day mode restricts to AM only
+    if (onlyAM && p === "PM") return false;
     if (minInclusiveMinutes === null) return true;
     // AM runs from 12:00 AM (0 min) to 11:55 AM (715 min)
     // PM runs from 12:00 PM (720 min) to 11:55 PM (1435 min)
@@ -541,6 +579,16 @@ export function TaskPanel({
   const [endHHMM, setEndHHMM] = useState(
     task?.scheduledEnd ? utcToLocalHHMM(task.scheduledEnd, timezone) : "",
   );
+  const [startNextDay, setStartNextDay] = useState(
+    task?.scheduledStart
+      ? getDayOffset(task.scheduledStart, eventDate, timezone) > 0
+      : false,
+  );
+  const [endNextDay, setEndNextDay] = useState(
+    task?.scheduledEnd
+      ? getDayOffset(task.scheduledEnd, eventDate, timezone) > 0
+      : false,
+  );
   const [parentTaskId, setParentTaskId] = useState(task?.parentTaskId ?? "");
   const [selectedVendorIds, setSelectedVendorIds] = useState<string[]>(
     task?.taskVendors?.map((tv) => tv.eventVendorId) ?? [],
@@ -562,6 +610,16 @@ export function TaskPanel({
     );
     setEndHHMM(
       task?.scheduledEnd ? utcToLocalHHMM(task.scheduledEnd, timezone) : "",
+    );
+    setStartNextDay(
+      task?.scheduledStart
+        ? getDayOffset(task.scheduledStart, eventDate, timezone) > 0
+        : false,
+    );
+    setEndNextDay(
+      task?.scheduledEnd
+        ? getDayOffset(task.scheduledEnd, eventDate, timezone) > 0
+        : false,
     );
     setParentTaskId(task?.parentTaskId ?? "");
     setSelectedVendorIds(
@@ -590,11 +648,14 @@ export function TaskPanel({
     if (!parent?.scheduledEnd) return;
 
     const parentEndHHMM = utcToLocalHHMM(parent.scheduledEnd, timezone);
+    const parentNextDay =
+      getDayOffset(parent.scheduledEnd, eventDate, timezone) > 0;
 
     if (startHHMM && endHHMM) {
       // Both start and end are set — preserve duration, shift both
       const origDuration = hhmmToMinutes(endHHMM) - hhmmToMinutes(startHHMM);
       setStartHHMM(parentEndHHMM);
+      setStartNextDay(parentNextDay);
       if (origDuration > 0) {
         const newEndTotalMins = hhmmToMinutes(parentEndHHMM) + origDuration;
         const endH = Math.floor(newEndTotalMins / 60) % 24;
@@ -602,29 +663,50 @@ export function TaskPanel({
         setEndHHMM(
           `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`,
         );
+        // If total end is beyond 24h, set endNextDay
+        if (newEndTotalMins >= 24 * 60) {
+          setEndNextDay(true);
+        }
       }
     } else if (!startHHMM && endHHMM) {
       // Only end is set, no start — set both to parent's end
       setStartHHMM(parentEndHHMM);
+      setStartNextDay(parentNextDay);
       setEndHHMM(parentEndHHMM);
+      setEndNextDay(parentNextDay);
     } else {
       // Only start set (or neither) — just update start
       setStartHHMM(parentEndHHMM);
+      setStartNextDay(parentNextDay);
     }
   }
 
-  // Computed duration from start and end times
+  // Computed duration from start and end times (handles cross-midnight)
   const startMins = startHHMM ? hhmmToMinutes(startHHMM) : Number.NaN;
-  const endMins = endHHMM ? hhmmToMinutes(endHHMM) : Number.NaN;
+  const endMinsRaw = endHHMM ? hhmmToMinutes(endHHMM) : Number.NaN;
+  // If end is next-day but start is not, add 24h worth of minutes
+  const endMins =
+    !Number.isNaN(endMinsRaw) && endNextDay && !startNextDay
+      ? endMinsRaw + 24 * 60
+      : !Number.isNaN(endMinsRaw) && startNextDay && endNextDay
+        ? endMinsRaw
+        : endMinsRaw;
   const durationMins =
     !Number.isNaN(startMins) && !Number.isNaN(endMins) && endMins > startMins
       ? endMins - startMins
       : Number.NaN;
 
-  // Summary label: "12:00 PM - 1:00 PM (1hr)"
+  // The end display value for cross-day: if end is next-day and start is not,
+  // we offset end display by 24h for correct duration calculation
+  const endDisplayMins =
+    !Number.isNaN(endMinsRaw) && endNextDay && !startNextDay
+      ? endMinsRaw + 24 * 60
+      : endMinsRaw;
+
+  // Summary label: "12:00 PM - 1:00 PM (1hr)" or cross-day with +1d
   const summaryLabel =
     startHHMM && endHHMM && !Number.isNaN(durationMins)
-      ? `${formatTimeDisplay(startHHMM)} - ${formatTimeDisplay(endHHMM)} (${formatDurationLabel(durationMins)})`
+      ? `${formatTimeDisplay(startHHMM)}${startNextDay ? " +1d" : ""} - ${formatTimeDisplay(endHHMM)}${endNextDay ? " +1d" : ""} (${formatDurationLabel(durationMins)})`
       : null;
 
   // Compute buffer from parent's end to this task's start (in minutes).
@@ -692,6 +774,12 @@ export function TaskPanel({
     const origEnd = task.scheduledEnd
       ? utcToLocalHHMM(task.scheduledEnd, timezone)
       : "";
+    const origStartNextDay = task.scheduledStart
+      ? getDayOffset(task.scheduledStart, eventDate, timezone) > 0
+      : false;
+    const origEndNextDay = task.scheduledEnd
+      ? getDayOffset(task.scheduledEnd, eventDate, timezone) > 0
+      : false;
     const origParentId = task.parentTaskId ?? "";
     const origVendorIds = (
       task.taskVendors?.map((tv) => tv.eventVendorId) ?? []
@@ -707,6 +795,8 @@ export function TaskPanel({
       description !== origDesc ||
       startHHMM !== origStart ||
       endHHMM !== origEnd ||
+      startNextDay !== origStartNextDay ||
+      endNextDay !== origEndNextDay ||
       parentTaskId !== origParentId ||
       curVendorIds.length !== origVendorIds.length ||
       curVendorIds.some((id, i) => id !== origVendorIds[i])
@@ -718,9 +808,12 @@ export function TaskPanel({
     description,
     startHHMM,
     endHHMM,
+    startNextDay,
+    endNextDay,
     parentTaskId,
     selectedVendorIds,
     timezone,
+    eventDate,
   ]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -733,13 +826,75 @@ export function TaskPanel({
       setError("Start time is required.");
       return;
     }
+
+    // ── Next-day boundary check: max 12 hours past midnight of event date ──
+    if (startNextDay || endNextDay) {
+      const maxEndLocal = "12:00"; // noon next day = 12 hours past midnight
+      const maxEndISO = localHHMMToUtcISO(eventDate, maxEndLocal, timezone, 1);
+      const maxEndMs = new Date(maxEndISO).getTime();
+
+      // Check start time
+      const startISO = localHHMMToUtcISO(
+        eventDate,
+        startHHMM,
+        timezone,
+        startNextDay ? 1 : 0,
+      );
+      if (new Date(startISO).getTime() > maxEndMs) {
+        setError("Next-day tasks must start by noon the day after the event.");
+        setSaving(false);
+        return;
+      }
+
+      // Check end time
+      if (endHHMM) {
+        const endISO = localHHMMToUtcISO(
+          eventDate,
+          endHHMM,
+          timezone,
+          endNextDay ? 1 : 0,
+        );
+        if (new Date(endISO).getTime() > maxEndMs) {
+          setError("Next-day tasks must end by noon the day after the event.");
+          setSaving(false);
+          return;
+        }
+      }
+    }
+
+    // Cross-day validation: end must be after start in absolute time
+    if (endHHMM) {
+      const startISO = localHHMMToUtcISO(
+        eventDate,
+        startHHMM,
+        timezone,
+        startNextDay ? 1 : 0,
+      );
+      const endISO = localHHMMToUtcISO(
+        eventDate,
+        endHHMM,
+        timezone,
+        endNextDay ? 1 : 0,
+      );
+      if (new Date(endISO).getTime() <= new Date(startISO).getTime()) {
+        setError("End time must be after start time.");
+        setSaving(false);
+        return;
+      }
+    }
+
+    const scheduledStartISO = localHHMMToUtcISO(
+      eventDate,
+      startHHMM,
+      timezone,
+      startNextDay ? 1 : 0,
+    );
+    const scheduledEndISO = endHHMM
+      ? localHHMMToUtcISO(eventDate, endHHMM, timezone, endNextDay ? 1 : 0)
+      : null;
+
     setSaving(true);
     setError("");
-
-    const scheduledStartISO = localHHMMToUtcISO(eventDate, startHHMM, timezone);
-    const scheduledEndISO = endHHMM
-      ? localHHMMToUtcISO(eventDate, endHHMM, timezone)
-      : null;
 
     const payload: Record<string, unknown> = {
       title: title.trim(),
@@ -1035,10 +1190,32 @@ export function TaskPanel({
                 <TimePickerPopover
                   value={startHHMM}
                   minInclusive={minInclusiveStartHHMM}
+                  onlyAM={startNextDay}
                   onChange={(hhmm) => {
                     setStartHHMM(hhmm);
                   }}
                 />
+                <label className="flex items-center gap-1.5 self-start cursor-pointer select-none">
+                  <Switch
+                    checked={startNextDay}
+                    onCheckedChange={(checked) => {
+                      if (checked && startHHMM) {
+                        const mins = hhmmToMinutes(startHHMM);
+                        if (mins >= 12 * 60) setStartHHMM("");
+                      }
+                      setStartNextDay(checked);
+                    }}
+                    className="scale-75"
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    Next day
+                  </span>
+                  {startNextDay && (
+                    <span className="rounded bg-primary/10 px-1 text-[10px] font-medium text-primary">
+                      +1d
+                    </span>
+                  )}
+                </label>
                 {minInclusiveStartHHMM && (
                   <p className="text-xs text-muted-foreground">
                     Start must be at or after{" "}
@@ -1053,12 +1230,38 @@ export function TaskPanel({
                 </label>
                 <TimePickerPopover
                   value={endHHMM}
-                  minInclusive={startHHMM || undefined}
+                  minInclusive={
+                    startNextDay === endNextDay
+                      ? startHHMM || undefined
+                      : undefined
+                  }
+                  onlyAM={endNextDay}
                   onChange={(hhmm) => {
                     setEndHHMM(hhmm);
                   }}
                   onClear={() => setEndHHMM("")}
                 />
+                <label className="flex items-center gap-1.5 self-start cursor-pointer select-none">
+                  <Switch
+                    checked={endNextDay}
+                    onCheckedChange={(checked) => {
+                      if (checked && endHHMM) {
+                        const mins = hhmmToMinutes(endHHMM);
+                        if (mins >= 12 * 60) setEndHHMM("");
+                      }
+                      setEndNextDay(checked);
+                    }}
+                    className="scale-75"
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    Next day
+                  </span>
+                  {endNextDay && (
+                    <span className="rounded bg-primary/10 px-1 text-[10px] font-medium text-primary">
+                      +1d
+                    </span>
+                  )}
+                </label>
               </div>
             </div>
 

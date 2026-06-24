@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { formatInTimeZone } from "date-fns-tz";
 import { toZonedTime } from "date-fns-tz";
 import { format } from "date-fns";
 import {
@@ -27,6 +26,7 @@ import { SubtaskList } from "./subtask-list";
 import { TaskStatusBadge } from "./task-status-badge";
 import { LiveActionButtons } from "./live-action-buttons";
 import { cn } from "@/lib/utils";
+import { formatTimeInZoneWithDay } from "@/lib/format-time";
 import type {
   SerializedTask,
   SerializedSubTask,
@@ -37,6 +37,7 @@ interface TaskDetailSheetProps {
   eventId: string;
   task: SerializedTask | undefined;
   timezone: string;
+  eventDate?: string | null;
   open: boolean;
   userRole: "admin" | "vendor";
   /** Whether the current user is an accepted vendor assigned to this task (controls checklist visibility) */
@@ -60,7 +61,8 @@ interface TaskDetailSheetProps {
   onEdit: (task: SerializedTask) => void;
 }
 
-function formatTimeInZone(iso: string, timezone: string): string {
+/** Local time-only formatter for inline use in this component. */
+function fmtTime(iso: string, timezone: string): string {
   const zoned = toZonedTime(new Date(iso), timezone);
   return format(zoned, "h:mm a");
 }
@@ -81,6 +83,7 @@ export function TaskDetailSheet({
   eventId,
   task,
   timezone,
+  eventDate,
   open,
   userRole,
   canViewSubTasks,
@@ -199,9 +202,24 @@ export function TaskDetailSheet({
             <div className="flex items-center gap-2 text-sm">
               <Clock className="size-4 shrink-0 text-muted-foreground" />
               <span className="text-foreground">
-                {formatTimeInZone(task.scheduledStart!, timezone)}
+                {eventDate
+                  ? formatTimeInZoneWithDay(
+                      task.scheduledStart!,
+                      timezone,
+                      eventDate,
+                    )
+                  : fmtTime(task.scheduledStart!, timezone)}
                 {hasEnd && (
-                  <> – {formatTimeInZone(task.scheduledEnd!, timezone)}</>
+                  <>
+                    {" – "}
+                    {eventDate
+                      ? formatTimeInZoneWithDay(
+                          task.scheduledEnd!,
+                          timezone,
+                          eventDate,
+                        )
+                      : fmtTime(task.scheduledEnd!, timezone)}
+                  </>
                 )}
               </span>
               {hasDuration && (
@@ -224,7 +242,10 @@ export function TaskDetailSheet({
             <div className="flex items-center gap-2 text-sm">
               <Check className="size-4 shrink-0 text-success" />
               <span className="text-foreground">
-                Completed {formatTimeInZone(task.actualEnd, timezone)}
+                Completed{" "}
+                {eventDate
+                  ? formatTimeInZoneWithDay(task.actualEnd, timezone, eventDate)
+                  : fmtTime(task.actualEnd, timezone)}
               </span>
             </div>
           )}

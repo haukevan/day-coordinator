@@ -146,6 +146,44 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     },
   });
 
+  // ── Propagate event date change to all task times ──────────────────────
+  // When the event date shifts by N days, move every task's scheduledStart
+  // and scheduledEnd by the same number of days so tasks don't get stranded
+  // on the old date.
+  if (eventDate !== undefined && !isLocked && eventDate && event.eventDate) {
+    const oldDateMs = event.eventDate.getTime();
+    const newDateMs = new Date(eventDate + "T12:00:00.000Z").getTime();
+    const dayDelta = Math.round(
+      (newDateMs - oldDateMs) / (24 * 60 * 60 * 1000),
+    );
+
+    if (dayDelta !== 0) {
+      const offsetMs = dayDelta * 24 * 60 * 60 * 1000;
+      const allTasks = await prisma.task.findMany({
+        where: { eventId },
+        select: { id: true, scheduledStart: true, scheduledEnd: true },
+      });
+
+      for (const t of allTasks) {
+        const taskUpdates: Record<string, Date> = {};
+        if (t.scheduledStart)
+          taskUpdates.scheduledStart = new Date(
+            t.scheduledStart.getTime() + offsetMs,
+          );
+        if (t.scheduledEnd)
+          taskUpdates.scheduledEnd = new Date(
+            t.scheduledEnd.getTime() + offsetMs,
+          );
+        if (Object.keys(taskUpdates).length > 0) {
+          await prisma.task.update({
+            where: { id: t.id },
+            data: taskUpdates,
+          });
+        }
+      }
+    }
+  }
+
   await prisma.activityLog.create({
     data: {
       eventId,

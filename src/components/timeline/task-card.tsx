@@ -2,7 +2,7 @@ import { Link2, Lock, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TaskStatusBadge } from "./task-status-badge";
 import { LiveActionButtons } from "./live-action-buttons";
-import { formatTimeInZone } from "@/lib/format-time";
+import { formatTimeInZone, formatTimeInZoneWithDay } from "@/lib/format-time";
 import type { SerializedTask } from "@/lib/types";
 import type { DependencyGroupMeta } from "./dependency-groups";
 
@@ -39,6 +39,7 @@ const statusStyles: Record<string, { wrapper: string; dot: string }> = {
 export function TaskCard({
   task,
   timezone,
+  eventDate,
   parentTitle,
   parentStatus,
   dependencyMeta,
@@ -53,6 +54,7 @@ export function TaskCard({
 }: {
   task: SerializedTask;
   timezone: string;
+  eventDate?: string | null;
   parentTitle?: string | null;
   parentStatus?: string | null;
   dependencyMeta?: DependencyGroupMeta;
@@ -121,10 +123,16 @@ export function TaskCard({
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <p className="text-xs text-muted-foreground">
               {task.scheduledStart
-                ? formatTimeInZone(task.scheduledStart, timezone)
+                ? eventDate
+                  ? formatTimeInZoneWithDay(
+                      task.scheduledStart,
+                      timezone,
+                      eventDate,
+                    )
+                  : formatTimeInZone(task.scheduledStart, timezone)
                 : "No time set"}
               {task.scheduledEnd && task.scheduledStart
-                ? ` → ${formatTimeInZone(task.scheduledEnd, timezone)}`
+                ? ` → ${eventDate ? formatTimeInZoneWithDay(task.scheduledEnd, timezone, eventDate) : formatTimeInZone(task.scheduledEnd, timezone)}`
                 : task.durationMins
                   ? ` · ${formatDuration(task.durationMins)}`
                   : ""}

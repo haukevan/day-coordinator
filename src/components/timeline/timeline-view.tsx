@@ -228,6 +228,7 @@ export function TimelineView({
         <TimelineList
           tasks={tasks}
           timezone={timezone}
+          eventDate={eventDate}
           onTaskClick={openDetail}
           isLive={isLive}
           liveStatuses={liveStatuses}
@@ -241,6 +242,7 @@ export function TimelineView({
           <TimelineGantt
             tasks={tasks}
             timezone={timezone}
+            eventDate={eventDate}
             onTaskClick={openDetail}
           />
         </div>
@@ -251,6 +253,7 @@ export function TimelineView({
         eventId={eventId}
         task={detailTask}
         timezone={timezone}
+        eventDate={eventDate}
         open={detailOpen}
         userRole={userRole}
         canViewSubTasks={canViewSubTasks}

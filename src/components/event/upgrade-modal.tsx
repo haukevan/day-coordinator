@@ -74,7 +74,7 @@ export function UpgradeModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-sm sm:max-w-md">
+      <DialogContent className="max-w-sm sm:max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Upgrade to Scheduled</DialogTitle>
           <DialogDescription>
