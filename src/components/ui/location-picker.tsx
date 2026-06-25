@@ -602,7 +602,7 @@ export function LocationPicker({ value, onChange, className }: Props) {
                   }
                 }}
                 placeholder="Search for a location..."
-                className="w-full pl-9 pr-8 py-2 text-sm rounded-lg bg-surface border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
+                className="w-full pl-9 pr-8 py-2 text-base rounded-lg bg-surface border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
               />
               {(searchQuery || isSearching) && (
                 <button
