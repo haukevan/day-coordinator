@@ -60,17 +60,45 @@ export function VenueFormDialog({
   // ── Form state ────────────────────────────────────────────────────────────
   const [location, setLocation] = useState<LocationValue | null>(null);
   const [venueName, setVenueName] = useState("");
+  const [manualAddress, setManualAddress] = useState("");
   const [venueDescription, setVenueDescription] = useState("");
   const [venueOwnerName, setVenueOwnerName] = useState("");
   const [venueOwnerPhone, setVenueOwnerPhone] = useState("");
   const [venueOwnerEmail, setVenueOwnerEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [showManualAddress, setShowManualAddress] = useState(false);
 
   // ── Delete state ──────────────────────────────────────────────────────────
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const resetForm = useCallback(() => {
+    setLocation(null);
+    setVenueName("");
+    setManualAddress("");
+    setVenueDescription("");
+    setVenueOwnerName("");
+    setVenueOwnerPhone("");
+    setVenueOwnerEmail("");
+    setSaveError("");
+    setDeleteError("");
+    setConfirmDelete(false);
+    setShowManualAddress(false);
+  }, []);
+
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      if (!next) {
+        resetForm();
+        setConfirmDelete(false);
+      }
+      onOpenChange(next);
+    },
+    [onOpenChange, resetForm],
+  );
 
   // ── Populate form when editing ────────────────────────────────────────────
   useEffect(() => {
@@ -100,45 +128,27 @@ export function VenueFormDialog({
     } else if (open && !venue) {
       resetForm();
     }
-  }, [open, venue]);
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  const resetForm = useCallback(() => {
-    setLocation(null);
-    setVenueName("");
-    setVenueDescription("");
-    setVenueOwnerName("");
-    setVenueOwnerPhone("");
-    setVenueOwnerEmail("");
-    setSaveError("");
-    setDeleteError("");
-    setConfirmDelete(false);
-  }, []);
-
-  const handleOpenChange = useCallback(
-    (next: boolean) => {
-      if (!next) {
-        resetForm();
-        setConfirmDelete(false);
-      }
-      onOpenChange(next);
-    },
-    [onOpenChange, resetForm],
-  );
+  }, [open, venue, resetForm]);
 
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
-    if (!location && !isEdit) return;
+    const hasLocation = location != null;
+    const hasManualAddress = manualAddress.trim().length > 0;
+    if (!hasLocation && !hasManualAddress && !isEdit) return;
+    if (!venueName.trim() && !hasLocation && !isEdit) return;
     setSaving(true);
     setSaveError("");
 
     const body: Record<string, unknown> = {};
-    if (location) {
+    if (hasLocation) {
       body.name = venueName.trim() || location.name;
       body.address = location.address;
       if (location.lat != null) body.lat = location.lat;
       if (location.lng != null) body.lng = location.lng;
       if (location.placeId?.trim()) body.placeId = location.placeId.trim();
+    } else if (hasManualAddress) {
+      body.name = venueName.trim();
+      body.address = manualAddress.trim();
     } else {
       body.name = venueName.trim();
       body.address = venue?.address ?? "";
@@ -188,6 +198,7 @@ export function VenueFormDialog({
     venueOwnerEmail,
     onSaved,
     handleOpenChange,
+    manualAddress,
   ]);
 
   // ── Delete ────────────────────────────────────────────────────────────────
@@ -298,15 +309,48 @@ export function VenueFormDialog({
             <span className="mb-1.5 block text-xs font-medium text-muted-foreground">
               Address <span className="text-destructive">*</span>
             </span>
-            <LocationPicker
-              value={location}
-              onChange={(loc) => {
-                setLocation(loc);
-                if (loc && !venueName.trim()) {
-                  setVenueName(loc.name);
-                }
-              }}
-            />
+            {!showManualAddress && (
+              <LocationPicker
+                value={location}
+                onChange={(loc) => {
+                  setLocation(loc);
+                  if (loc && !venueName.trim()) {
+                    setVenueName(loc.name);
+                  }
+                }}
+              />
+            )}
+            {!location && (
+              <button
+                type="button"
+                onClick={() => setShowManualAddress(!showManualAddress)}
+                className="mt-2 text-xs text-muted-foreground underline hover:text-foreground"
+                style={{ minHeight: "44px", minWidth: "44px" }}
+              >
+                {showManualAddress
+                  ? "Use map search instead"
+                  : "Type address manually instead"}
+              </button>
+            )}
+            {showManualAddress && (
+              <div>
+                <label
+                  htmlFor="vf-manual-address"
+                  className="mb-1.5 block text-xs font-medium text-muted-foreground"
+                >
+                  Street address <span className="text-destructive">*</span>
+                </label>
+                <input
+                  id="vf-manual-address"
+                  type="text"
+                  value={manualAddress}
+                  onChange={(e) => setManualAddress(e.target.value)}
+                  maxLength={500}
+                  placeholder="Enter full street address…"
+                  className={inputClass}
+                />
+              </div>
+            )}
           </div>
 
           {/* Description */}
@@ -457,7 +501,11 @@ export function VenueFormDialog({
               type="button"
               size="sm"
               onClick={handleSave}
-              disabled={(!location && !isEdit) || saving || deleting}
+              disabled={
+                (!location && !manualAddress.trim() && !isEdit) ||
+                saving ||
+                deleting
+              }
             >
               {saving ? "Saving…" : isEdit ? "Save changes" : "Save venue"}
             </Button>

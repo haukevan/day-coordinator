@@ -1142,9 +1142,13 @@ export function TaskPanel({
                       {eligiblePrereqs.map((t) => (
                         <option key={t.id} value={t.id}>
                           {t.title}
-                          {t.scheduledEnd
-                            ? ` · ends ${utcToLocalHHMM(t.scheduledEnd, timezone)}`
-                            : ""}
+                          {(() => {
+                            const displayIso =
+                              t.scheduledEnd ?? t.scheduledStart;
+                            return displayIso
+                              ? ` · ends ${formatEndTime(displayIso, timezone)}`
+                              : "";
+                          })()}
                           {t.status === "COMPLETED" ? " ✓" : ""}
                         </option>
                       ))}

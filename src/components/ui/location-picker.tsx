@@ -59,13 +59,8 @@ interface Props {
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-const NOMINATIM_BASE = "https://nominatim.openstreetmap.org";
-
 async function searchAddress(query: string): Promise<NominatimResult[]> {
-  const res = await fetch(
-    `${NOMINATIM_BASE}/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`,
-    { headers: { "Accept-Language": "en" } },
-  );
+  const res = await fetch(`/api/venues/geocode?q=${encodeURIComponent(query)}`);
   if (!res.ok) throw new Error("Search failed");
   return res.json();
 }
@@ -75,8 +70,7 @@ async function reverseGeocode(
   lng: number,
 ): Promise<NominatimResult | null> {
   const res = await fetch(
-    `${NOMINATIM_BASE}/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
-    { headers: { "Accept-Language": "en" } },
+    `/api/venues/geocode?lat=${encodeURIComponent(lat.toString())}&lng=${encodeURIComponent(lng.toString())}`,
   );
   if (!res.ok) return null;
   return res.json();
