@@ -1,24 +1,38 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { cn } from "@/lib/utils";
-import { MapPin, Search, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  MapPin,
+  Search,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Check,
+} from "lucide-react";
 
-// Fix Leaflet default marker icon paths for bundled apps
-const DefaultIcon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-L.Marker.prototype.options.icon = DefaultIcon;
+// ─── tile styles (theme-aware vector tiles) ─────────────────────────────────
+
+const MAP_STYLES = {
+  light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+  dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+} as const;
+
+function resolveTheme(): "light" | "dark" {
+  if (typeof document === "undefined") return "light";
+  return document.documentElement.classList.contains("dark") ? "dark" : "light";
+}
+
+// ─── constants ──────────────────────────────────────────────────────────────
+
+const DEFAULT_CENTER: [number, number] = [-98.5795, 39.8283];
+const DEFAULT_ZOOM = 3;
+const PINNED_ZOOM = 13;
+const PREVIEW_ZOOM = 12;
+const TOOLTIP_DELAY = 800;
 
 // ─── types ──────────────────────────────────────────────────────────────────
 
@@ -59,8 +73,17 @@ interface Props {
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-async function searchAddress(query: string): Promise<NominatimResult[]> {
-  const res = await fetch(`/api/venues/geocode?q=${encodeURIComponent(query)}`);
+async function forwardGeocode(
+  query: string,
+  signal?: AbortSignal,
+): Promise<NominatimResult[]> {
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
+    {
+      headers: { "User-Agent": "DayCoordinator/1.0" },
+      signal,
+    },
+  );
   if (!res.ok) throw new Error("Search failed");
   return res.json();
 }
@@ -69,19 +92,22 @@ async function reverseGeocode(
   lat: number,
   lng: number,
 ): Promise<NominatimResult | null> {
-  const res = await fetch(
-    `/api/venues/geocode?lat=${encodeURIComponent(lat.toString())}&lng=${encodeURIComponent(lng.toString())}`,
-  );
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+      { headers: { "User-Agent": "DayCoordinator/1.0" } },
+    );
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 }
 
-/** Build a human-readable name from Nominatim parts (first 3 comma segments). */
 function buildDisplayName(parts: string[]): string {
   return parts.slice(0, 3).join(", ").trim();
 }
 
-/** Extract city + state from display_name for disambiguation. */
 function buildSubtitle(parts: string[], r: NominatimResult): string {
   const city = parts[2]?.trim() ?? "";
   const state = parts[3]?.trim() ?? "";
@@ -91,11 +117,9 @@ function buildSubtitle(parts: string[], r: NominatimResult): string {
   return segments.join(", ");
 }
 
-/** Build a clean address from Nominatim's structured address object. */
 function buildCleanAddress(r: NominatimResult): string {
   const a = r.address;
-  if (!a) return r.display_name; // fallback
-
+  if (!a) return r.display_name;
   const street = [a.house_number, a.road].filter(Boolean).join(" ");
   const city = a.city ?? a.town ?? a.village ?? "";
   const parts = [street, city, a.state, a.postcode, a.country].filter(Boolean);
@@ -113,153 +137,380 @@ function resultToLocation(r: NominatimResult): LocationValue {
   };
 }
 
-/** Short readable summary for the "selected" pill — just city + state. */
 function shortSummary(addr: string): string {
   const parts = addr.split(",").map((s) => s.trim());
-  // parts[0] = street/building, parts[2] = city, parts[3] = state
   const city = parts[2] ?? "";
   const state = parts[3] ?? "";
   if (city && state) return `${city}, ${state}`;
   return parts.slice(1, 3).join(", ").trim() || addr;
 }
 
-// ─── component ───────────────────────────────────────────────────────────────
+function getLocationDisplayName(value: LocationValue | null): string | null {
+  if (value?.name) return value.name.split(",")[0];
+  if (value) return "Loading address...";
+  return null;
+}
 
-const inputClass =
-  "w-full rounded-md border border-border bg-background px-3 py-2 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50";
+/** Returns true if the coordinates are not both ~0 (e.g. existing venues with no geodata). */
+function hasValidCoords(value: LocationValue | null): boolean {
+  if (!value) return false;
+  return Math.abs(value.lat) >= 0.0001 || Math.abs(value.lng) >= 0.0001;
+}
+
+// ─── component ───────────────────────────────────────────────────────────────
 
 export function LocationPicker({ value, onChange, className }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const markerRef = useRef<L.Marker | null>(null);
+  const previewMapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const previewMapRef = useRef<maplibregl.Map | null>(null);
+  const markerRef = useRef<maplibregl.Marker | null>(null);
+  const previewMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const [query, setQuery] = useState(value?.address ?? "");
-  const [results, setResults] = useState<NominatimResult[]>([]);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(value?.address ?? "");
+  const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const [error, setError] = useState("");
-  const [mapReady, setMapReady] = useState(false);
+  const [showMapTooltip, setShowMapTooltip] = useState(false);
+  const [copiedCoords, setCopiedCoords] = useState(false);
 
-  // ── init map ──────────────────────────────────────────────────────────────
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const tooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Refs to avoid stale closures in event handlers
+  const valueRef = useRef(value);
+  const onChangeRef = useRef(onChange);
+
+  // Sync refs in effect — React 19 forbids ref writes during render
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return;
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
-    const map = L.map(mapContainerRef.current, {
-      center: [value?.lat ?? 49.2827, value?.lng ?? -123.1207],
-      zoom: value ? 15 : 4,
-      zoomControl: true,
-      attributionControl: true,
+  // ── init full map (lazy, only when expanded) ──────────────────────────────
+
+  useEffect(() => {
+    if (!isExpanded) return;
+    if (mapRef.current) return;
+    if (!mapContainerRef.current) return;
+
+    const theme = resolveTheme();
+    const currentValue = valueRef.current;
+    const valid = hasValidCoords(currentValue);
+
+    const center: [number, number] = valid
+      ? [currentValue!.lng, currentValue!.lat]
+      : DEFAULT_CENTER;
+    const zoom = valid ? PINNED_ZOOM : DEFAULT_ZOOM;
+
+    const map = new maplibregl.Map({
+      container: mapContainerRef.current,
+      style: MAP_STYLES[theme],
+      center,
+      zoom,
+      attributionControl: false,
     });
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19,
-    }).addTo(map);
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
 
-    // Click on map to place pin and reverse-geocode
-    map.on("click", async (e: L.LeafletMouseEvent) => {
-      try {
-        const result = await reverseGeocode(e.latlng.lat, e.latlng.lng);
-        if (result) {
-          const loc = resultToLocation(result);
-          setQuery(loc.address);
-          onChange(loc);
-        }
-      } catch {
-        // silently fail
+    map.on("load", () => {
+      const attributionControl = new maplibregl.AttributionControl({
+        compact: true,
+      });
+      map.addControl(attributionControl, "bottom-right");
+
+      // Collapse attribution
+      const attribEl =
+        mapContainerRef.current?.querySelector<HTMLDetailsElement>(
+          ".maplibregl-ctrl-attrib",
+        );
+      if (attribEl) {
+        attribEl.removeAttribute("open");
+        attribEl.classList.remove("maplibregl-compact-show");
       }
-    });
 
-    mapRef.current = map;
-    setMapReady(true);
+      requestAnimationFrame(() => {
+        setIsMapLoaded(true);
+      });
 
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      // Place existing marker if value exists with valid coords
+      if (valid && currentValue?.lat && currentValue?.lng) {
+        const marker = new maplibregl.Marker({
+          color: "hsl(var(--primary))",
+          draggable: true,
+        })
+          .setLngLat([currentValue.lng, currentValue.lat])
+          .addTo(map);
 
-  // ── sync marker with value ────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!mapRef.current || !mapReady) return;
-
-    const map = mapRef.current;
-
-    if (markerRef.current) {
-      markerRef.current.remove();
-      markerRef.current = null;
-    }
-
-    if (value?.lat && value?.lng) {
-      const marker = L.marker([value.lat, value.lng], {
-        draggable: true,
-      }).addTo(map);
-
-      marker.on("dragend", async () => {
-        const pos = marker.getLatLng();
-        try {
+        marker.on("dragend", async () => {
+          const pos = marker.getLngLat();
           const result = await reverseGeocode(pos.lat, pos.lng);
           if (result) {
             const loc = resultToLocation(result);
-            setQuery(loc.address);
-            onChange(loc);
+            setSearchQuery(loc.address);
+            onChangeRef.current(loc);
           }
-        } catch {
-          // silently fail
+        });
+
+        markerRef.current = marker;
+      }
+    });
+
+    // Click to place / move pin
+    map.on("click", async (e) => {
+      const lngLat: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+
+      if (markerRef.current) {
+        markerRef.current.remove();
+      }
+
+      const marker = new maplibregl.Marker({
+        color: "hsl(var(--primary))",
+        draggable: true,
+      })
+        .setLngLat(lngLat)
+        .addTo(map);
+
+      marker.on("dragend", async () => {
+        const pos = marker.getLngLat();
+        const result = await reverseGeocode(pos.lat, pos.lng);
+        if (result) {
+          const loc = resultToLocation(result);
+          setSearchQuery(loc.address);
+          onChangeRef.current(loc);
         }
       });
 
       markerRef.current = marker;
-      map.setView([value.lat, value.lng], map.getZoom());
-    }
-  }, [value, mapReady, onChange]);
 
-  // ── search ────────────────────────────────────────────────────────────────
-
-  const handleSearch = useCallback(async () => {
-    const q = query.trim();
-    if (!q || q.length < 3) return;
-
-    setSearching(true);
-    setError("");
-    try {
-      const data = await searchAddress(q);
-      setResults(data);
-      setShowResults(true);
-      if (data.length === 0) {
-        setError("No results found. Try a different search.");
+      const result = await reverseGeocode(lngLat[1], lngLat[0]);
+      if (result) {
+        const loc = resultToLocation(result);
+        setSearchQuery(loc.address);
+        onChangeRef.current(loc);
       }
-    } catch {
-      setError("Search failed. Please try again.");
-    } finally {
-      setSearching(false);
-    }
-  }, [query]);
+    });
 
-  const selectResult = useCallback(
+    mapRef.current = map;
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+        setIsMapLoaded(false);
+      }
+    };
+  }, [isExpanded]);
+
+  // ── auto-focus search input when map loads ────────────────────────────────
+
+  useEffect(() => {
+    if (isExpanded && isMapLoaded && searchInputRef.current) {
+      const id = setTimeout(() => searchInputRef.current?.focus(), 100);
+      return () => clearTimeout(id);
+    }
+  }, [isExpanded, isMapLoaded]);
+
+  // ── init preview map (when collapsed + value exists, coords valid) ────────
+
+  useEffect(() => {
+    if (isExpanded) return;
+
+    const valid = hasValidCoords(value);
+
+    if (!value || !valid) {
+      if (previewMapRef.current) {
+        previewMapRef.current.remove();
+        previewMapRef.current = null;
+        previewMarkerRef.current = null;
+      }
+      return;
+    }
+
+    if (!previewMapContainerRef.current) return;
+
+    // Update existing preview
+    if (previewMapRef.current) {
+      previewMapRef.current.setCenter([value.lng, value.lat]);
+      if (previewMarkerRef.current) {
+        previewMarkerRef.current.setLngLat([value.lng, value.lat]);
+      } else {
+        const marker = new maplibregl.Marker({
+          color: "hsl(var(--primary))",
+          draggable: false,
+        })
+          .setLngLat([value.lng, value.lat])
+          .addTo(previewMapRef.current);
+        previewMarkerRef.current = marker;
+      }
+      return;
+    }
+
+    const theme = resolveTheme();
+    const previewMap = new maplibregl.Map({
+      container: previewMapContainerRef.current,
+      style: MAP_STYLES[theme],
+      center: [value.lng, value.lat],
+      zoom: PREVIEW_ZOOM,
+      attributionControl: false,
+      interactive: false,
+    });
+
+    previewMap.on("load", () => {
+      const marker = new maplibregl.Marker({
+        color: "hsl(var(--primary))",
+        draggable: false,
+      })
+        .setLngLat([value.lng, value.lat])
+        .addTo(previewMap);
+
+      previewMarkerRef.current = marker;
+    });
+
+    previewMapRef.current = previewMap;
+  }, [isExpanded, value]);
+
+  // ── theme change observer ─────────────────────────────────────────────────
+
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type === "attributes" && m.attributeName === "class") {
+          const theme = resolveTheme();
+          if (mapRef.current) {
+            mapRef.current.setStyle(MAP_STYLES[theme]);
+          }
+          if (previewMapRef.current) {
+            previewMapRef.current.setStyle(MAP_STYLES[theme]);
+          }
+        }
+      }
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // ── cleanup preview on unmount ────────────────────────────────────────────
+
+  useEffect(() => {
+    return () => {
+      if (previewMapRef.current) {
+        previewMapRef.current.remove();
+        previewMapRef.current = null;
+        previewMarkerRef.current = null;
+      }
+    };
+  }, []);
+
+  // ── search (debounced 300ms, direct Nominatim) ────────────────────────────
+
+  const doSearch = useCallback(async (q: string) => {
+    const trimmed = q.trim();
+    if (!trimmed) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setIsSearching(true);
+    try {
+      const data = await forwardGeocode(trimmed, controller.signal);
+      setSearchResults(data);
+      setShowResults(data.length > 0);
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  const handleSearchChange = useCallback(
+    (newQuery: string) => {
+      setSearchQuery(newQuery);
+
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+
+      if (!newQuery.trim()) {
+        setSearchResults([]);
+        setShowResults(false);
+        return;
+      }
+
+      searchTimeoutRef.current = setTimeout(() => {
+        doSearch(newQuery);
+      }, 300);
+    },
+    [doSearch],
+  );
+
+  const selectSearchResult = useCallback(
     (r: NominatimResult) => {
       const loc = resultToLocation(r);
-      setQuery(loc.address);
+      setSearchQuery(loc.address);
+      setSearchResults([]);
       setShowResults(false);
-      setResults([]);
       onChange(loc);
-      // Zoom into the selected location
+
       if (mapRef.current) {
-        mapRef.current.setView([loc.lat, loc.lng], 15);
+        mapRef.current.flyTo({
+          center: [loc.lng, loc.lat],
+          zoom: PINNED_ZOOM,
+          duration: 1000,
+        });
+
+        // Update marker
+        if (markerRef.current) {
+          markerRef.current.remove();
+        }
+        const marker = new maplibregl.Marker({
+          color: "hsl(var(--primary))",
+          draggable: true,
+        })
+          .setLngLat([loc.lng, loc.lat])
+          .addTo(mapRef.current);
+
+        marker.on("dragend", async () => {
+          const pos = marker.getLngLat();
+          const result = await reverseGeocode(pos.lat, pos.lng);
+          if (result) {
+            const loc2 = resultToLocation(result);
+            setSearchQuery(loc2.address);
+            onChange(loc2);
+          }
+        });
+
+        markerRef.current = marker;
       }
     },
     [onChange],
   );
 
   const clearLocation = useCallback(() => {
-    setQuery("");
-    setResults([]);
+    setSearchQuery("");
+    setSearchResults([]);
     setShowResults(false);
-    setError("");
+    setIsExpanded(false);
     if (markerRef.current) {
       markerRef.current.remove();
       markerRef.current = null;
@@ -267,129 +518,251 @@ export function LocationPicker({ value, onChange, className }: Props) {
     onChange(null);
   }, [onChange]);
 
+  // ── computed values ───────────────────────────────────────────────────────
+
+  const locationDisplayName = getLocationDisplayName(value);
+  const coordsValid = hasValidCoords(value);
+  const showPreviewMap = !!(value && coordsValid && !isExpanded);
+  const isTextOnlyVenue = !!(value && !coordsValid);
+
+  const buttonLabel = (() => {
+    if (isExpanded) return "Hide map";
+    if (isTextOnlyVenue)
+      return `${locationDisplayName ?? "Location"} (text only)`;
+    return locationDisplayName ?? "Select location";
+  })();
+
   // ── render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className={cn("space-y-3", className)}>
-      {/* Search bar */}
-      <div className="relative z-10">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleSearch();
-                }
-              }}
-              placeholder="Search for a venue or address..."
-              className={cn(inputClass, "!pl-9")}
-            />
-          </div>
-          <Button
-            type="button"
-            size="lg"
-            className="h-auto py-2"
-            onClick={handleSearch}
-            disabled={searching || query.trim().length < 3}
-          >
-            {searching ? "…" : "Search"}
-          </Button>
-        </div>
-
-        {/* Results dropdown */}
-        {showResults && results.length > 0 && (
-          <>
-            {/* Click-away backdrop */}
-            <button
-              type="button"
-              className="fixed inset-0 z-20 cursor-default"
-              onClick={() => setShowResults(false)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setShowResults(false);
-              }}
-              aria-label="Close search results"
-            />
-            <div className="absolute z-30 mt-1 w-full rounded-md border border-border bg-popover shadow-lg">
-              <ul className="max-h-48 overflow-auto py-1">
-                {results.map((r) => {
-                  const parts = r.display_name.split(",").map((s) => s.trim());
-                  return (
-                    <li key={r.place_id}>
-                      <button
-                        type="button"
-                        onClick={() => selectResult(r)}
-                        className="flex w-full items-start gap-2 px-3 py-2.5 text-left text-sm hover:bg-hover"
-                        style={{ minHeight: "44px" }}
-                      >
-                        <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-foreground">
-                            {buildDisplayName(parts)}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {buildSubtitle(parts, r)}
-                          </p>
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          </>
+    <div className={cn("w-full", className)}>
+      {/* ── toggle button / preview ──────────────────────────────────────── */}
+      <div className={`relative ${showPreviewMap ? "h-16" : ""}`}>
+        {/* Preview map background — only when coords are valid */}
+        {coordsValid && (
+          <div
+            ref={previewMapContainerRef}
+            className={`absolute inset-0 w-full h-full rounded-lg overflow-hidden transition-opacity duration-300 ${
+              showPreviewMap ? "opacity-60" : "opacity-0 pointer-events-none"
+            }`}
+          />
         )}
+
+        <button
+          type="button"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors ${
+            showPreviewMap
+              ? "absolute inset-0 h-full bg-transparent"
+              : "relative bg-background"
+          }`}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <MapPin className="size-4 shrink-0" />
+            {showPreviewMap ? (
+              <span className="text-xs font-medium truncate bg-background px-2 py-0.5 rounded-md text-foreground shadow-sm">
+                {buttonLabel}
+              </span>
+            ) : (
+              <span className="text-xs truncate">{buttonLabel}</span>
+            )}
+          </div>
+          {isExpanded ? (
+            <ChevronUp
+              className={`size-4 shrink-0 ${showPreviewMap ? "bg-background rounded p-0.5" : ""}`}
+            />
+          ) : (
+            <ChevronDown
+              className={`size-4 shrink-0 ${showPreviewMap ? "bg-background rounded p-0.5" : ""}`}
+            />
+          )}
+        </button>
       </div>
 
-      {/* Error */}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {/* ── expanded map ──────────────────────────────────────────────────── */}
+      <div
+        className={`overflow-hidden transition-all duration-300 ease-out ${
+          isExpanded ? "mt-3 opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        <div className="rounded-xl overflow-hidden border border-border bg-card">
+          {/* Search bar */}
+          <div className="px-3 py-2 border-b border-border bg-background relative">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                onFocus={() => searchResults.length > 0 && setShowResults(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setShowResults(false);
+                  }
+                }}
+                placeholder="Search for a location..."
+                className="w-full pl-9 pr-8 py-2 text-sm rounded-lg bg-surface border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
+              />
+              {(searchQuery || isSearching) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSearchResults([]);
+                    setShowResults(false);
+                    if (markerRef.current) {
+                      markerRef.current.remove();
+                      markerRef.current = null;
+                    }
+                    onChange(null);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded"
+                  aria-label="Clear search"
+                >
+                  {isSearching ? (
+                    <div className="size-3 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <X className="size-3.5" />
+                  )}
+                </button>
+              )}
+            </div>
 
-      {/* Map — always render container so Leaflet can mount; overlay loading */}
-      <div className="relative z-0">
-        <div className="overflow-hidden rounded-lg border border-border">
+            {/* Search results dropdown */}
+            {showResults && searchResults.length > 0 && (
+              <div className="absolute left-3 right-3 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg z-30 max-h-48 overflow-y-auto">
+                {searchResults.map((r) => {
+                  const parts = r.display_name.split(",").map((s) => s.trim());
+                  return (
+                    <button
+                      key={r.place_id}
+                      type="button"
+                      onClick={() => {
+                        selectSearchResult(r);
+                      }}
+                      className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover transition-colors border-b border-border last:border-b-0 flex items-start gap-2"
+                    >
+                      <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-foreground">
+                          {buildDisplayName(parts)}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {buildSubtitle(parts, r)}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Map container */}
           <div
             ref={mapContainerRef}
-            className="h-[280px] w-full sm:h-[320px]"
-          />
-          {!mapReady && (
-            <div className="absolute inset-0 flex items-center justify-center bg-muted/40">
-              <p className="text-sm text-muted-foreground">Loading map…</p>
-            </div>
-          )}
+            className="w-full h-[350px] relative"
+            style={{ minHeight: "350px" }}
+            onMouseEnter={() => {
+              tooltipTimeoutRef.current = setTimeout(() => {
+                setShowMapTooltip(true);
+              }, TOOLTIP_DELAY);
+            }}
+            onMouseLeave={() => {
+              if (tooltipTimeoutRef.current) {
+                clearTimeout(tooltipTimeoutRef.current);
+                tooltipTimeoutRef.current = null;
+              }
+              setShowMapTooltip(false);
+            }}
+            onMouseDown={() => {
+              if (tooltipTimeoutRef.current) {
+                clearTimeout(tooltipTimeoutRef.current);
+                tooltipTimeoutRef.current = null;
+              }
+              setShowMapTooltip(false);
+            }}
+          >
+            {/* Loading overlay */}
+            {isExpanded && !isMapLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center bg-surface">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  <span className="text-xs text-muted-foreground">
+                    Loading map...
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Coordinates display — only for valid coords */}
+            {coordsValid && isMapLoaded && value && (
+              <div className="absolute bottom-2 left-2 z-10 bg-background/90 backdrop-blur-sm px-2 py-1 rounded text-[10px] text-muted-foreground font-mono flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const coords = `${value.lat.toFixed(6)}, ${value.lng.toFixed(6)}`;
+                    await navigator.clipboard.writeText(coords);
+                    setCopiedCoords(true);
+                    setTimeout(() => setCopiedCoords(false), 1500);
+                  }}
+                  className="p-0.5 hover:text-foreground transition-colors"
+                  title="Copy coordinates"
+                >
+                  {copiedCoords ? (
+                    <Check className="size-3 text-success" />
+                  ) : (
+                    <Copy className="size-3" />
+                  )}
+                </button>
+                <span>
+                  {value.lat.toFixed(6)}, {value.lng.toFixed(6)}
+                </span>
+              </div>
+            )}
+
+            {/* Tooltip */}
+            {showMapTooltip && isMapLoaded && (
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 bg-popover/95 backdrop-blur-sm px-3 py-2 rounded-lg shadow-lg border border-border pointer-events-none">
+                <p className="text-xs text-foreground whitespace-nowrap">
+                  Drag pin to adjust or click to move
+                </p>
+              </div>
+            )}
+          </div>
         </div>
-        {value && mapReady && (
+      </div>
+
+      {/* Selected location summary (shown when collapsed) */}
+      {!isExpanded && value && (
+        <div className="flex items-start gap-2 mt-2 rounded-md bg-muted/40 px-3 py-2">
+          <MapPin className="mt-0.5 size-4 shrink-0 text-primary" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">{value.name}</p>
+            {coordsValid ? (
+              <p className="truncate text-xs text-muted-foreground">
+                {shortSummary(value.address)}
+              </p>
+            ) : (
+              <p className="truncate text-xs text-muted-foreground">
+                {value.address || "Text-only location"}
+              </p>
+            )}
+            {isTextOnlyVenue && (
+              <p className="text-[10px] text-muted-foreground mt-0.5 italic">
+                No map coordinates — search to update
+              </p>
+            )}
+          </div>
           <button
             type="button"
             onClick={clearLocation}
-            className="absolute right-3 top-3 z-20 rounded-full bg-background/90 p-1.5 text-muted-foreground shadow-sm hover:bg-background hover:text-foreground"
-            aria-label="Clear location"
+            className="ml-auto p-1 text-muted-foreground hover:text-destructive rounded shrink-0"
+            aria-label="Remove location"
           >
-            <X className="size-4" />
+            <X className="size-3.5" />
           </button>
-        )}
-        {/* Promote Leaflet zoom controls above tile GPU layer */}
-        <style>{`
-          .leaflet-control-zoom {
-            z-index: 1000 !important;
-            transform: translateZ(0);
-          }
-        `}</style>
-      </div>
-
-      {/* Selected location summary */}
-      {value && (
-        <div className="flex items-start gap-2 rounded-md bg-muted/40 px-3 py-2">
-          <MapPin className="mt-0.5 size-4 shrink-0 text-accent" />
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground">{value.name}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {shortSummary(value.address)}
-            </p>
-          </div>
         </div>
       )}
     </div>

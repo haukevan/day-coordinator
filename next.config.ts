@@ -21,7 +21,9 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'; " +
               "img-src 'self' data: https:; " +
               "font-src 'self'; " +
-              "connect-src 'self' https://*.supabase.co;",
+              "connect-src 'self' https://*.supabase.co https://nominatim.openstreetmap.org https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://tiles.openfreemap.org https://api.maptiler.com; " +
+              "worker-src 'self' blob:; " +
+              "child-src 'self' blob:;",
           },
         ],
       },
