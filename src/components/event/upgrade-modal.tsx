@@ -154,12 +154,7 @@ export function UpgradeModal({
                   : "You must set an event date before scheduling. Your event can't go live without one."}
               </p>
               {!hasDate && (
-                <Button
-                  asChild
-                  size="sm"
-                  variant="outline"
-                  className="mt-2 h-7 text-xs"
-                >
+                <Button asChild size="sm" variant="outline" className="mt-2">
                   <Link href={`/events/${eventId}/settings`}>
                     Go to settings →
                   </Link>

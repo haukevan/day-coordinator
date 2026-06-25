@@ -16,6 +16,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 interface Props {
   readonly name: string;
@@ -102,22 +103,14 @@ export function VenueChipPopup({
               <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
               <span className="group-hover:underline">{address}</span>
             </a>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon-xs"
               onClick={handleCopy}
-              className={cn(
-                "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-hover hover:text-foreground transition-colors",
-                copied && "text-success",
-              )}
-              style={{ minHeight: "24px", minWidth: "24px" }}
               aria-label={copied ? "Address copied" : "Copy address"}
             >
-              {copied ? (
-                <Check className="size-3.5" />
-              ) : (
-                <Copy className="size-3.5" />
-              )}
-            </button>
+              {copied ? <Check className="text-success" /> : <Copy />}
+            </Button>
           </div>
 
           {/* Contact info */}

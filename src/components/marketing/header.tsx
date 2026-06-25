@@ -30,10 +30,10 @@ export function MarketingHeader() {
 
         <div className="flex items-center gap-1.5">
           <ThemeToggle />
-          <Button variant="ghost" size="sm" asChild>
+          <Button variant="ghost" asChild>
             <Link href="/login">Sign in</Link>
           </Button>
-          <Button size="sm" asChild>
+          <Button asChild>
             <Link href="/login?mode=signup">Get started</Link>
           </Button>
         </div>

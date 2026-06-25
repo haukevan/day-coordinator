@@ -118,7 +118,6 @@ export function DelayDialog({
                 variant="outline"
                 size="sm"
                 onClick={() => handlePresetClick(mins)}
-                className="min-h-[44px]"
               >
                 {mins} min
               </Button>

@@ -313,7 +313,7 @@ export function SubtaskItem({
       )}
     >
       {/* ── Row 1: grip · circle · status text · vendor chips · actions ── */}
-      <div className="flex items-center gap-2.5 min-h-[28px]">
+      <div className="flex items-center gap-2.5 min-h-[42px]">
         {/* Drag grip handle (admin only) */}
         {userRole === "admin" && (
           <div

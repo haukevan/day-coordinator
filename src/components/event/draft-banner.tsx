@@ -66,13 +66,15 @@ export function DraftBanner({ eventId, status, eventDate }: Props) {
             Upgrade to Scheduled →
           </Button>
         </div>
-        <button
+        <Button
+          variant="ghost"
+          size="icon-xs"
           onClick={dismiss}
-          className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
+          className="shrink-0"
           aria-label="Dismiss"
         >
-          <X className="size-3.5" />
-        </button>
+          <X />
+        </Button>
       </div>
 
       <UpgradeModal
@@ -113,13 +115,14 @@ export function DraftWarningIcon({ eventId }: { eventId: string }) {
   if (!visible) return null;
 
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="icon-xs"
       onClick={reopen}
-      className="rounded p-0.5 text-warning transition-colors hover:text-warning/80 focus:outline-none focus:ring-1 focus:ring-ring/50"
       aria-label="View draft mode notice"
       title="This event is in draft mode"
     >
-      <AlertTriangle className="size-4" />
-    </button>
+      <AlertTriangle className="text-warning" />
+    </Button>
   );
 }

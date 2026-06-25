@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   MapPin,
   Search,
@@ -551,7 +552,7 @@ export function LocationPicker({ value, onChange, className }: Props) {
         <button
           type="button"
           onClick={() => setIsExpanded(!isExpanded)}
-          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors ${
+          className={`w-full flex items-center justify-between gap-2 px-3 py-3 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors min-h-[42px] ${
             showPreviewMap
               ? "absolute inset-0 h-full bg-transparent"
               : "relative bg-background"
@@ -605,8 +606,9 @@ export function LocationPicker({ value, onChange, className }: Props) {
                 className="w-full pl-9 pr-8 py-2 text-base rounded-lg bg-surface border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
               />
               {(searchQuery || isSearching) && (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   onClick={() => {
                     setSearchQuery("");
                     setSearchResults([]);
@@ -617,15 +619,15 @@ export function LocationPicker({ value, onChange, className }: Props) {
                     }
                     onChange(null);
                   }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
                   aria-label="Clear search"
                 >
                   {isSearching ? (
                     <div className="size-3 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <X className="size-3.5" />
+                    <X />
                   )}
-                </button>
+                </Button>
               )}
             </div>
 
@@ -699,23 +701,19 @@ export function LocationPicker({ value, onChange, className }: Props) {
             {/* Coordinates display — only for valid coords */}
             {coordsValid && isMapLoaded && value && (
               <div className="absolute bottom-2 left-2 z-10 bg-background/90 backdrop-blur-sm px-2 py-1 rounded text-[10px] text-muted-foreground font-mono flex items-center gap-1.5">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   onClick={async () => {
                     const coords = `${value.lat.toFixed(6)}, ${value.lng.toFixed(6)}`;
                     await navigator.clipboard.writeText(coords);
                     setCopiedCoords(true);
                     setTimeout(() => setCopiedCoords(false), 1500);
                   }}
-                  className="p-0.5 hover:text-foreground transition-colors"
                   title="Copy coordinates"
                 >
-                  {copiedCoords ? (
-                    <Check className="size-3 text-success" />
-                  ) : (
-                    <Copy className="size-3" />
-                  )}
-                </button>
+                  {copiedCoords ? <Check className="text-success" /> : <Copy />}
+                </Button>
                 <span>
                   {value.lat.toFixed(6)}, {value.lng.toFixed(6)}
                 </span>
@@ -755,14 +753,15 @@ export function LocationPicker({ value, onChange, className }: Props) {
               </p>
             )}
           </div>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-xs"
             onClick={clearLocation}
-            className="ml-auto p-1 text-muted-foreground hover:text-destructive rounded shrink-0"
+            className="ml-auto shrink-0"
             aria-label="Remove location"
           >
-            <X className="size-3.5" />
-          </button>
+            <X />
+          </Button>
         </div>
       )}
     </div>

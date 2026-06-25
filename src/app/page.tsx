@@ -103,14 +103,10 @@ export default function HomePage() {
             </p>
 
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Button asChild className="h-10 w-full px-6 text-sm sm:w-auto">
+              <Button asChild className="w-full sm:w-auto">
                 <Link href="/login?mode=signup">Start planning free</Link>
               </Button>
-              <Button
-                variant="ghost"
-                asChild
-                className="h-10 w-full px-6 text-sm sm:w-auto"
-              >
+              <Button variant="ghost" asChild className="w-full sm:w-auto">
                 <Link href="#features">See how it works</Link>
               </Button>
             </div>
@@ -348,7 +344,7 @@ export default function HomePage() {
               Start planning in minutes. Go live when you're ready.
             </p>
             <div className="mt-10">
-              <Button asChild className="h-10 px-8 text-sm">
+              <Button asChild>
                 <Link href="/login?mode=signup">Start planning free</Link>
               </Button>
             </div>

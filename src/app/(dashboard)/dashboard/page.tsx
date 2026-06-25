@@ -109,7 +109,7 @@ export default async function DashboardPage() {
               : `${events.length} ${events.length === 1 ? "event" : "events"}`}
           </p>
         </div>
-        <Button asChild size="sm" className="shrink-0">
+        <Button asChild className="shrink-0">
           <Link href="/events/new">
             <Plus className="size-4" />
             <span className="hidden sm:inline">New event</span>
@@ -126,7 +126,7 @@ export default async function DashboardPage() {
           <p className="mb-5 text-xs text-muted-foreground">
             Plan your first event in minutes.
           </p>
-          <Button asChild size="sm">
+          <Button asChild>
             <Link href="/events/new">
               <Plus className="size-4" />
               Create event

@@ -163,12 +163,12 @@ export function VendorCard({
 
       {userRole === "admin" && !vendor.isEventOwner && (
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          <Button size="xs" variant="outline" onClick={() => setShowEdit(true)}>
+          <Button size="sm" variant="outline" onClick={() => setShowEdit(true)}>
             Edit
           </Button>
           {eventStatus !== "DRAFT" && (
             <Button
-              size="xs"
+              size="sm"
               variant="outline"
               onClick={handleResend}
               disabled={resending}
@@ -180,7 +180,7 @@ export function VendorCard({
             <span className="text-xs text-muted-foreground">{resendMsg}</span>
           )}
           <Button
-            size="xs"
+            size="sm"
             variant="destructive"
             className="ml-auto"
             onClick={handleRemove}

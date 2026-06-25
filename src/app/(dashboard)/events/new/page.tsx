@@ -116,7 +116,7 @@ export default function NewEventPage() {
             required
             maxLength={100}
             placeholder="Smith–Johnson Wedding"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
+            className="w-full rounded-md border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
           />
         </div>
 
@@ -146,7 +146,7 @@ export default function NewEventPage() {
             rows={3}
             maxLength={500}
             placeholder="Optional overview for your team."
-            className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
+            className="w-full resize-none rounded-md border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
           />
         </div>
 
@@ -164,7 +164,7 @@ export default function NewEventPage() {
                   id="event-date"
                   type="button"
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring/50",
+                    "flex w-full items-center gap-2 rounded-md border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring/50",
                     !eventDate && "text-muted-foreground",
                   )}
                 >
@@ -218,7 +218,7 @@ export default function NewEventPage() {
               required
               maxLength={128}
               placeholder="Evergreen Events"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
+              className="w-full rounded-md border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
             />
           </div>
 
@@ -237,7 +237,7 @@ export default function NewEventPage() {
               required
               maxLength={128}
               placeholder="Lead Planner"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
+              className="w-full rounded-md border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
             />
           </div>
         </div>

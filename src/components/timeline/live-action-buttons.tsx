@@ -150,11 +150,11 @@ export function LiveActionButtons({
           <>
             <Button
               variant="outline"
-              size="xs"
+              size="sm"
               disabled={isBlocked || loading !== null}
               onClick={() => handleStatus("IN_PROGRESS")}
               className={cn(
-                "flex-1 gap-1 min-h-[44px] min-w-0",
+                "flex-1 gap-1 min-w-0",
                 "border-primary/40 text-primary hover:bg-primary/10",
               )}
               data-testid={`live_${taskId}_inProgress_btn`}
@@ -168,11 +168,11 @@ export function LiveActionButtons({
             </Button>
             <Button
               variant="outline"
-              size="xs"
+              size="sm"
               disabled={loading !== null}
               onClick={() => handleStatus("COMPLETED")}
               className={cn(
-                "flex-1 gap-1 min-h-[44px] min-w-0",
+                "flex-1 gap-1 min-w-0",
                 "border-success/40 text-success hover:bg-success/10",
               )}
               data-testid={`live_${taskId}_done_btn`}
@@ -192,11 +192,11 @@ export function LiveActionButtons({
           <>
             <Button
               variant="outline"
-              size="xs"
+              size="sm"
               disabled={loading !== null}
               onClick={() => setDelayOpen(true)}
               className={cn(
-                "flex-1 gap-1 min-h-[44px] min-w-0",
+                "flex-1 gap-1 min-w-0",
                 "border-warning/40 text-warning hover:bg-warning/10",
                 isDelayed && "bg-warning/15",
               )}
@@ -213,7 +213,7 @@ export function LiveActionButtons({
             </Button>
             <Button
               variant="outline"
-              size="xs"
+              size="sm"
               disabled={loading !== null}
               onClick={() => {
                 if (isDelayed) {
@@ -223,7 +223,7 @@ export function LiveActionButtons({
                 }
               }}
               className={cn(
-                "flex-1 gap-1 min-h-[44px] min-w-0",
+                "flex-1 gap-1 min-w-0",
                 "border-success/40 text-success hover:bg-success/10",
               )}
               data-testid={`live_${taskId}_done_btn`}

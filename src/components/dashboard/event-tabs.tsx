@@ -42,7 +42,7 @@ export function EventTabs({
               key={href}
               href={href}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors min-h-[36px] sm:px-3 sm:py-1.5 sm:text-sm",
+                "inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors min-h-[42px] min-w-[42px] justify-center sm:min-w-0 sm:justify-start sm:px-3 sm:py-1.5 sm:text-sm",
                 isActive
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",

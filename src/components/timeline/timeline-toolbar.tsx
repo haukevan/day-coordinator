@@ -18,7 +18,7 @@ export function TimelineToolbar({
         <button
           onClick={() => setView("list")}
           className={cn(
-            "inline-flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium transition-colors min-h-[36px] sm:px-3 sm:py-1.5",
+            "inline-flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium transition-colors min-h-[42px] min-w-[42px] justify-center sm:min-w-0 sm:justify-start sm:px-3 sm:py-1.5",
             view === "list"
               ? "bg-primary text-primary-foreground"
               : "bg-background text-muted-foreground hover:bg-muted",
@@ -31,7 +31,7 @@ export function TimelineToolbar({
         <button
           onClick={() => setView("gantt")}
           className={cn(
-            "inline-flex items-center gap-1.5 border-l border-border px-2 py-1.5 text-xs font-medium transition-colors min-h-[36px] sm:px-3 sm:py-1.5",
+            "inline-flex items-center gap-1.5 border-l border-border px-2 py-1.5 text-xs font-medium transition-colors min-h-[42px] min-w-[42px] justify-center sm:min-w-0 sm:justify-start sm:px-3 sm:py-1.5",
             view === "gantt"
               ? "bg-primary text-primary-foreground"
               : "bg-background text-muted-foreground hover:bg-muted",

@@ -83,18 +83,14 @@ export function CompleteConfirmDialog({
 
         {!showCustomTime ? (
           <div className="flex flex-col gap-3">
-            <Button
-              onClick={handleCompleteNow}
-              className="min-h-[44px] gap-2"
-              size="sm"
-            >
+            <Button onClick={handleCompleteNow} className="gap-2" size="sm">
               <Clock className="size-4" />
               Completed now
             </Button>
             <Button
               variant="outline"
               onClick={handleCompleteEarlier}
-              className="min-h-[44px] gap-2"
+              className="gap-2"
               size="sm"
             >
               <Clock className="size-4" />

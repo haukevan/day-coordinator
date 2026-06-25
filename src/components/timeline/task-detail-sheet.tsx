@@ -175,14 +175,15 @@ export function TaskDetailSheet({
         {/* ── Header ─────────────────────────────────────────────────── */}
         <SheetHeader className="px-4 pt-3 pb-0">
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={onClose}
-              className="flex shrink-0 items-center justify-center size-8 -ml-1.5 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="-ml-1.5"
               aria-label="Go back"
             >
-              <ArrowLeft className="size-5" />
-            </button>
+              <ArrowLeft />
+            </Button>
             <div className="flex-1 min-w-0">
               <SheetTitle className="truncate text-lg">{task.title}</SheetTitle>
             </div>
@@ -371,7 +372,7 @@ export function TaskDetailSheet({
                     task.status === "DELAYED") && (
                     <Button
                       variant="ghost"
-                      size="xs"
+                      size="sm"
                       className="text-muted-foreground hover:text-foreground gap-1.5 w-fit"
                       onClick={async () => {
                         const res = await fetch(
@@ -399,7 +400,7 @@ export function TaskDetailSheet({
             <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3">
               <Button
                 variant="ghost"
-                size="xs"
+                size="sm"
                 className="text-muted-foreground hover:text-foreground gap-1.5 w-fit"
                 onClick={async () => {
                   const res = await fetch(

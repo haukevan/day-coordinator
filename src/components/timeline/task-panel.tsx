@@ -318,7 +318,7 @@ function TimePickerPopover({
           ref={triggerRef}
           type="button"
           onClick={handleTrigger}
-          className="flex flex-1 items-center gap-1 px-2.5 py-1.5 text-sm focus:outline-none"
+          className="flex flex-1 items-center gap-1 px-2.5 py-1.5 text-sm focus:outline-none min-h-[42px]"
         >
           <Clock className="size-3.5 shrink-0 text-muted-foreground" />
           <span
@@ -374,7 +374,7 @@ function TimePickerPopover({
                       commitHour(h);
                     }}
                     className={cn(
-                      "rounded-md px-3 py-1.5 text-sm transition-colors",
+                      "rounded-md px-3 py-1.5 text-sm transition-colors min-h-[42px]",
                       selectable
                         ? "hover:bg-accent hover:text-accent-foreground"
                         : "cursor-not-allowed opacity-40",
@@ -409,7 +409,7 @@ function TimePickerPopover({
                       commit(selH, m, selPeriod);
                     }}
                     className={cn(
-                      "rounded-md px-3 py-1.5 text-sm transition-colors",
+                      "rounded-md px-3 py-1.5 text-sm transition-colors min-h-[42px]",
                       selectable
                         ? "hover:bg-accent hover:text-accent-foreground"
                         : "cursor-not-allowed opacity-40",
@@ -449,7 +449,7 @@ function TimePickerPopover({
                       }
                     }}
                     className={cn(
-                      "rounded-md px-3 py-1.5 text-sm transition-colors",
+                      "rounded-md px-3 py-1.5 text-sm transition-colors min-h-[42px]",
                       selectable
                         ? "hover:bg-accent hover:text-accent-foreground"
                         : "cursor-not-allowed opacity-40",
