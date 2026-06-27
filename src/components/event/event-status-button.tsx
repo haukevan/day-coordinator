@@ -87,7 +87,7 @@ export function EventStatusButton({
     return (
       <span
         className={cn(
-          "inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium",
+          "inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium min-h-[28px]",
           config.badgeClass,
         )}
       >
@@ -102,7 +102,7 @@ export function EventStatusButton({
         <DropdownMenuTrigger
           disabled={transitioning}
           className={cn(
-            "inline-flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-full pl-2.5 pr-3 py-0.5 text-xs font-medium transition-opacity hover:opacity-80 focus:outline-none",
+            "inline-flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-full pl-2.5 pr-3 py-0.5 text-xs font-medium min-h-[28px] transition-opacity hover:opacity-80 focus:outline-none",
             config.badgeClass,
           )}
         >

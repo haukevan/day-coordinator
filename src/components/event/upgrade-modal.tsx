@@ -136,7 +136,7 @@ export function UpgradeModal({
                 hasDate ? "text-warning" : "text-destructive",
               )}
             />
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium text-foreground">
                 {hasDate ? "Confirm your event date" : "Event date required"}
               </p>
@@ -148,7 +148,7 @@ export function UpgradeModal({
               >
                 {formattedDate}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground break-words">
                 {hasDate
                   ? "You can update this date in settings before the event day. Once the event date arrives, the date will be locked and cannot be changed."
                   : "You must set an event date before scheduling. Your event can't go live without one."}
@@ -168,6 +168,17 @@ export function UpgradeModal({
         {hasDate ? (
           <form onSubmit={handleUpgrade} className="space-y-3">
             <div>
+              <label
+                htmlFor="upgrade-password"
+                className="mb-1.5 block text-xs font-medium text-muted-foreground"
+              >
+                We are currently in a closed{" "}
+                <span className="inline-flex items-center rounded-full border border-accent/30 animate-shimmer px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent">
+                  Beta
+                </span>
+                . Please enter the access code provided to you or reach out to
+                daycoordinator.org@gmail.com to request beta access.
+              </label>
               <label
                 htmlFor="upgrade-password"
                 className="mb-1.5 block text-xs font-medium text-muted-foreground"

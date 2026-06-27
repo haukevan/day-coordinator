@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
+import { EventDateBadge } from "@/components/event/event-date-badge";
 import { EventTabs } from "@/components/dashboard/event-tabs";
 import { VenueChipPopup } from "@/components/event/venue-chip-popup";
 import { TimelineToolbar } from "@/components/timeline/timeline-toolbar";
@@ -8,9 +9,7 @@ import { TimelineViewProvider } from "@/components/timeline/timeline-view-contex
 import { EventHeaderSkeleton } from "@/components/ui/skeletons";
 import Link from "next/link";
 import { Suspense } from "react";
-import { ChevronLeft, CalendarDays, ShieldX } from "lucide-react";
-import { formatInTimeZone } from "date-fns-tz";
-import { cn } from "@/lib/utils";
+import { ChevronLeft, ShieldX } from "lucide-react";
 
 function NoAccessMessage() {
   return (
@@ -116,33 +115,6 @@ async function VendorHeaderContent({
 
   if (!event) notFound();
 
-  const eventDateInfo = (() => {
-    if (!event.eventDate) return null;
-    const d = event.eventDate;
-    const formatted = formatInTimeZone(d, "UTC", "EEE, MMM d, yyyy");
-    const now = new Date();
-    const eventDay = Date.UTC(
-      d.getUTCFullYear(),
-      d.getUTCMonth(),
-      d.getUTCDate(),
-    );
-    const todayDay = Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-    );
-    const diff = eventDay - todayDay;
-    let dateStatus: "today" | "upcoming" | "past";
-    if (diff === 0) {
-      dateStatus = "today";
-    } else if (diff > 0) {
-      dateStatus = "upcoming";
-    } else {
-      dateStatus = "past";
-    }
-    return { formatted, dateStatus };
-  })();
-
   return (
     <div className="border-b border-border bg-card px-4 py-4 sm:px-6">
       <Link
@@ -161,30 +133,7 @@ async function VendorHeaderContent({
 
       {/* Date + Venue row */}
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-        {eventDateInfo && (
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium",
-              eventDateInfo.dateStatus === "today" &&
-                "bg-warning/15 text-warning",
-              eventDateInfo.dateStatus === "upcoming" && "bg-info/15 text-info",
-              eventDateInfo.dateStatus === "past" &&
-                "bg-muted text-muted-foreground",
-            )}
-          >
-            <CalendarDays className="size-3" />
-            <span className="sm:hidden">
-              {eventDateInfo.dateStatus === "today"
-                ? "Today"
-                : eventDateInfo.formatted}
-            </span>
-            <span className="hidden sm:inline">
-              {eventDateInfo.dateStatus === "today"
-                ? `Today · ${eventDateInfo.formatted}`
-                : eventDateInfo.formatted}
-            </span>
-          </span>
-        )}
+        {event.eventDate && <EventDateBadge eventDate={event.eventDate} />}
         {event.venue && (
           <VenueChipPopup
             name={event.venue.name}

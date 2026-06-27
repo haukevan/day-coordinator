@@ -1,6 +1,7 @@
 "use client";
 
 import { List, BarChart2, Plus } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useTimelineView } from "./timeline-view-context";
 import { cn } from "@/lib/utils";
@@ -11,6 +12,10 @@ export function TimelineToolbar({
   userRole?: "admin" | "vendor";
 }) {
   const { view, setView, openCreatePanel } = useTimelineView();
+  const pathname = usePathname();
+
+  // Only show the view toggle + add-task button on the timeline tab
+  if (!pathname.endsWith("/timeline")) return null;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -25,7 +30,7 @@ export function TimelineToolbar({
           )}
           aria-label="List view"
         >
-          <List className="size-3.5" />
+          <List className="size-4" />
           <span className="hidden sm:inline">List</span>
         </button>
         <button
@@ -38,13 +43,13 @@ export function TimelineToolbar({
           )}
           aria-label="Calendar view"
         >
-          <BarChart2 className="size-3.5" />
+          <BarChart2 className="size-4" />
           <span className="hidden sm:inline">Calendar</span>
         </button>
       </div>
 
       {userRole === "admin" && (
-        <Button size="lg" onClick={openCreatePanel} className="sm:px-3">
+        <Button size="sm" onClick={openCreatePanel}>
           <Plus className="size-4 sm:mr-1" />
           <span className="hidden sm:inline">Add task</span>
         </Button>

@@ -133,7 +133,11 @@ export function EventSettingsForm({ event }: { event: EventData }) {
     setSaving(false);
 
     if (res.ok) {
-      router.push(`/events/${event.id}/timeline`);
+      // Hard-navigate to force a full re-fetch of all server components
+      // (layout header chips for date + venue) so they reflect the changes
+      // immediately. Soft router.push() + router.refresh() doesn't reliably
+      // invalidate shared layouts in this Next.js version.
+      globalThis.location.href = `/events/${event.id}/timeline`;
     } else {
       const data = await res.json();
       setSaveError(data.error ?? "Failed to save.");

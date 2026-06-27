@@ -15,7 +15,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 interface Props {
@@ -27,24 +26,18 @@ interface Props {
   readonly ownerEmail: string | null;
 }
 
-function mapsUrl(address: string): string {
-  // Strip verbose Nominatim display_name down to a clean address for Google Maps.
-  // display_name parts: [street, neighborhood?, city, district?, state, postcode, country]
-  // Keep at most 5 parts: street, city, state, postcode, country.
+function mapsUrl(name: string, address: string): string {
+  // Build a destination query that includes both the venue name and a
+  // cleaned address so Google Maps can disambiguate rural/highway locations.
   const parts = address.split(",").map((s) => s.trim());
-  const clean =
+  const cleanAddress =
     parts.length > 5
-      ? [
-          parts[0],
-          parts[parts.length - 4],
-          parts[parts.length - 3],
-          parts[parts.length - 2],
-          parts[parts.length - 1],
-        ]
+      ? [parts[0], parts.at(-4), parts.at(-3), parts.at(-2), parts.at(-1)]
           .filter(Boolean)
           .join(", ")
       : address;
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(clean)}`;
+  const destination = `${name}, ${cleanAddress}`;
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
 }
 
 export function VenueChipPopup({
@@ -59,13 +52,15 @@ export function VenueChipPopup({
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(address);
+      // Copy the full location: venue name + address so it's pasteable as a
+      // complete reference (e.g. into a text message or calendar invite).
+      await navigator.clipboard.writeText(`${name}\n${address}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // clipboard API not available — silently ignore
     }
-  }, [address]);
+  }, [name, address]);
 
   return (
     <Popover>
@@ -95,13 +90,17 @@ export function VenueChipPopup({
           {/* Address with directions link + copy button */}
           <div className="flex items-start gap-2">
             <a
-              href={mapsUrl(address)}
+              href={mapsUrl(name, address)}
               target="_blank"
               rel="noopener noreferrer"
               className="group flex min-w-0 flex-1 items-start gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <span className="group-hover:underline">{address}</span>
+              <span className="group-hover:underline">
+                <span className="font-medium text-foreground">{name}</span>
+                <br />
+                {address}
+              </span>
             </a>
             <Button
               variant="ghost"

@@ -386,3 +386,28 @@
     }
   }
 }
+
+/* ── Shimmer animation for badges / chips ─────────────────────────── */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@utility animate-shimmer {
+  background:
+    linear-gradient(
+      110deg,
+      transparent 30%,
+      hsl(var(--accent) / 0.2) 50%,
+      transparent 70%
+    ),
+    hsl(var(--accent) / 0.1);
+  background-size:
+    200% 100%,
+    100% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+}

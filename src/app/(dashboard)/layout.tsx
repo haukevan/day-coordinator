@@ -55,8 +55,11 @@ export default async function DashboardLayout({
       {/* ── Desktop sidebar (hidden on mobile) ── */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-border bg-card sm:flex">
         <div className="flex h-14 items-center border-b border-border px-4">
-          <Link href="/dashboard">
+          <Link href="/dashboard" className="flex items-center gap-2">
             <Logo size="sm" />
+            <span className="inline-flex items-center rounded-full border border-accent/30 animate-shimmer px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent">
+              Beta
+            </span>
           </Link>
         </div>
 
@@ -75,8 +78,11 @@ export default async function DashboardLayout({
       {/* ── Mobile top bar (hidden on desktop) ── */}
       <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card px-3 sm:hidden">
         <MobileNavSheet />
-        <Link href="/dashboard">
+        <Link href="/dashboard" className="flex items-center gap-1.5">
           <Logo size="sm" iconOnly />
+          <span className="inline-flex items-center rounded-full border border-accent/30 animate-shimmer px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-accent">
+            Beta
+          </span>
         </Link>
         <UserMenu
           initials={initials}

@@ -63,3 +63,60 @@ export function formatDateInZone(iso: string, timezone: string): string {
     timeZone: timezone,
   }).format(new Date(iso));
 }
+
+/**
+ * Format a Date as a short date string in the given IANA timezone.
+ * Output: "Sat, Jun 27, 2026"
+ */
+export function formatShortDateInZone(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: timezone,
+  }).format(date);
+}
+
+export type DateStatus = "today" | "upcoming" | "past";
+
+/**
+ * Compare a Date against "now" in a given IANA timezone and return
+ * whether the date is today, upcoming, or past.
+ *
+ * Both the event date and "now" are resolved to calendar dates in the
+ * given timezone, so the comparison is timezone-aware.
+ */
+export function getDateStatus(date: Date, timezone: string): DateStatus {
+  const now = new Date();
+
+  const eventParts = new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: timezone,
+  }).formatToParts(date);
+
+  const nowParts = new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: timezone,
+  }).formatToParts(now);
+
+  const eventYear = +eventParts.find((p) => p.type === "year")!.value;
+  const eventMonth = +eventParts.find((p) => p.type === "month")!.value;
+  const eventDay = +eventParts.find((p) => p.type === "day")!.value;
+
+  const nowYear = +nowParts.find((p) => p.type === "year")!.value;
+  const nowMonth = +nowParts.find((p) => p.type === "month")!.value;
+  const nowDay = +nowParts.find((p) => p.type === "day")!.value;
+
+  // Compare as YYYYMMDD integers for simplicity
+  const eventDateInt = eventYear * 10000 + eventMonth * 100 + eventDay;
+  const nowDateInt = nowYear * 10000 + nowMonth * 100 + nowDay;
+
+  if (eventDateInt === nowDateInt) return "today";
+  if (eventDateInt > nowDateInt) return "upcoming";
+  return "past";
+}

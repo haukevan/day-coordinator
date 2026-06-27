@@ -52,6 +52,8 @@ interface NominatimResult {
     city?: string;
     town?: string;
     village?: string;
+    hamlet?: string;
+    county?: string;
     state?: string;
     postcode?: string;
     country?: string;
@@ -122,7 +124,8 @@ function buildCleanAddress(r: NominatimResult): string {
   const a = r.address;
   if (!a) return r.display_name;
   const street = [a.house_number, a.road].filter(Boolean).join(" ");
-  const city = a.city ?? a.town ?? a.village ?? "";
+  // Prefer city/town/village, then fall back to hamlet/county for rural areas
+  const city = a.city ?? a.town ?? a.village ?? a.hamlet ?? a.county ?? "";
   const parts = [street, city, a.state, a.postcode, a.country].filter(Boolean);
   return parts.join(", ");
 }
