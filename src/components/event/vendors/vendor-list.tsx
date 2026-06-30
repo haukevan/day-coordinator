@@ -19,9 +19,16 @@ interface Props {
   vendors: SerializedVendor[];
   userRole: "admin" | "vendor";
   eventStatus?: string;
+  eventDate?: string | null;
 }
 
-export function VendorList({ eventId, vendors: initialVendors, userRole, eventStatus }: Props) {
+export function VendorList({
+  eventId,
+  vendors: initialVendors,
+  userRole,
+  eventStatus,
+  eventDate,
+}: Props) {
   const [vendors, setVendors] = useState(initialVendors);
   const [addMode, setAddMode] = useState<"new" | "existing" | null>(null);
 
@@ -101,17 +108,27 @@ export function VendorList({ eventId, vendors: initialVendors, userRole, eventSt
       {addMode === "new" && (
         <AddVendorDialog
           eventId={eventId}
+          eventStatus={eventStatus}
+          eventDate={eventDate}
           onClose={() => setAddMode(null)}
-          onAdded={(v) => { handleAdded(v); setAddMode(null); }}
+          onAdded={(v) => {
+            handleAdded(v);
+            setAddMode(null);
+          }}
         />
       )}
 
       {addMode === "existing" && (
         <AddExistingVendorDialog
           eventId={eventId}
+          eventStatus={eventStatus}
+          eventDate={eventDate}
           existingVendorEmails={existingEmails}
           onClose={() => setAddMode(null)}
-          onAdded={(vs) => { handleMultiAdded(vs); setAddMode(null); }}
+          onAdded={(vs) => {
+            handleMultiAdded(vs);
+            setAddMode(null);
+          }}
         />
       )}
     </div>

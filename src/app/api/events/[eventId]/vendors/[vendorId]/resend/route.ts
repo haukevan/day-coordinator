@@ -48,8 +48,8 @@ export async function POST(_req: NextRequest, { params }: Params) {
     // Send plain event link to accepted vendor
     try {
       await sendVendorEventLink(eventVendor.id);
-    } catch {
-      /* non-fatal */
+    } catch (err) {
+      console.error("[vendor-resend] Failed to send event link:", err);
     }
     return NextResponse.json({ ok: true });
   }
@@ -64,13 +64,14 @@ export async function POST(_req: NextRequest, { params }: Params) {
       inviteToken: newToken,
       inviteTokenExpiresAt: newExpiry,
       inviteSentAt: null, // reset so sendVendorInviteEmail will send
+      invitedByUserId: dbUser.id,
     },
   });
 
   try {
     await sendVendorInviteEmail(eventVendor.id);
-  } catch {
-    /* non-fatal */
+  } catch (err) {
+    console.error("[vendor-resend] Failed to send invite email:", err);
   }
 
   return NextResponse.json({ ok: true });

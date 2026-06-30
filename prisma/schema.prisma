@@ -32,6 +32,7 @@ model User {
   activityLogs      ActivityLog[]
   vendorContacts    VendorContact[] @relation("VendorContacts")
   vendorMemberships EventVendor[]   @relation("VendorMemberships")
+  invitedVendors    EventVendor[]   @relation("InvitedBy")
   completedSubTasks SubTask[]
 }
 
@@ -209,6 +210,8 @@ model EventVendor {
   inviteTokenExpiresAt DateTime?
   inviteSentAt         DateTime?
   joinedAt             DateTime?
+  invitedByUserId      String?
+  invitedBy            User?         @relation("InvitedBy", fields: [invitedByUserId], references: [id])
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
@@ -221,6 +224,7 @@ model EventVendor {
   @@index([vendorContactId])
   @@index([status])
   @@index([role])
+  @@index([invitedByUserId])
 }
 
 // ─── Task-Vendor Join ─────────────────────────────────────────────────────

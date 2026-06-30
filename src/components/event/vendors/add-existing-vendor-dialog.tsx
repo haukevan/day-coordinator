@@ -11,9 +11,12 @@ import { Button } from "@/components/ui/button";
 import type { SerializedVendor, SerializedVendorContact } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Check, Search, Shield } from "lucide-react";
+import { DraftVendorWarning } from "@/components/event/draft-vendor-warning";
 
 interface Props {
   eventId: string;
+  eventStatus?: string;
+  eventDate?: string | null;
   existingVendorEmails: Set<string>;
   onClose: () => void;
   onAdded: (vendors: SerializedVendor[]) => void;
@@ -21,6 +24,8 @@ interface Props {
 
 export function AddExistingVendorDialog({
   eventId,
+  eventStatus,
+  eventDate,
   existingVendorEmails,
   onClose,
   onAdded,
@@ -132,6 +137,12 @@ export function AddExistingVendorDialog({
         <DialogHeader>
           <DialogTitle>Add existing contacts</DialogTitle>
         </DialogHeader>
+
+        <DraftVendorWarning
+          eventStatus={eventStatus ?? ""}
+          eventId={eventId}
+          eventDate={eventDate}
+        />
 
         {/* Search */}
         <div className="relative mt-1">

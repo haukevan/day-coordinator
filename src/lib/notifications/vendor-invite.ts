@@ -11,6 +11,12 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "";
 /** Pre-fetched EventVendor shape used by the batch send path. */
 type PreFetchedVendor = EventVendor & {
   vendorContact: VendorContact;
+  invitedBy?: {
+    firstName: string | null;
+    lastName: string | null;
+    name: string | null;
+    email: string;
+  } | null;
   event: Pick<Event, "title" | "eventDate">;
 };
 
@@ -53,6 +59,13 @@ export async function sendVendorInviteEmailBatch(
           recipientName,
           eventTitle: ev.event.title,
           inviteUrl,
+          invitedByName: ev.invitedBy
+            ? [ev.invitedBy.firstName, ev.invitedBy.lastName]
+                .filter(Boolean)
+                .join(" ") ||
+              ev.invitedBy.name ||
+              ev.invitedBy.email
+            : undefined,
         }),
       });
     }),
@@ -101,13 +114,21 @@ export async function sendVendorInviteEmailBatch(
 export async function sendVendorInviteEmail(
   eventVendorId: string,
 ): Promise<void> {
-  const ev = await prisma.eventVendor.findUnique({
-    where: { id: eventVendorId },
-    include: {
-      vendorContact: true,
-      event: { select: { title: true, eventDate: true } },
-    },
-  });
+  const ev = await prisma.eventVendor
+    .findUnique({
+      where: { id: eventVendorId },
+      include: {
+        vendorContact: true,
+        invitedBy: {
+          select: { firstName: true, lastName: true, name: true, email: true },
+        },
+        event: { select: { title: true, eventDate: true } },
+      },
+    })
+    .catch((err) => {
+      console.error("[sendVendorInviteEmail] Prisma query failed:", err);
+      return null;
+    });
 
   if (!ev || !ev.inviteToken) return;
   // Idempotency guard
@@ -119,10 +140,19 @@ export async function sendVendorInviteEmail(
       .filter(Boolean)
       .join(" ") || ev.vendorContact.email;
 
+  const invitedByName = ev.invitedBy
+    ? [ev.invitedBy.firstName, ev.invitedBy.lastName]
+        .filter(Boolean)
+        .join(" ") ||
+      ev.invitedBy.name ||
+      ev.invitedBy.email
+    : undefined;
+
   const html = buildInviteHtml({
     recipientName,
     eventTitle: ev.event.title,
     inviteUrl,
+    invitedByName,
   });
 
   const resend = getResendClient();
@@ -155,13 +185,21 @@ export async function sendVendorInviteEmail(
 export async function sendVendorEventLink(
   eventVendorId: string,
 ): Promise<void> {
-  const ev = await prisma.eventVendor.findUnique({
-    where: { id: eventVendorId },
-    include: {
-      vendorContact: true,
-      event: { select: { id: true, title: true } },
-    },
-  });
+  const ev = await prisma.eventVendor
+    .findUnique({
+      where: { id: eventVendorId },
+      include: {
+        vendorContact: true,
+        invitedBy: {
+          select: { firstName: true, lastName: true, name: true, email: true },
+        },
+        event: { select: { id: true, title: true } },
+      },
+    })
+    .catch((err) => {
+      console.error("[sendVendorEventLink] Prisma query failed:", err);
+      return null;
+    });
 
   if (!ev) return;
 
@@ -171,10 +209,19 @@ export async function sendVendorEventLink(
       .filter(Boolean)
       .join(" ") || ev.vendorContact.email;
 
+  const invitedByName = ev.invitedBy
+    ? [ev.invitedBy.firstName, ev.invitedBy.lastName]
+        .filter(Boolean)
+        .join(" ") ||
+      ev.invitedBy.name ||
+      ev.invitedBy.email
+    : undefined;
+
   const html = buildEventLinkHtml({
     recipientName,
     eventTitle: ev.event.title,
     eventUrl,
+    invitedByName,
   });
 
   const resend = getResendClient();
@@ -205,20 +252,29 @@ function buildInviteHtml({
   recipientName,
   eventTitle,
   inviteUrl,
+  invitedByName,
 }: {
   recipientName: string;
   eventTitle: string;
   inviteUrl: string;
+  invitedByName?: string;
 }): string {
+  const inviterLine = invitedByName
+    ? `<p style="color:#7d8494;font-size:14px;margin:0 0 24px;">Invited by <strong style="color:#364259;">${invitedByName}</strong></p>`
+    : "";
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"/></head>
-<body style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 16px;color:#111;">
-  <h2 style="margin:0 0 8px;">You're invited to an event</h2>
-  <p style="color:#555;">Hi ${recipientName},</p>
-  <p style="color:#555;">You've been added as a vendor for <strong>${eventTitle}</strong>. Click the button below to confirm your details and view the event.</p>
-  <a href="${inviteUrl}" style="display:inline-block;margin:16px 0;padding:12px 24px;background:#c0607a;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">View Invitation</a>
-  <p style="font-size:12px;color:#999;">If you weren't expecting this, you can safely ignore this email.</p>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:480px;margin:0 auto;padding:32px 16px;color:#364259;background-color:#faf9f7;">
+  <div style="background:#ffffff;border-radius:12px;padding:32px 24px;border:1px solid #e8e3db;">
+    <h2 style="margin:0 0 4px;font-size:20px;color:#1f2e50;">You're invited to an event</h2>
+    <p style="color:#7d8494;font-size:14px;margin:0 0 24px;">${eventTitle}</p>
+    ${inviterLine}
+    <p style="color:#364259;font-size:15px;line-height:1.5;">Hi ${recipientName},</p>
+    <p style="color:#364259;font-size:15px;line-height:1.5;">You've been added as a vendor. Click below to confirm your details and view the event.</p>
+    <a href="${inviteUrl}" style="display:inline-block;margin:24px 0;padding:12px 28px;background:#1f2e50;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">View Invitation</a>
+    <p style="font-size:12px;color:#7d8494;margin:0;">If you weren't expecting this, you can safely ignore this email.</p>
+  </div>
 </body>
 </html>`;
 }
@@ -227,19 +283,28 @@ function buildEventLinkHtml({
   recipientName,
   eventTitle,
   eventUrl,
+  invitedByName,
 }: {
   recipientName: string;
   eventTitle: string;
   eventUrl: string;
+  invitedByName?: string;
 }): string {
+  const inviterLine = invitedByName
+    ? `<p style="color:#7d8494;font-size:14px;margin:0 0 24px;">Invited by <strong style="color:#364259;">${invitedByName}</strong></p>`
+    : "";
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"/></head>
-<body style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 16px;color:#111;">
-  <h2 style="margin:0 0 8px;">${eventTitle}</h2>
-  <p style="color:#555;">Hi ${recipientName},</p>
-  <p style="color:#555;">Here's your link to view the event timeline and details for <strong>${eventTitle}</strong>.</p>
-  <a href="${eventUrl}" style="display:inline-block;margin:16px 0;padding:12px 24px;background:#c0607a;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">View Event</a>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:480px;margin:0 auto;padding:32px 16px;color:#364259;background-color:#faf9f7;">
+  <div style="background:#ffffff;border-radius:12px;padding:32px 24px;border:1px solid #e8e3db;">
+    <h2 style="margin:0 0 4px;font-size:20px;color:#1f2e50;">${eventTitle}</h2>
+    ${inviterLine}
+    <p style="color:#364259;font-size:15px;line-height:1.5;">Hi ${recipientName},</p>
+    <p style="color:#364259;font-size:15px;line-height:1.5;">Here's your link to view the event timeline and details.</p>
+    <a href="${eventUrl}" style="display:inline-block;margin:24px 0;padding:12px 28px;background:#1f2e50;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">View Event</a>
+    <p style="font-size:12px;color:#7d8494;margin:0;">Day Coordinator</p>
+  </div>
 </body>
 </html>`;
 }

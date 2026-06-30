@@ -10,6 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import type { SerializedVendor } from "@/lib/types";
 
+import { DraftVendorWarning } from "@/components/event/draft-vendor-warning";
+
 function formatPhone(digits: string): string {
   const d = digits.slice(0, 10);
   if (d.length <= 3) return d;
@@ -22,11 +24,19 @@ const inputClass =
 
 interface Props {
   eventId: string;
+  eventStatus?: string;
+  eventDate?: string | null;
   onClose: () => void;
   onAdded: (vendor: SerializedVendor) => void;
 }
 
-export function AddVendorDialog({ eventId, onClose, onAdded }: Props) {
+export function AddVendorDialog({
+  eventId,
+  eventStatus,
+  eventDate,
+  onClose,
+  onAdded,
+}: Props) {
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -77,6 +87,12 @@ export function AddVendorDialog({ eventId, onClose, onAdded }: Props) {
         <DialogHeader>
           <DialogTitle>Add new contact</DialogTitle>
         </DialogHeader>
+
+        <DraftVendorWarning
+          eventStatus={eventStatus ?? ""}
+          eventId={eventId}
+          eventDate={eventDate}
+        />
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>

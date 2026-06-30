@@ -61,6 +61,11 @@ export function UpgradeModal({
     setLoading(false);
 
     if (res.ok) {
+      // Notify all draft-banner / draft-warning components on the page
+      // so they disappear immediately regardless of which modal triggered the upgrade.
+      window.dispatchEvent(
+        new CustomEvent("dc:event-upgraded", { detail: { eventId } }),
+      );
       onClose();
       onUpgraded?.();
     } else {

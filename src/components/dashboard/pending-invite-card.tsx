@@ -5,6 +5,12 @@ import { Button } from "@/components/ui/button";
 interface PendingInvite {
   id: string;
   inviteToken: string | null;
+  invitedBy: {
+    firstName: string | null;
+    lastName: string | null;
+    name: string | null;
+    email: string;
+  } | null;
   event: {
     id: string;
     title: string;
@@ -29,8 +35,22 @@ function ownerDisplayName(owner: PendingInvite["event"]["owner"]): string {
   return owner.name ?? owner.email ?? "Unknown";
 }
 
+function inviterDisplayName(
+  invitedBy: NonNullable<PendingInvite["invitedBy"]>,
+): string {
+  if (invitedBy.firstName || invitedBy.lastName) {
+    return [invitedBy.firstName, invitedBy.lastName].filter(Boolean).join(" ");
+  }
+  return invitedBy.name ?? invitedBy.email;
+}
+
 export function PendingInviteCard({ invite }: Props) {
   const ownerName = ownerDisplayName(invite.event.owner);
+  const inviterName = invite.invitedBy
+    ? inviterDisplayName(invite.invitedBy)
+    : null;
+  // Show inviter if it differs from the owner (e.g., a coordinator sent it)
+  const showInviter = inviterName && inviterName !== ownerName;
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
@@ -52,7 +72,18 @@ export function PendingInviteCard({ invite }: Props) {
             </p>
           )}
           <p className="mt-0.5 text-xs text-muted-foreground">
-            From <span className="text-foreground">{ownerName}</span>
+            {showInviter ? (
+              <>
+                From <span className="text-foreground">{inviterName}</span>{" "}
+                <span className="text-muted-foreground/70">
+                  · Event by {ownerName}
+                </span>
+              </>
+            ) : (
+              <>
+                From <span className="text-foreground">{ownerName}</span>
+              </>
+            )}
           </p>
         </div>
       </div>

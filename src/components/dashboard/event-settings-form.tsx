@@ -61,12 +61,15 @@ export function EventSettingsForm({ event }: { event: EventData }) {
     setAppOrigin(window.location.origin);
   }, []);
 
-  const isLive =
-    event.status === "LIVE" ||
-    event.status === "COMPLETED" ||
-    event.status === "ARCHIVED";
-
+  // Only ARCHIVED events are fully locked. LIVE and COMPLETED remain
+  // editable — last-minute changes during an event are expected.
   const isArchived = event.status === "ARCHIVED";
+  const isLive = event.status === "LIVE";
+
+  // Lock the date field only when the event date has passed.
+  const isDatePassed = !!(
+    event.eventDate && new Date(event.eventDate) < new Date()
+  );
 
   // Compare form state with original event to detect unsaved changes
   const hasChanges = useMemo(() => {
@@ -170,7 +173,7 @@ export function EventSettingsForm({ event }: { event: EventData }) {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              disabled={isLive}
+              disabled={isArchived}
               required
               maxLength={100}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -196,7 +199,7 @@ export function EventSettingsForm({ event }: { event: EventData }) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              disabled={isLive}
+              disabled={isArchived}
               maxLength={500}
               className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
             />
@@ -209,7 +212,7 @@ export function EventSettingsForm({ event }: { event: EventData }) {
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  disabled={isLive}
+                  disabled={isArchived || isDatePassed}
                   className={cn(
                     "flex w-full items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
                     !eventDate && "text-muted-foreground",
@@ -241,7 +244,7 @@ export function EventSettingsForm({ event }: { event: EventData }) {
             <TimezoneSelect
               value={timezone}
               onChange={setTimezone}
-              disabled={isLive}
+              disabled={isArchived}
             />
           </div>
           {/* Event location */}
@@ -252,7 +255,7 @@ export function EventSettingsForm({ event }: { event: EventData }) {
             <VenueSelector
               venueId={venueId}
               onChange={setVenueId}
-              disabled={isLive}
+              disabled={isArchived}
             />
           </div>
           <div className="sm:col-span-2">
@@ -299,7 +302,7 @@ export function EventSettingsForm({ event }: { event: EventData }) {
                   type="text"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
-                  disabled={isLive}
+                  disabled={isArchived}
                   placeholder="my-wedding-day"
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
                 />
@@ -319,18 +322,19 @@ export function EventSettingsForm({ event }: { event: EventData }) {
             view or delete it.
           </p>
         )}
-        {isLive && !isArchived && (
+        {isDatePassed && !isArchived && (
           <p className="text-xs text-muted-foreground">
-            Event details are locked while the event is live or completed.
+            The event date is locked because it has already passed. Other
+            details can still be edited.
           </p>
         )}
-        <Button type="submit" disabled={saving || isLive || !hasChanges}>
+        <Button type="submit" disabled={saving || isArchived || !hasChanges}>
           {saving ? "Saving…" : "Save changes"}
         </Button>
       </form>
 
-      {/* Danger zone */}
-      {event.status !== "LIVE" && (
+      {/* Danger zone — hidden only when LIVE (can't delete a live event) */}
+      {!isLive && (
         <div className="rounded-xl border border-destructive/30 p-5">
           <h2 className="mb-1 text-sm font-semibold text-destructive">
             Danger zone

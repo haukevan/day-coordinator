@@ -32,6 +32,9 @@ export default async function InvitePage({
     where: { inviteToken: token },
     include: {
       vendorContact: true,
+      invitedBy: {
+        select: { firstName: true, lastName: true, name: true, email: true },
+      },
       event: {
         select: {
           id: true,
@@ -101,6 +104,16 @@ export default async function InvitePage({
               address: eventVendor.event.venue.address,
               lat: eventVendor.event.venue.lat,
               lng: eventVendor.event.venue.lng,
+            }
+          : null
+      }
+      invitedBy={
+        eventVendor.invitedBy
+          ? {
+              firstName: eventVendor.invitedBy.firstName,
+              lastName: eventVendor.invitedBy.lastName,
+              name: eventVendor.invitedBy.name,
+              email: eventVendor.invitedBy.email,
             }
           : null
       }

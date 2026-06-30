@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { AlertTriangle, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UpgradeModal } from "@/components/event/upgrade-modal";
@@ -17,16 +18,46 @@ function storageKey(eventId: string) {
 }
 
 export function DraftBanner({ eventId, status, eventDate }: Props) {
-  const [dismissed, setDismissed] = useState(true); // start hidden to avoid hydration flash
+  const pathname = usePathname();
+  const isVendorsTab = pathname.endsWith("/vendors");
+  const [dismissed, setDismissed] = useState(true);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  // One-way latch: set to true on upgrade, only resets on full unmount/remount
+  const [hidden, setHidden] = useState(false);
+
+  const handleUpgraded = useCallback(() => {
+    setHidden(true);
+    setUpgradeOpen(false);
+  }, []);
 
   useEffect(() => {
-    if (status !== "DRAFT") return;
+    if (status !== "DRAFT") {
+      setHidden(true);
+      return;
+    }
+    // On the vendors tab, always show the full banner so users see the vendor notification note
+    if (isVendorsTab) {
+      setDismissed(false);
+      return;
+    }
     const saved = localStorage.getItem(storageKey(eventId));
     setDismissed(saved === "true");
-  }, [eventId, status]);
+  }, [eventId, status, isVendorsTab]);
 
-  if (status !== "DRAFT") return null;
+  // Listen for upgrade events from any UpgradeModal on the page
+  useEffect(() => {
+    function onUpgrade(e: Event) {
+      const detail = (e as CustomEvent).detail as { eventId: string };
+      if (detail.eventId === eventId) {
+        setHidden(true);
+      }
+    }
+    window.addEventListener("dc:event-upgraded", onUpgrade);
+    return () => window.removeEventListener("dc:event-upgraded", onUpgrade);
+  }, [eventId]);
+
+  // Hidden by local state (upgrade just happened) or by server prop (page loaded with non-draft status)
+  if (hidden || status !== "DRAFT") return null;
 
   // ── Slim banner (dismissed) ──────────────────────────────────────────
   if (dismissed) {
@@ -61,6 +92,7 @@ export function DraftBanner({ eventId, status, eventDate }: Props) {
           eventDate={eventDate}
           open={upgradeOpen}
           onClose={() => setUpgradeOpen(false)}
+          onUpgraded={handleUpgraded}
         />
       </>
     );
@@ -98,15 +130,17 @@ export function DraftBanner({ eventId, status, eventDate }: Props) {
             Upgrade to Scheduled →
           </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          onClick={dismiss}
-          className="shrink-0"
-          aria-label="Dismiss"
-        >
-          <X />
-        </Button>
+        {!isVendorsTab && (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={dismiss}
+            className="shrink-0"
+            aria-label="Dismiss"
+          >
+            <X />
+          </Button>
+        )}
       </div>
 
       <UpgradeModal
@@ -114,6 +148,7 @@ export function DraftBanner({ eventId, status, eventDate }: Props) {
         eventDate={eventDate}
         open={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
+        onUpgraded={handleUpgraded}
       />
     </>
   );

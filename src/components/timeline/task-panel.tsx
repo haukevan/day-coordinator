@@ -29,6 +29,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { DraftVendorWarning } from "@/components/event/draft-vendor-warning";
 import type { SerializedTask, SerializedVendor } from "@/lib/types";
 
 // ── Timezone helpers ──────────────────────────────────────────────────────────
@@ -556,6 +557,7 @@ export function TaskPanel({
   onRefresh,
   vendors,
   readOnly = false,
+  eventStatus,
 }: {
   eventId: string;
   tasks: SerializedTask[];
@@ -568,6 +570,7 @@ export function TaskPanel({
   onRefresh: () => void;
   vendors: SerializedVendor[];
   readOnly?: boolean;
+  eventStatus?: string;
 }) {
   const isEdit = Boolean(task);
 
@@ -1304,6 +1307,12 @@ export function TaskPanel({
               <p className="text-xs text-muted-foreground">
                 Vendors who are responsible for this task.
               </p>
+
+              <DraftVendorWarning
+                eventStatus={eventStatus ?? ""}
+                eventId={eventId}
+                eventDate={eventDate}
+              />
 
               {/* Add vendors button + popover */}
               {vendors.length > 0 ? (

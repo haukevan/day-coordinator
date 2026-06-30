@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Plus, Loader2, ListChecks } from "lucide-react";
 import { SubtaskItem } from "./subtask-item";
 import { cn } from "@/lib/utils";
+import { DraftVendorWarning } from "@/components/event/draft-vendor-warning";
 import type { SerializedSubTask, SerializedVendor } from "@/lib/types";
 
 type SubTaskStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
@@ -17,6 +18,8 @@ interface SubtaskListProps {
   eventId: string;
   /** The current vendor's EventVendor ID — used to restrict subtask status toggling */
   currentVendorEventId?: string | null;
+  eventStatus?: string;
+  eventDate?: string | null;
   onSubTasksChange: (subTasks: SerializedSubTask[]) => void;
 }
 
@@ -28,6 +31,8 @@ export function SubtaskList({
   taskId,
   eventId,
   currentVendorEventId,
+  eventStatus,
+  eventDate,
   onSubTasksChange,
 }: SubtaskListProps) {
   const [adding, setAdding] = useState(false);
@@ -526,6 +531,14 @@ export function SubtaskList({
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
             )}
           </div>
+        )}
+
+        {userRole === "admin" && (
+          <DraftVendorWarning
+            eventStatus={eventStatus ?? ""}
+            eventId={eventId}
+            eventDate={eventDate}
+          />
         )}
       </div>
 

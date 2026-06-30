@@ -44,6 +44,8 @@ interface TaskDetailSheetProps {
   canViewSubTasks: boolean;
   /** The current vendor's EventVendor ID — used to restrict subtask status toggling */
   currentVendorEventId?: string | null;
+  /** The current event status — used for DRAFT warnings */
+  eventStatus?: string;
   /** Whether the event is in LIVE mode */
   isLive?: boolean;
   /** Whether the current user can act on this task (start/complete/delay) */
@@ -88,6 +90,7 @@ export function TaskDetailSheet({
   userRole,
   canViewSubTasks,
   currentVendorEventId,
+  eventStatus,
   isLive = false,
   canAct = false,
   isBlocked = false,
@@ -456,6 +459,8 @@ export function TaskDetailSheet({
               taskId={task.id}
               eventId={eventId}
               currentVendorEventId={currentVendorEventId ?? null}
+              eventStatus={eventStatus}
+              eventDate={eventDate}
               onSubTasksChange={setSubTasks}
             />
           )}

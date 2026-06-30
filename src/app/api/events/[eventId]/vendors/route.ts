@@ -225,6 +225,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       role,
       inviteToken,
       inviteTokenExpiresAt,
+      invitedByUserId: dbUser.id,
     },
     include: {
       event: { select: { ownerId: true } },
@@ -250,8 +251,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (inviteThrottle.allowed) {
       try {
         await sendVendorInviteEmail(eventVendor.id);
-      } catch {
-        /* non-fatal */
+      } catch (err) {
+        console.error("[vendor-create] Failed to send invite email:", err);
       }
     }
     // Re-fetch so the response reflects the updated inviteSentAt

@@ -26,6 +26,12 @@ interface Props {
     lat: number | null;
     lng: number | null;
   } | null;
+  readonly invitedBy: {
+    firstName: string | null;
+    lastName: string | null;
+    name: string | null;
+    email: string;
+  } | null;
   readonly onboarded: boolean;
   readonly userEmail: string;
   readonly inviteEmail: string;
@@ -42,6 +48,7 @@ export function VendorJoinForm({
   eventTitle,
   eventDate,
   eventVenue,
+  invitedBy,
   onboarded,
   userEmail,
   inviteEmail,
@@ -136,6 +143,18 @@ export function VendorJoinForm({
                 year: "numeric",
                 timeZone: "UTC",
               })}
+            </p>
+          )}
+          {invitedBy && (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Invited by{" "}
+              <span className="font-medium text-foreground">
+                {invitedBy.firstName || invitedBy.lastName
+                  ? [invitedBy.firstName, invitedBy.lastName]
+                      .filter(Boolean)
+                      .join(" ")
+                  : (invitedBy.name ?? invitedBy.email)}
+              </span>
             </p>
           )}
           {eventVenue && (

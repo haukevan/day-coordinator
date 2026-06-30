@@ -77,6 +77,9 @@ export default async function DashboardPage() {
       },
     },
     include: {
+      invitedBy: {
+        select: { firstName: true, lastName: true, name: true, email: true },
+      },
       event: {
         select: {
           id: true,

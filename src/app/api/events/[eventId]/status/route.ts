@@ -96,12 +96,31 @@ export async function POST(req: NextRequest, { params }: Params) {
         { status: 422 },
       );
     }
+
+    // Require the event date not to be in the past before scheduling.
+    // Uses yesterday's date as the cutoff so "today" works in all timezones.
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - 1);
+    const cutoffStr = d.toISOString().split("T")[0];
+    if (event.eventDate.toISOString().split("T")[0] <= cutoffStr) {
+      return NextResponse.json(
+        {
+          error:
+            "Cannot schedule an event whose date has already passed. Please update the event date first.",
+        },
+        { status: 422 },
+      );
+    }
   }
 
   const updated = await prisma.event.update({
     where: { id: eventId },
     data: {
       status: targetStatus,
+      // Mark as PAID when upgrading from DRAFT → SCHEDULED (payment gate above)
+      ...(event.status === "DRAFT" && targetStatus === "SCHEDULED"
+        ? { paymentStatus: "PAID" }
+        : {}),
       ...(targetStatus === "LIVE" && !event.liveStartedAt
         ? { liveStartedAt: new Date() }
         : {}),
@@ -132,6 +151,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       },
       include: {
         vendorContact: true,
+        invitedBy: {
+          select: { firstName: true, lastName: true, name: true, email: true },
+        },
         event: { select: { title: true, eventDate: true } },
       },
     });

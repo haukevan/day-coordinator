@@ -258,6 +258,7 @@ export function TimelineView({
         userRole={userRole}
         canViewSubTasks={canViewSubTasks}
         currentVendorEventId={currentVendorEventId}
+        eventStatus={eventStatus}
         isLive={isLive}
         canAct={detailTask ? (canActMap.get(detailTask.id) ?? false) : false}
         isBlocked={
@@ -282,6 +283,7 @@ export function TimelineView({
         onRefresh={refreshTasks}
         vendors={vendors}
         readOnly={userRole === "vendor"}
+        eventStatus={eventStatus}
       />
     </div>
   );

@@ -97,6 +97,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── Reject past dates ────────────────────────────────────────────────
+  // Uses yesterday's date as the cutoff so "today" works in all timezones.
+  // Strictly less than (not <=) — yesterday is still allowed as a grace day.
+  if (eventDate) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - 1);
+    const cutoffStr = d.toISOString().split("T")[0];
+    if (eventDate < cutoffStr) {
+      return NextResponse.json(
+        { error: "Event date cannot be in the past." },
+        { status: 422 },
+      );
+    }
+  }
+
   const resolvedSlug = slug?.trim() ? await uniqueSlug(slug.trim()) : undefined;
 
   const event = await prisma.$transaction(async (tx) => {

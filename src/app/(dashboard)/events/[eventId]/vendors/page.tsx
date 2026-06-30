@@ -23,7 +23,7 @@ export default async function AdminVendorsPage({
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, ownerId: dbUser.id },
-    select: { id: true, status: true, ownerId: true },
+    select: { id: true, status: true, eventDate: true, ownerId: true },
   });
   if (!event) notFound();
 
@@ -59,6 +59,7 @@ export default async function AdminVendorsPage({
       vendors={vendors}
       userRole="admin"
       eventStatus={event.status}
+      eventDate={event.eventDate?.toISOString() ?? null}
     />
   );
 }
