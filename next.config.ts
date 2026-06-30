@@ -1,4 +1,15 @@
 import type { NextConfig } from "next";
+import withSerwistInit from "@serwist/next";
+
+// A revision helps Serwist version precached pages. Using a UUID since
+// we don't have a git-based revision in all environments.
+const revision = crypto.randomUUID();
+
+const withSerwist = withSerwistInit({
+  swSrc: "src/app/sw.ts",
+  swDest: "public/sw.js",
+  additionalPrecacheEntries: [{ url: "/~offline", revision }],
+});
 
 const nextConfig: NextConfig = {
   async headers() {
@@ -23,7 +34,8 @@ const nextConfig: NextConfig = {
               "font-src 'self'; " +
               "connect-src 'self' https://*.supabase.co https://nominatim.openstreetmap.org https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://tiles.openfreemap.org https://api.maptiler.com; " +
               "worker-src 'self' blob:; " +
-              "child-src 'self' blob:;",
+              "child-src 'self' blob:; " +
+              "manifest-src 'self';",
           },
         ],
       },
@@ -31,4 +43,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSerwist(nextConfig);

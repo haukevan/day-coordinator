@@ -41,4 +41,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Serwist (PWA service worker)
+public/sw*
+public/swe-worker*
+
 /src/generated/prisma
