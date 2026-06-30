@@ -50,7 +50,7 @@ export function PwaInstall() {
     <pwa-install
       ref={ref}
       use-local-storage
-      manifest-url="/manifest.json"
+      manifest-url="/manifest.webmanifest"
       name="Day Coordinator"
       description="Real-time event coordination for weddings and private events."
       icon="/logo.svg"
