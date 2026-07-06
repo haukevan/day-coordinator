@@ -10,6 +10,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { sendPush, type Jsonifiable } from "@/lib/notifications/push";
 
 /**
  * Send a pending notification by ID.
@@ -28,8 +29,18 @@ export async function sendNotification(notificationId: string): Promise<void> {
   }
 
   try {
-    // TODO: dispatch via channel (email / SMS / push)
-    // Replace this block with real provider calls per NotificationChannel
+    // Dispatch via channel
+    if (notification.channel === "PUSH") {
+      const { sent, failed } = await sendPush(
+        notification.recipient,
+        notification.payload as unknown as Jsonifiable,
+      );
+      if (failed > 0 && sent === 0) {
+        throw new Error(`Push dispatch failed for all ${failed} subscriptions`);
+      }
+    }
+    // TODO: SMS channel (Phase 2)
+    // TODO: EMAIL channel (Phase 2)
 
     await prisma.notification.update({
       where: { id: notificationId },

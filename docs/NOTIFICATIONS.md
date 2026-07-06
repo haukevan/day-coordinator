@@ -1,7 +1,7 @@
 # Notification System — Architecture & Implementation Plan
 
-> **Status:** Phase 0 ✅ Complete — Phase 1 next  
-> **Last updated:** 2026-06-30
+> **Status:** Phase 0 ✅ Complete — Phase 1 ✅ Complete — Phase 2 next  
+> **Last updated:** 2026-07-02
 
 ---
 
@@ -84,17 +84,26 @@ Cron scan (overdue) ──→ Create Notification (status=PENDING)
 | 0.10 | `package.json`                      | Add `--webpack` to dev/build scripts (Next.js 16 Turbopack compat) | ✅   |
 | 0.11 | —                                   | `npm run build` passes                                             | ✅   |
 
-### Phase 1 — Web Push Plumbing
+### Phase 1 — Web Push Plumbing ✅ COMPLETE
 
 **Test:** Browser subscribes → DB stores subscription → server sends → system notification appears.
 
-| Step | File                                          | Action                                            |
-| ---- | --------------------------------------------- | ------------------------------------------------- |
-| 1.1  | —                                             | Install `@pushforge/builder`, generate VAPID keys |
-| 1.2  | `prisma/schema.prisma`                        | Add `PushSubscription` model, migrate             |
-| 1.3  | `src/app/api/user/push-subscription/route.ts` | POST/DELETE subscription CRUD                     |
-| 1.4  | `src/lib/notifications/push.ts`               | `sendPush(userId, payload)` dispatch              |
-| 1.5  | `src/app/sw.ts`                               | Wire push + notificationclick handlers            |
+| Step | File                                          | Action                                            | Done |
+| ---- | --------------------------------------------- | ------------------------------------------------- | ---- |
+| 1.1  | —                                             | Install `@pushforge/builder`, generate VAPID keys | ✅   |
+| 1.2  | `prisma/schema.prisma`                        | Add `PushSubscription` model, migrate             | ✅   |
+| 1.3  | `src/app/api/user/push-subscription/route.ts` | POST/DELETE subscription CRUD                     | ✅   |
+| 1.4  | `src/lib/notifications/push.ts`               | `sendPush(userId, payload)` dispatch              | ✅   |
+| 1.5  | `src/app/sw.ts`                               | Wire push + notificationclick handlers            | ✅   |
+
+**Implementation notes:**
+
+- `PushSubscription` model uses `onDelete: Cascade` so subscriptions are cleaned up when a user is deleted
+- `sendPush()` fans out to ALL subscriptions for a user (multiple devices supported)
+- Expired subscriptions (HTTP 410 from push service) are auto-deleted from the DB
+- `usePushSubscription()` hook created in `src/lib/notifications/usePushSubscription.ts` (originally Phase 5b, moved up for E2E testing)
+- PUSH channel fully wired in `sendNotification()` — calls `sendPush()` for PUSH type
+- No changes needed to `src/app/sw.ts` — push/notificationclick handlers were already in place from Phase 0
 
 ### Phase 2 — SMS Plumbing
 
@@ -110,11 +119,11 @@ Cron scan (overdue) ──→ Create Notification (status=PENDING)
 
 **Test:** Insert Notification → ≤1 min → dispatched via correct channel.
 
-| Step | File                                           | Action                                      |
-| ---- | ---------------------------------------------- | ------------------------------------------- |
-| 3.1  | `src/lib/notifications/index.ts`               | Wire PUSH → `sendPush()`, SMS → `sendSms()` |
-| 3.2  | `src/app/api/cron/send-notifications/route.ts` | Unified dispatch cron                       |
-| 3.3  | `vercel.json`                                  | Add cron schedule, upgrade Vercel to Pro    |
+| Step | File                                           | Action                                                                        |
+| ---- | ---------------------------------------------- | ----------------------------------------------------------------------------- |
+| 3.1  | `src/lib/notifications/index.ts`               | Wire SMS → `sendSms()`, EMAIL → `sendEmail()` (PUSH already wired in Phase 1) |
+| 3.2  | `src/app/api/cron/send-notifications/route.ts` | Unified dispatch cron                                                         |
+| 3.3  | `vercel.json`                                  | Add cron schedule, upgrade Vercel to Pro                                      |
 
 ### Phase 4 — First Notification Types
 
@@ -132,24 +141,24 @@ Cron scan (overdue) ──→ Create Notification (status=PENDING)
 
 **Test:** Task overdue → within 5 min → assignee notified. User toggles preferences.
 
-| Step | File                                             | Action                             |
-| ---- | ------------------------------------------------ | ---------------------------------- |
-| 5a   | `src/app/api/cron/check-overdue/route.ts`        | Overdue task checker cron          |
-| 5b   | `src/lib/notifications/usePushSubscription.ts`   | Push opt-in hook                   |
-| 5c   | `src/components/ui/notification-toast.tsx`       | In-app toast via Supabase Realtime |
-| 5d   | `src/components/event/notification-settings.tsx` | Notification preferences UI        |
+| Step | File                                             | Action                                                                     |
+| ---- | ------------------------------------------------ | -------------------------------------------------------------------------- |
+| 5a   | `src/app/api/cron/check-overdue/route.ts`        | Overdue task checker cron                                                  |
+| 5b   | `src/lib/notifications/usePushSubscription.ts`   | Push opt-in hook ✅ (already built in Phase 1, wire into settings UI here) |
+| 5c   | `src/components/ui/notification-toast.tsx`       | In-app toast via Supabase Realtime                                         |
+| 5d   | `src/components/event/notification-settings.tsx` | Notification preferences UI                                                |
 
 ---
 
 ## Database Changes
 
-### PushSubscription (Phase 1)
+### PushSubscription (Phase 1) ✅ Implemented
 
 ```prisma
 model PushSubscription {
   id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   endpoint  String   @unique
   p256dh    String
   auth      String
@@ -157,6 +166,8 @@ model PushSubscription {
   @@index([userId])
 }
 ```
+
+Reverse relation added to `User` model: `pushSubscriptions PushSubscription[]`
 
 ### NotificationType Enum Extension (Phase 4e)
 
@@ -194,5 +205,14 @@ Nullable columns on User: `pushEnabled`, `smsEnabled`, `taskReminders`, `delayAl
 - [ ] Phase 3: Notification inserted → dispatched within 1 minute
 - [ ] Phase 4: Vendor accepted → push received. Event live → broadcast received
 - [ ] Phase 5: Task overdue → notified within 5 min. Preferences toggles work
-- [ ] `npm run build` passes after each phase
+- [x] `npm run build` passes after Phase 1
 - [ ] Existing email notifications (Resend) unaffected
+
+## Env Vars Added (Phase 1)
+
+| Variable                       | Client? | Description                                           |
+| ------------------------------ | ------- | ----------------------------------------------------- |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Yes     | VAPID public key (base64url) for browser Push API     |
+| `VAPID_PRIVATE_KEY`            | No      | VAPID private key (JWK JSON) for server-side dispatch |
+
+Generate with: `npx @pushforge/builder vapid`

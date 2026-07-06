@@ -33,7 +33,8 @@ model User {
   vendorContacts    VendorContact[] @relation("VendorContacts")
   vendorMemberships EventVendor[]   @relation("VendorMemberships")
   invitedVendors    EventVendor[]   @relation("InvitedBy")
-  completedSubTasks SubTask[]
+  completedSubTasks   SubTask[]
+  pushSubscriptions   PushSubscription[]
 }
 
 // ─── Event ───────────────────────────────────────────────────────────────────
@@ -161,6 +162,20 @@ enum NotificationStatus {
   SENT
   FAILED
   SKIPPED
+}
+
+// ─── Push Subscriptions ───────────────────────────────────────────────────────
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 // ─── Vendors ─────────────────────────────────────────────────────────────────
