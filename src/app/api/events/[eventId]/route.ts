@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { emitEventUpdate } from "@/lib/realtime";
 import { z } from "zod";
+import { createEventReminders } from "@/lib/notifications/helpers";
 
 type Params = { params: Promise<{ eventId: string }> };
 
@@ -216,6 +217,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         }
       }
     }
+  }
+
+  // Recreate event reminders if the event date changed and the event is SCHEDULED
+  if (
+    eventDate !== undefined &&
+    !dateFieldLocked &&
+    eventDate &&
+    updated.status === "SCHEDULED"
+  ) {
+    await createEventReminders(eventId, updated.eventDate!);
   }
 
   await prisma.activityLog.create({

@@ -8,6 +8,7 @@ import {
 } from "@/lib/notifications/vendor-invite";
 import type { EventStatus } from "@/generated/prisma/client";
 import { z } from "zod";
+import { createEventReminders } from "@/lib/notifications/helpers";
 
 type Params = { params: Promise<{ eventId: string }> };
 
@@ -159,6 +160,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
     if (pendingVendors.length > 0) {
       await sendVendorInviteEmailBatch(pendingVendors);
+    }
+
+    // Pre-create event reminder notifications (24h and 2h before event)
+    if (event.eventDate) {
+      await createEventReminders(eventId, event.eventDate);
     }
   }
 

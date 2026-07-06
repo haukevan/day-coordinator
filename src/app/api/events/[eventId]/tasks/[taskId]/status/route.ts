@@ -5,6 +5,11 @@ import { canActOnTask } from "@/lib/db/permissions";
 import { emitEventUpdate } from "@/lib/realtime";
 import { reconcileDelay } from "@/lib/scheduler/delay";
 import { z } from "zod";
+import {
+  createNotification,
+  resolveCoordinatorUserIds,
+  buildIdempotencyKey,
+} from "@/lib/notifications/helpers";
 
 type Params = { params: Promise<{ eventId: string; taskId: string }> };
 
@@ -151,6 +156,25 @@ export async function POST(req: NextRequest, { params }: Params) {
       status: "IN_PROGRESS",
     });
 
+    // Notify coordinators that a task started
+    const coordinatorIds = await resolveCoordinatorUserIds(eventId);
+    await Promise.all(
+      coordinatorIds.map((cid) =>
+        createNotification({
+          eventId,
+          type: "TASK_STARTED",
+          channel: "PUSH",
+          recipient: cid,
+          payload: {
+            title: "Task Started",
+            body: `"${task.title}" is now in progress.`,
+            data: { url: `/events/${eventId}/timeline` },
+          },
+          idempotencyKey: buildIdempotencyKey("TASK_STARTED", eventId, taskId),
+        }),
+      ),
+    );
+
     return NextResponse.json({
       task: {
         id: taskId,
@@ -226,6 +250,95 @@ export async function POST(req: NextRequest, { params }: Params) {
       actualEnd: actualEnd.toISOString(),
       status: "COMPLETED",
     });
+
+    // Notify parent task assignee + coordinators about completion
+    const coordinatorIds = await resolveCoordinatorUserIds(eventId);
+    const notifyCompleted: Promise<void>[] = [];
+
+    if (task.assignedToId) {
+      // Parent assignee (if this task had a parent)
+      if (task.parentTaskId) {
+        const parent = await prisma.task.findUnique({
+          where: { id: task.parentTaskId },
+          select: { assignedToId: true, title: true },
+        });
+        if (parent?.assignedToId) {
+          notifyCompleted.push(
+            createNotification({
+              eventId,
+              type: "TASK_COMPLETED",
+              channel: "PUSH",
+              recipient: parent.assignedToId,
+              payload: {
+                title: "Task Completed",
+                body: `"${task.title}" was completed.`,
+                data: { url: `/events/${eventId}/timeline` },
+              },
+              idempotencyKey: buildIdempotencyKey(
+                "TASK_COMPLETED",
+                eventId,
+                taskId,
+                "parent",
+              ),
+            }),
+          );
+        }
+      }
+    }
+
+    // Coordinators
+    for (const cid of coordinatorIds) {
+      notifyCompleted.push(
+        createNotification({
+          eventId,
+          type: "TASK_COMPLETED",
+          channel: "PUSH",
+          recipient: cid,
+          payload: {
+            title: "Task Completed",
+            body: `"${task.title}" was completed.`,
+            data: { url: `/events/${eventId}/timeline` },
+          },
+          idempotencyKey: buildIdempotencyKey(
+            "TASK_COMPLETED",
+            eventId,
+            taskId,
+            `coordinator-${cid}`,
+          ),
+        }),
+      );
+    }
+
+    // Unblock child tasks — notify their assignees
+    const childTasks = await prisma.task.findMany({
+      where: { parentTaskId: taskId },
+      select: { id: true, title: true, assignedToId: true },
+    });
+
+    for (const child of childTasks) {
+      if (child.assignedToId) {
+        notifyCompleted.push(
+          createNotification({
+            eventId,
+            type: "TASK_UNBLOCKED",
+            channel: "PUSH",
+            recipient: child.assignedToId,
+            payload: {
+              title: "Task Unblocked",
+              body: `"${task.title}" is complete — "${child.title}" is now unblocked.`,
+              data: { url: `/events/${eventId}/timeline` },
+            },
+            idempotencyKey: buildIdempotencyKey(
+              "TASK_UNBLOCKED",
+              eventId,
+              child.id,
+            ),
+          }),
+        );
+      }
+    }
+
+    await Promise.all(notifyCompleted);
 
     return NextResponse.json({
       task: {

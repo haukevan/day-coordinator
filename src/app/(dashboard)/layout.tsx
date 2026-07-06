@@ -6,6 +6,7 @@ import { Logo } from "@/components/ui/logo";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { MobileNavSheet } from "@/components/dashboard/mobile-nav-sheet";
 import { UserMenu } from "@/components/dashboard/user-menu";
+import { DashboardProviders } from "@/components/providers/dashboard-providers";
 
 function buildAvatar(
   firstName: string | null,
@@ -95,7 +96,7 @@ export default async function DashboardLayout({
       {/* Mobile: top bar (56px) padding */}
       {/* Desktop: left sidebar (224px / w-56) padding */}
       <main className="w-full min-h-screen pt-14 sm:pl-56 sm:pt-0">
-        {children}
+        <DashboardProviders>{children}</DashboardProviders>
       </main>
     </div>
   );

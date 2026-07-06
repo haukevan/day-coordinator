@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { TimelineView } from "@/components/timeline/timeline-view";
+import { NotificationBell } from "@/components/event/notification-bell";
 import type { SerializedTask } from "@/lib/types";
 
 export default async function VendorTimelinePage({
@@ -94,21 +95,31 @@ export default async function VendorTimelinePage({
   }));
 
   return (
-    <Suspense fallback={null}>
-      <TimelineView
-        eventId={eventId}
-        tasks={serializedTasks}
-        timezone={eventVendor.event.timezone}
-        eventDate={
-          eventVendor.event.eventDate
-            ? eventVendor.event.eventDate.toISOString()
-            : null
-        }
-        userRole={isCoordinator ? "admin" : "vendor"}
-        currentUserId={dbUser.id}
-        eventStatus={eventVendor.event.status}
-        vendorEventVendorId={isCoordinator ? undefined : eventVendor.id}
-      />
-    </Suspense>
+    <div>
+      <div className="flex items-center justify-end px-4 py-2">
+        <NotificationBell
+          eventId={eventId}
+          eventStatus={eventVendor.event.status}
+          initialPushEnabled={eventVendor.pushEnabled ?? true}
+          initialSmsEnabled={eventVendor.smsEnabled ?? true}
+        />
+      </div>
+      <Suspense fallback={null}>
+        <TimelineView
+          eventId={eventId}
+          tasks={serializedTasks}
+          timezone={eventVendor.event.timezone}
+          eventDate={
+            eventVendor.event.eventDate
+              ? eventVendor.event.eventDate.toISOString()
+              : null
+          }
+          userRole={isCoordinator ? "admin" : "vendor"}
+          currentUserId={dbUser.id}
+          eventStatus={eventVendor.event.status}
+          vendorEventVendorId={isCoordinator ? undefined : eventVendor.id}
+        />
+      </Suspense>
+    </div>
   );
 }

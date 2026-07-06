@@ -3,6 +3,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import {
+  createNotification,
+  resolveCoordinatorUserIds,
+  buildIdempotencyKey,
+} from "@/lib/notifications/helpers";
 
 type Params = { params: Promise<{ token: string }> };
 
@@ -152,6 +157,34 @@ export async function POST(req: NextRequest, { params }: Params) {
       metadata: { eventVendorId: eventVendor.id },
     },
   });
+
+  // Notify all coordinators that a vendor accepted
+  const coordinatorIds = await resolveCoordinatorUserIds(eventVendor.eventId);
+  const vendorName =
+    [eventVendor.vendorContact.firstName, eventVendor.vendorContact.lastName]
+      .filter(Boolean)
+      .join(" ") || eventVendor.vendorContact.email;
+
+  await Promise.all(
+    coordinatorIds.map((userId) =>
+      createNotification({
+        eventId: eventVendor.eventId,
+        type: "VENDOR_ACCEPTED",
+        channel: "PUSH",
+        recipient: userId,
+        payload: {
+          title: "Vendor Accepted",
+          body: `${vendorName} has accepted your invite.`,
+          data: { url: `/events/${eventVendor.eventId}/vendors` },
+        },
+        idempotencyKey: buildIdempotencyKey(
+          "VENDOR_ACCEPTED",
+          eventVendor.eventId,
+          eventVendor.id,
+        ),
+      }),
+    ),
+  );
 
   return NextResponse.json({ eventId: eventVendor.eventId });
 }

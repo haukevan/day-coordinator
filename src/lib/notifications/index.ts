@@ -11,6 +11,8 @@
 
 import { prisma } from "@/lib/db/prisma";
 import { sendPush, type Jsonifiable } from "@/lib/notifications/push";
+import { sendSms } from "@/lib/notifications/sms";
+import { sendEmail } from "@/lib/notifications/email";
 
 /**
  * Send a pending notification by ID.
@@ -38,9 +40,23 @@ export async function sendNotification(notificationId: string): Promise<void> {
       if (failed > 0 && sent === 0) {
         throw new Error(`Push dispatch failed for all ${failed} subscriptions`);
       }
+    } else if (notification.channel === "SMS") {
+      const body =
+        typeof (notification.payload as Record<string, unknown>).body ===
+        "string"
+          ? (notification.payload as Record<string, unknown>).body
+          : JSON.stringify(notification.payload);
+      await sendSms(notification.recipient, body as string);
+    } else if (notification.channel === "EMAIL") {
+      const p = notification.payload as Record<string, unknown>;
+      const subject =
+        typeof p.subject === "string" ? p.subject : "Day Coordinator";
+      const html =
+        typeof p.html === "string"
+          ? p.html
+          : `<p>${typeof p.body === "string" ? p.body : JSON.stringify(p)}</p>`;
+      await sendEmail(notification.recipient, subject, html);
     }
-    // TODO: SMS channel (Phase 2)
-    // TODO: EMAIL channel (Phase 2)
 
     await prisma.notification.update({
       where: { id: notificationId },

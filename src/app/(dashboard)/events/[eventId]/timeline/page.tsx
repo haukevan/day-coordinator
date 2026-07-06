@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { TimelineView } from "@/components/timeline/timeline-view";
 import { TaskRowSkeletonList } from "@/components/ui/skeletons";
+import { NotificationBell } from "@/components/event/notification-bell";
 import type { SerializedTask } from "@/lib/types";
 
 export default async function TimelinePage({
@@ -29,6 +30,12 @@ export default async function TimelinePage({
   });
 
   if (!event) notFound();
+
+  // Fetch per-event notification prefs for the current user
+  const vendorPref = await prisma.eventVendor.findFirst({
+    where: { eventId, userId: dbUser.id },
+    select: { pushEnabled: true, smsEnabled: true },
+  });
 
   const tasks = await prisma.task.findMany({
     where: { eventId },
@@ -83,17 +90,27 @@ export default async function TimelinePage({
   }));
 
   return (
-    <Suspense fallback={<TimelineSkeleton />}>
-      <TimelineView
-        eventId={eventId}
-        tasks={serializedTasks}
-        timezone={event.timezone}
-        eventDate={event.eventDate ? event.eventDate.toISOString() : null}
-        eventStatus={event.status}
-        userRole="admin"
-        currentUserId={dbUser.id}
-      />
-    </Suspense>
+    <div>
+      <div className="flex items-center justify-end px-4 py-2">
+        <NotificationBell
+          eventId={eventId}
+          eventStatus={event.status}
+          initialPushEnabled={vendorPref?.pushEnabled ?? true}
+          initialSmsEnabled={vendorPref?.smsEnabled ?? true}
+        />
+      </div>
+      <Suspense fallback={<TimelineSkeleton />}>
+        <TimelineView
+          eventId={eventId}
+          tasks={serializedTasks}
+          timezone={event.timezone}
+          eventDate={event.eventDate ? event.eventDate.toISOString() : null}
+          eventStatus={event.status}
+          userRole="admin"
+          currentUserId={dbUser.id}
+        />
+      </Suspense>
+    </div>
   );
 }
 

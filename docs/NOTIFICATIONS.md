@@ -1,7 +1,7 @@
 # Notification System — Architecture & Implementation Plan
 
-> **Status:** Phase 0 ✅ Complete — Phase 1 ✅ Complete — Phase 2 next  
-> **Last updated:** 2026-07-02
+> **Status:** Phase 0–5 ✅ All phases complete  
+> **Last updated:** 2026-07-06
 
 ---
 
@@ -105,48 +105,110 @@ Cron scan (overdue) ──→ Create Notification (status=PENDING)
 - PUSH channel fully wired in `sendNotification()` — calls `sendPush()` for PUSH type
 - No changes needed to `src/app/sw.ts` — push/notificationclick handlers were already in place from Phase 0
 
-### Phase 2 — SMS Plumbing
+### Phase 2 — SMS Plumbing ✅ COMPLETE
 
 **Test:** Call endpoint → SMS arrives at phone.
 
-| Step | File                           | Action                      |
-| ---- | ------------------------------ | --------------------------- |
-| 2.1  | `.env`                         | Add Twilio env vars         |
-| 2.2  | `src/lib/notifications/sms.ts` | `sendSms(to, body)` wrapper |
-| 2.3  | —                              | Test via debug endpoint     |
+| Step | File                                 | Action                               | Done |
+| ---- | ------------------------------------ | ------------------------------------ | ---- |
+| 2.1  | `.env`                               | Add Twilio env vars                  | ✅   |
+| 2.2  | `src/lib/notifications/sms.ts`       | `sendSms(to, body)` wrapper          | ✅   |
+| 2.3  | `src/app/api/cron/test-sms/route.ts` | CRON_SECRET protected debug endpoint | ✅   |
 
-### Phase 3 — Unified Dispatch Pipeline
+**Implementation notes:**
+
+- `sendSms()` uses lazy-singleton Twilio client (same pattern as `src/lib/resend.ts`)
+- Validates E.164 phone format (`+1XXXXXXXXXX`) before sending
+- SMS channel fully wired in `sendNotification()` — calls `sendSms()` for SMS type
+- Test endpoint at `POST /api/cron/test-sms` — requires `Authorization: Bearer <CRON_SECRET>`, accepts `{ to, body }`
+- No rate limiting at this phase — will be added with notification preferences in Phase 5
+
+### Phase 3 — Unified Dispatch Pipeline ✅ COMPLETE
 
 **Test:** Insert Notification → ≤1 min → dispatched via correct channel.
 
-| Step | File                                           | Action                                                                        |
-| ---- | ---------------------------------------------- | ----------------------------------------------------------------------------- |
-| 3.1  | `src/lib/notifications/index.ts`               | Wire SMS → `sendSms()`, EMAIL → `sendEmail()` (PUSH already wired in Phase 1) |
-| 3.2  | `src/app/api/cron/send-notifications/route.ts` | Unified dispatch cron                                                         |
-| 3.3  | `vercel.json`                                  | Add cron schedule, upgrade Vercel to Pro                                      |
+| Step | File                                           | Action                                                              | Done |
+| ---- | ---------------------------------------------- | ------------------------------------------------------------------- | ---- |
+| 3.1  | `src/lib/notifications/email.ts`               | `sendEmail(to, subject, html)` via Resend                           | ✅   |
+| 3.2  | `src/app/api/cron/send-notifications/route.ts` | Unified dispatch cron (finds all PENDING, calls `sendNotification`) | ✅   |
+| 3.3  | —                                              | External cron trigger via cron-job.org (free tier)                  | ✅   |
 
-### Phase 4 — First Notification Types
+**Implementation notes:**
 
-**Test:** Vendor accepts → coordinator gets push. Event goes live → broadcast.
+- All three channels (PUSH, SMS, EMAIL) wired in `sendNotification()`
+- `sendEmail()` wraps the existing Resend client from `src/lib/resend.ts`
+- Dispatch cron at `GET /api/cron/send-notifications` (CRON_SECRET protected)
+- Uses cron-job.org (free) instead of Vercel cron (requires Pro) — setup instructions in Phase 5 summary
 
-| Step | File                                                          | Action                                        |
-| ---- | ------------------------------------------------------------- | --------------------------------------------- |
-| 4a   | `src/app/api/invite/[token]/route.ts`                         | Vendor accepted → coordinator alert           |
-| 4b   | `src/app/api/events/[eventId]/tasks/[taskId]/delay/route.ts`  | Task delayed → downstream alert               |
-| 4c   | `src/app/api/events/[eventId]/tasks/[taskId]/status/route.ts` | Event live → broadcast                        |
-| 4d   | `src/app/api/events/[eventId]/status/route.ts`                | Event scheduled → pre-create 24h/2h reminders |
-| 4e   | `prisma/schema.prisma`                                        | Extend `NotificationType` enum                |
+### Phase 4 — First Notification Types ✅ COMPLETE
 
-### Phase 5 — Cron-Polled + Frontend UI
+**Test:** Vendor accepts → coordinator gets push. Task delayed → downstream notified. Event scheduled → reminders created.
+
+| Step | File                                                                  | Action                                                                             | Done |
+| ---- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---- |
+| 4a   | `src/app/api/invite/[token]/route.ts`                                 | Vendor accepted → VENDOR_ACCEPTED PUSH to all coordinators                         | ✅   |
+| 4b   | `src/app/api/events/[eventId]/tasks/[taskId]/delay/route.ts`          | Task delayed → TASK_DELAYED PUSH to child assignees + coordinators                 | ✅   |
+| 4c   | `src/app/api/events/[eventId]/tasks/[taskId]/status/route.ts`         | Task started → TASK_STARTED PUSH; completed → TASK_COMPLETED + TASK_UNBLOCKED PUSH | ✅   |
+| 4d   | `src/app/api/events/[eventId]/status/route.ts` + `[eventId]/route.ts` | Event scheduled → pre-create EVENT_REMINDER_24H/2H; date change → recreate         | ✅   |
+| 4e   | `prisma/schema.prisma`                                                | Extend `NotificationType` enum (13 values — all future types included)             | ✅   |
+
+**Implementation notes:**
+
+- All notification creation goes through `createNotification()` in `src/lib/notifications/helpers.ts` — idempotent via `idempotencyKey`
+- `resolveCoordinatorUserIds()` returns event owner + all accepted COORDINATOR-role EventVendors
+- Notifications are created as PENDING — the Phase 3 dispatch cron sends them within 1 minute
+- Event reminders auto-delete old ones before recreating (safe for date changes)
+- Reminders in the past are skipped (only future reminders are created)
+
+### Phase 5 — Cron-Polled + Frontend UI ✅ COMPLETE
 
 **Test:** Task overdue → within 5 min → assignee notified. User toggles preferences.
 
-| Step | File                                             | Action                                                                     |
-| ---- | ------------------------------------------------ | -------------------------------------------------------------------------- |
-| 5a   | `src/app/api/cron/check-overdue/route.ts`        | Overdue task checker cron                                                  |
-| 5b   | `src/lib/notifications/usePushSubscription.ts`   | Push opt-in hook ✅ (already built in Phase 1, wire into settings UI here) |
-| 5c   | `src/components/ui/notification-toast.tsx`       | In-app toast via Supabase Realtime                                         |
-| 5d   | `src/components/event/notification-settings.tsx` | Notification preferences UI                                                |
+| Step | File                                             | Action                                                        | Done |
+| ---- | ------------------------------------------------ | ------------------------------------------------------------- | ---- |
+| 5a   | `src/app/api/cron/check-overdue/route.ts`        | Overdue task checker cron (TASK_OVERDUE + EVENT_ALL_COMPLETE) | ✅   |
+| 5b   | `src/lib/notifications/usePushSubscription.ts`   | Push opt-in hook ✅ (built in Phase 1)                        | ✅   |
+| 5c   | `src/components/ui/notification-toast.tsx`       | In-app toast via Supabase Realtime + custom ToastProvider     | ✅   |
+| 5d   | `src/components/event/notification-settings.tsx` | Notification preferences UI (PUSH + SMS toggles)              | ✅   |
+
+**Implementation notes:**
+
+- `check-overdue` cron scans LIVE events for tasks past their `scheduledEnd` — creates TASK_OVERDUE PUSH+SMS
+- Also detects when all tasks are COMPLETED/SKIPPED → EVENT_ALL_COMPLETE PUSH
+- Uses 5-minute idempotency buckets to prevent duplicate notifications
+- Toast system built from scratch (no external dependency) — `ToastProvider` + `useToast()` hook
+- `NotificationToastListener` subscribes to Supabase Realtime broadcasts for task events
+- Settings UI uses shadcn `Switch` component, saves to `PATCH /api/events/[eventId]/notification-prefs`
+- `pushEnabled`/`smsEnabled` on `EventVendor` — per-user, per-event preferences
+- **Notification bell** in timeline header shows recent notifications dropdown + PUSH/SMS toggles
+- Bell only visible for SCHEDULED and LIVE events
+- **Global safety gate**: No notifications for DRAFT or ARCHIVED events
+- **VENDOR_ACCEPTED gate**: Only fires for SCHEDULED+ events (global gate blocks DRAFT/ARCHIVED)
+
+### Safety Gates (Phase 5)
+
+| Gate            | Where                  | Rule                                                                                                             |
+| --------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Event state     | `createNotification()` | Skip if event is DRAFT or ARCHIVED                                                                               |
+| User prefs      | `createNotification()` | Check `EventVendor.pushEnabled`/`smsEnabled` per-event-per-user. Owner (no EventVendor row) defaults to enabled. |
+| VENDOR_ACCEPTED | Invite route           | Global gate blocks DRAFT/ARCHIVED; fires for SCHEDULED/LIVE/COMPLETED                                            |
+
+### Notification Event State Rules
+
+| Event State | Notifications                                                                                               |
+| ----------- | ----------------------------------------------------------------------------------------------------------- |
+| DRAFT       | ❌ None (blocked by global gate)                                                                            |
+| SCHEDULED   | VENDOR_ACCEPTED, EVENT_REMINDER_24H/2H                                                                      |
+| LIVE        | TASK_STARTED, TASK_COMPLETED, TASK_UNBLOCKED, TASK_DELAYED, EVENT_STARTED, TASK_OVERDUE, EVENT_ALL_COMPLETE |
+| COMPLETED   | None (tasks done)                                                                                           |
+| ARCHIVED    | ❌ None (blocked by global gate)                                                                            |
+
+### cron-job.org Setup (after deploy)
+
+1. Create 2 cron jobs at [cron-job.org](https://cron-job.org):
+   - `send-notifications` — every 1 min
+   - `check-overdue` — every 5 min
+2. Both use `GET` method with header `Authorization: Bearer <CRON_SECRET>`
 
 ---
 
@@ -178,9 +240,19 @@ EVENT_STARTED (existing) → keep, add EVENT_REMINDER_24H, EVENT_REMINDER_2H, EV
 CUSTOM (existing) → keep, add VENDOR_ACCEPTED, VENDOR_DECLINED
 ```
 
-### User Notification Prefs (Phase 5d)
+### User Notification Prefs (Phase 5d) ✅ Implemented — Per-Event
 
-Nullable columns on User: `pushEnabled`, `smsEnabled`, `taskReminders`, `delayAlerts`
+```prisma
+// On EventVendor model (per-user, per-event):
+pushEnabled   Boolean?   // null = enabled (opt-out pattern)
+smsEnabled    Boolean?   // null = enabled (opt-out pattern)
+```
+
+Preferences are stored on `EventVendor` — each user has independent prefs for each event. The event owner (who has no EventVendor row) defaults to enabled for all channels.
+
+- **Notification bell** (`src/components/event/notification-bell.tsx`) in timeline header shows recent notifications + PUSH/SMS toggles
+- **API**: `PATCH /api/events/[eventId]/notification-prefs` updates per-event prefs
+- **API**: `GET /api/events/[eventId]/notifications` returns recent sent notifications for the bell dropdown
 
 ---
 
@@ -205,7 +277,7 @@ Nullable columns on User: `pushEnabled`, `smsEnabled`, `taskReminders`, `delayAl
 - [ ] Phase 3: Notification inserted → dispatched within 1 minute
 - [ ] Phase 4: Vendor accepted → push received. Event live → broadcast received
 - [ ] Phase 5: Task overdue → notified within 5 min. Preferences toggles work
-- [x] `npm run build` passes after Phase 1
+- [x] `npm run build` passes after Phase 5
 - [ ] Existing email notifications (Resend) unaffected
 
 ## Env Vars Added (Phase 1)

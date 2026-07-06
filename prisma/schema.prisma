@@ -149,6 +149,15 @@ enum NotificationType {
   TASK_DELAYED
   EVENT_STARTED
   CUSTOM
+  TASK_OVERDUE
+  TASK_COMPLETED
+  TASK_UNBLOCKED
+  TASK_STARTED
+  EVENT_REMINDER_24H
+  EVENT_REMINDER_2H
+  EVENT_ALL_COMPLETE
+  VENDOR_ACCEPTED
+  VENDOR_DECLINED
 }
 
 enum NotificationChannel {
@@ -227,6 +236,8 @@ model EventVendor {
   joinedAt             DateTime?
   invitedByUserId      String?
   invitedBy            User?         @relation("InvitedBy", fields: [invitedByUserId], references: [id])
+  pushEnabled          Boolean?
+  smsEnabled           Boolean?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 

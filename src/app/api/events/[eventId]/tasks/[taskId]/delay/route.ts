@@ -6,6 +6,11 @@ import { emitEventUpdate } from "@/lib/realtime";
 import { propagateDelay } from "@/lib/scheduler/delay";
 import { computeScheduledEnd } from "@/lib/scheduler";
 import { z } from "zod";
+import {
+  createNotification,
+  resolveCoordinatorUserIds,
+  buildIdempotencyKey,
+} from "@/lib/notifications/helpers";
 
 type Params = { params: Promise<{ eventId: string; taskId: string }> };
 
@@ -127,6 +132,67 @@ export async function POST(req: NextRequest, { params }: Params) {
     status: "DELAYED",
     previousStatus,
   });
+
+  // Notify direct children's assignees + coordinators about the delay
+  const childTasks = await prisma.task.findMany({
+    where: { parentTaskId: taskId },
+    select: { id: true, title: true, assignedToId: true },
+  });
+
+  const coordinatorIds = await resolveCoordinatorUserIds(eventId);
+  const delayBucket = Math.floor(Date.now() / 60000).toString();
+
+  const notifications: Promise<void>[] = [];
+
+  // PUSH for each child task assignee
+  for (const child of childTasks) {
+    if (child.assignedToId) {
+      notifications.push(
+        createNotification({
+          eventId,
+          type: "TASK_DELAYED",
+          channel: "PUSH",
+          recipient: child.assignedToId,
+          payload: {
+            title: "Task Delayed",
+            body: `"${task.title}" was delayed by ${roundedDelay} min. "${child.title}" is affected.`,
+            data: { url: `/events/${eventId}/timeline` },
+          },
+          idempotencyKey: buildIdempotencyKey(
+            "TASK_DELAYED",
+            eventId,
+            child.id,
+            delayBucket,
+          ),
+        }),
+      );
+    }
+  }
+
+  // PUSH for coordinators (summary)
+  for (const cid of coordinatorIds) {
+    notifications.push(
+      createNotification({
+        eventId,
+        type: "TASK_DELAYED",
+        channel: "PUSH",
+        recipient: cid,
+        payload: {
+          title: "Task Delayed",
+          body: `"${task.title}" was delayed by ${roundedDelay} min. ${childTasks.length} downstream task(s) affected.`,
+          data: { url: `/events/${eventId}/timeline` },
+        },
+        idempotencyKey: buildIdempotencyKey(
+          "TASK_DELAYED",
+          eventId,
+          `coordinator-${cid}`,
+          delayBucket,
+        ),
+      }),
+    );
+  }
+
+  await Promise.all(notifications);
 
   // Fetch fresh task to return
   const fresh = await prisma.task.findUnique({

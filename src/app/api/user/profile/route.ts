@@ -4,8 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 const profileSchema = z.object({
-  firstName: z.string().min(1, "First name is required").max(64),
-  lastName: z.string().min(1, "Last name is required").max(64),
+  firstName: z.string().min(1, "First name is required").max(64).optional(),
+  lastName: z.string().min(1, "Last name is required").max(64).optional(),
   phone: z
     .string()
     .regex(/^\+1\d{10}$/, "Phone must be a valid US number")
@@ -40,15 +40,34 @@ export async function PATCH(request: NextRequest) {
 
   const { firstName, lastName, phone } = parsed.data;
 
+  // Build update data from provided fields only (partial PATCH)
+  const updateData: Record<string, unknown> = {};
+
+  if (firstName !== undefined) {
+    updateData.firstName = firstName;
+    updateData.name = `${firstName} ${lastName ?? ""}`.trim();
+  }
+  if (lastName !== undefined) {
+    updateData.lastName = lastName;
+    if (firstName === undefined && updateData.name === undefined) {
+      // Only lastName provided — reconstruct name from existing
+      const existing = await prisma.user.findUnique({
+        where: { supabaseId: user.id },
+        select: { firstName: true },
+      });
+      updateData.name = `${existing?.firstName ?? ""} ${lastName}`.trim();
+    }
+  }
+  if (phone !== undefined) updateData.phone = phone ?? null;
+
+  // Require at least one field
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ error: "No fields to update" }, { status: 422 });
+  }
+
   const updated = await prisma.user.update({
     where: { supabaseId: user.id },
-    data: {
-      firstName,
-      lastName,
-      name: `${firstName} ${lastName}`,
-      phone: phone ?? null,
-      onboarded: true,
-    },
+    data: updateData,
     select: {
       id: true,
       firstName: true,
