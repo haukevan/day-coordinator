@@ -119,29 +119,3 @@ export async function reanchorTasksToEventDate(
 
   return updates.length;
 }
-
-/**
- * True when the earliest task date is neither the event day nor the following
- * day (the form's supported +1 day offset). Used to self-heal legacy tasks
- * that were anchored before the event date was known.
- */
-export function tasksNeedReanchor(
-  tasks: Array<{ scheduledStart: Date | string | null }>,
-  eventDate: Date | string,
-  timeZone: string,
-): boolean {
-  const scheduled = tasks.filter((task) => task.scheduledStart);
-  if (scheduled.length === 0) return false;
-
-  const eventDay =
-    typeof eventDate === "string"
-      ? eventDate.slice(0, 10)
-      : eventCalendarDate(eventDate);
-  const nextDay = shiftedDay(eventDay, 1);
-
-  const anchorDay = scheduled
-    .map((task) => localDate(new Date(task.scheduledStart!), timeZone))
-    .sort()[0];
-
-  return anchorDay !== eventDay && anchorDay !== nextDay;
-}

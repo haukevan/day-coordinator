@@ -1,5 +1,5 @@
 import { toZonedTime } from "date-fns-tz";
-import { format } from "date-fns";
+import { addDays, format } from "date-fns";
 
 // ─── Timezone abbreviations ─────────────────────────────────────────────────
 
@@ -88,6 +88,19 @@ function getOffsetMinutes(date: Date, timeZone: string): number | null {
 
 /** True when the instant falls in daylight saving time for the zone. */
 function isDaylightSaving(date: Date, timeZone: string): boolean {
+  const offsets = getZoneOffsetInfo(date, timeZone);
+  return offsets ? offsets.current > offsets.standard : false;
+}
+
+/**
+ * Standard and current UTC offsets for a zone at an instant.
+ * Standard time is the smaller (more negative for the Americas) of the
+ * January and July offsets.
+ */
+function getZoneOffsetInfo(
+  date: Date,
+  timeZone: string,
+): { standard: number; current: number } | null {
   const year = date.getUTCFullYear();
   const januaryOffset = getOffsetMinutes(
     new Date(Date.UTC(year, 0, 1, 12)),
@@ -97,16 +110,38 @@ function isDaylightSaving(date: Date, timeZone: string): boolean {
     new Date(Date.UTC(year, 6, 1, 12)),
     timeZone,
   );
-  const currentOffset = getOffsetMinutes(date, timeZone);
+  const current = getOffsetMinutes(date, timeZone);
 
-  if (januaryOffset === null || julyOffset === null || currentOffset === null) {
-    return false;
+  if (januaryOffset === null || julyOffset === null || current === null) {
+    return null;
   }
 
-  // Standard time is the smaller (more negative for the Americas) offset.
-  const standardOffset = Math.min(januaryOffset, julyOffset);
-  return currentOffset > standardOffset;
+  return { standard: Math.min(januaryOffset, julyOffset), current };
 }
+
+// Offset-based labels catch North American zones that the name matcher misses
+// (for example legacy aliases).
+const STANDARD_OFFSET_ABBREVIATIONS: Record<number, string> = {
+  [-600]: "HST",
+  [-540]: "AKST",
+  [-480]: "PST",
+  [-420]: "MST",
+  [-360]: "CST",
+  [-300]: "EST",
+  [-240]: "AST",
+  [-210]: "NST",
+};
+
+const DAYLIGHT_OFFSET_ABBREVIATIONS: Record<number, string> = {
+  [-540]: "HDT",
+  [-480]: "AKDT",
+  [-420]: "PDT",
+  [-360]: "MDT",
+  [-300]: "CDT",
+  [-240]: "EDT",
+  [-180]: "ADT",
+  [-150]: "NDT",
+};
 
 /**
  * Abbreviation for a timestamp in a zone, e.g. "PST" for a December instant
@@ -127,6 +162,15 @@ export function getTimeZoneAbbreviation(
       : knownZone.standard;
   }
 
+  const offsets = getZoneOffsetInfo(date, timeZone);
+  if (offsets) {
+    const daylight = offsets.current > offsets.standard;
+    const label = (
+      daylight ? DAYLIGHT_OFFSET_ABBREVIATIONS : STANDARD_OFFSET_ABBREVIATIONS
+    )[offsets.current];
+    if (label) return label;
+  }
+
   return (
     new Intl.DateTimeFormat("en-US", {
       timeZone,
@@ -140,8 +184,17 @@ export function getTimeZoneAbbreviation(
 /**
  * Format a UTC ISO string as a local time string in the given IANA timezone.
  * Output: "3:00 PM EDT"
+ *
+ * `labelIso` controls which instant determines the timezone abbreviation. Pass
+ * the event date here so a winter event always reads PST/EST even when a task
+ * timestamp happens to have been anchored in summer. The clock time itself is
+ * always derived from `iso`.
  */
-export function formatTimeInZone(iso: string, timezone: string): string {
+export function formatTimeInZone(
+  iso: string,
+  timezone: string,
+  labelIso?: string | Date | null,
+): string {
   const date = new Date(iso);
   const time = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
@@ -149,7 +202,7 @@ export function formatTimeInZone(iso: string, timezone: string): string {
     hour12: true,
     timeZone: timezone,
   }).format(date);
-  const abbr = getTimeZoneAbbreviation(date, timezone);
+  const abbr = getTimeZoneAbbreviation(labelIso ?? date, timezone);
   return abbr ? `${time} ${abbr}` : time;
 }
 
@@ -169,15 +222,19 @@ export function formatTimeInZoneWithDay(
   timezone: string,
   eventDateIso: string | null,
 ): string {
-  const time = formatTimeInZone(iso, timezone);
+  // Use the event date for the abbreviation so the label matches the season
+  // of the event, not the stored task timestamp.
+  const time = formatTimeInZone(iso, timezone, eventDateIso);
   if (!eventDateIso) return time;
 
   const taskZoned = toZonedTime(new Date(iso), timezone);
   const eventZoned = toZonedTime(new Date(eventDateIso), timezone);
   const taskDay = format(taskZoned, "yyyy-MM-dd");
-  const eventDay = format(eventZoned, "yyyy-MM-dd");
 
-  return taskDay !== eventDay ? `${time} +1d` : time;
+  // Only the immediately following day gets the "+1d" marker. A larger gap
+  // means a stale task date, which should not change the displayed label.
+  const nextDay = format(addDays(eventZoned, 1), "yyyy-MM-dd");
+  return taskDay === nextDay ? `${time} +1d` : time;
 }
 
 /**
