@@ -14,6 +14,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { TimezoneSelect } from "@/components/ui/timezone-select";
 import { VenueSelector } from "@/components/ui/venue-selector";
+import { useToast } from "@/components/ui/toast";
+import { useDuplicateEvent } from "@/components/dashboard/use-duplicate-event";
 import { cn } from "@/lib/utils";
 
 type EventStatus = "DRAFT" | "SCHEDULED" | "LIVE" | "COMPLETED" | "ARCHIVED";
@@ -32,6 +34,8 @@ type EventData = {
 
 export function EventSettingsForm({ event }: { event: EventData }) {
   const router = useRouter();
+  const { addToast } = useToast();
+  const { duplicateEvent, duplicating } = useDuplicateEvent();
   const [title, setTitle] = useState(event.title);
   const [description, setDescription] = useState(event.description ?? "");
   // Parse event date as local noon so it survives timezone round-trips.
@@ -136,11 +140,13 @@ export function EventSettingsForm({ event }: { event: EventData }) {
     setSaving(false);
 
     if (res.ok) {
-      // Hard-navigate to force a full re-fetch of all server components
-      // (layout header chips for date + venue) so they reflect the changes
-      // immediately. Soft router.push() + router.refresh() doesn't reliably
-      // invalidate shared layouts in this Next.js version.
-      globalThis.location.href = `/events/${event.id}/timeline`;
+      addToast({
+        title: "Event updated",
+        body: "Your changes have been saved.",
+        variant: "success",
+      });
+      // Refresh server components (header chips, tabs) without a full reload.
+      router.refresh();
     } else {
       const data = await res.json();
       setSaveError(data.error ?? "Failed to save.");
@@ -332,6 +338,25 @@ export function EventSettingsForm({ event }: { event: EventData }) {
           {saving ? "Saving…" : "Save changes"}
         </Button>
       </form>
+
+      {/* Event actions */}
+      <div className="rounded-xl border border-border p-5">
+        <h2 className="mb-1 text-sm font-semibold text-foreground">
+          Duplicate event
+        </h2>
+        <p className="mb-4 text-xs text-muted-foreground">
+          Create a new draft with the same tasks, dependencies, vendors, and
+          checklists. Vendors are re-invited and no emails are sent.
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={duplicating}
+          onClick={() => duplicateEvent(event.id)}
+        >
+          {duplicating ? "Duplicating…" : "Duplicate event"}
+        </Button>
+      </div>
 
       {/* Danger zone — hidden only when LIVE (can't delete a live event) */}
       {!isLive && (

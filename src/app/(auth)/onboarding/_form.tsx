@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import { ArrowLeft } from "lucide-react";
 
 function formatPhone(digits: string): string {
@@ -28,6 +29,7 @@ export function OnboardingForm({
   initialPhoneDigits,
 }: Props) {
   const router = useRouter();
+  const { addToast } = useToast();
 
   const [firstName, setFirstName] = useState(initialFirstName);
   const [lastName, setLastName] = useState(initialLastName);
@@ -68,6 +70,13 @@ export function OnboardingForm({
       });
 
       if (res.ok) {
+        addToast({
+          title: onboarded ? "Profile saved" : "You're all set",
+          body: onboarded
+            ? "Your profile has been updated."
+            : "Welcome to Day Coordinator.",
+          variant: "success",
+        });
         router.push("/dashboard");
         router.refresh();
       } else {

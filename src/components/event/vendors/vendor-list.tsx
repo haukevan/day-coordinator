@@ -20,6 +20,7 @@ interface Props {
   userRole: "admin" | "vendor";
   eventStatus?: string;
   eventDate?: string | null;
+  currentUserId?: string;
 }
 
 export function VendorList({
@@ -28,6 +29,7 @@ export function VendorList({
   userRole,
   eventStatus,
   eventDate,
+  currentUserId,
 }: Props) {
   const [vendors, setVendors] = useState(initialVendors);
   const [addMode, setAddMode] = useState<"new" | "existing" | null>(null);
@@ -99,6 +101,7 @@ export function VendorList({
                 eventStatus={eventStatus}
                 onUpdated={handleUpdated}
                 onRemoved={handleRemoved}
+                currentUserId={currentUserId}
               />
             </li>
           ))}

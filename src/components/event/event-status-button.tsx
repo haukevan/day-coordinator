@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 import { UpgradeModal } from "@/components/event/upgrade-modal";
+import { useDuplicateEvent } from "@/components/dashboard/use-duplicate-event";
 
 type EventStatus = "DRAFT" | "SCHEDULED" | "LIVE" | "COMPLETED" | "ARCHIVED";
 
@@ -57,6 +58,7 @@ export function EventStatusButton({
   const available = transitions[status] ?? [];
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
+  const { duplicateEvent, duplicating } = useDuplicateEvent();
 
   // Sync if parent re-renders with a different status
   useEffect(() => {
@@ -82,20 +84,7 @@ export function EventStatusButton({
     }
   }
 
-  // Non-interactive for statuses with no transitions
-  if (available.length === 0) {
-    return (
-      <span
-        className={cn(
-          "inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium min-h-[28px]",
-          config.badgeClass,
-        )}
-      >
-        {config.label}
-      </span>
-    );
-  }
-
+  // Non-interactive statuses still expose the per-event actions menu.
   return (
     <>
       <DropdownMenu>
@@ -113,21 +102,32 @@ export function EventStatusButton({
           <ChevronDown className="size-3 opacity-60" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-[180px]">
-          <div className="px-2 py-1.5 text-xs text-muted-foreground">
-            Change status
-          </div>
-          <DropdownMenuSeparator />
-          {available.map((t) => (
-            <DropdownMenuItem
-              key={t.to}
-              onClick={() => handleTransition(t.to)}
-              className={cn(
-                t.destructive && "text-destructive focus:text-destructive",
-              )}
-            >
-              {t.label}
-            </DropdownMenuItem>
-          ))}
+          {available.length > 0 && (
+            <>
+              <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                Change status
+              </div>
+              <DropdownMenuSeparator />
+              {available.map((t) => (
+                <DropdownMenuItem
+                  key={t.to}
+                  onClick={() => handleTransition(t.to)}
+                  className={cn(
+                    t.destructive && "text-destructive focus:text-destructive",
+                  )}
+                >
+                  {t.label}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+            </>
+          )}
+          <DropdownMenuItem
+            disabled={duplicating}
+            onClick={() => duplicateEvent(eventId)}
+          >
+            {duplicating ? "Duplicating…" : "Duplicate event"}
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 

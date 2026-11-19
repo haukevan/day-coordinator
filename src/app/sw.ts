@@ -47,7 +47,21 @@ self.addEventListener("push", (event) => {
     silent: data.silent ?? false,
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    (async () => {
+      // Show the system notification
+      await self.registration.showNotification(title, options);
+
+      // Notify all open clients so the in-app bell updates immediately
+      const clients = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      for (const client of clients) {
+        client.postMessage({ type: "NOTIFICATION_RECEIVED" });
+      }
+    })(),
+  );
 });
 
 // ─── Notification Click Handler ──────────────────────────────────────────────

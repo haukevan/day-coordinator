@@ -3,11 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { canManageEvent } from "@/lib/db/permissions";
 import { emitEventUpdate } from "@/lib/realtime";
-import {
-  computeScheduledEnd,
-  propagateSchedule,
-  detectCycle,
-} from "@/lib/scheduler";
+import { computeScheduledEnd } from "@/lib/scheduler";
 import { checkTaskLimit } from "@/lib/db/limits";
 import { z } from "zod";
 
@@ -189,6 +185,16 @@ export async function POST(req: NextRequest, { params }: Params) {
         { status: 400 },
       );
     }
+    // A blocked task cannot start before its blocker ends. Buffers are fine.
+    if (
+      parent.scheduledEnd &&
+      startDate.getTime() < parent.scheduledEnd.getTime()
+    ) {
+      return NextResponse.json(
+        { error: "Start time must be at or after the blocking task ends." },
+        { status: 422 },
+      );
+    }
   }
 
   // Validate vendorIds — each must belong to this event
@@ -225,14 +231,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     },
   });
 
-  // Fallback: compute scheduledEnd from durationMins if end wasn't provided
+  // Fallback: compute scheduledEnd from durationMins if end wasn't provided.
+  // Creating a task must never reposition existing tasks (that would drop any
+  // planned buffer between the blocker and the new task).
   if (task.scheduledStart && task.durationMins && !task.scheduledEnd) {
     await computeScheduledEnd(task.id);
-  }
-
-  // Propagate schedule from parent
-  if (parentTaskId) {
-    await propagateSchedule(parentTaskId);
   }
 
   await prisma.activityLog.create({

@@ -366,7 +366,7 @@ export function SubtaskItem({
           <span className="text-[11px] font-medium whitespace-nowrap text-muted-foreground/50">
             Not started
           </span>
-        ) : (
+        ) : changedByNameDisplay ? (
           <Popover open={showStatusInfo} onOpenChange={setShowStatusInfo}>
             <PopoverTrigger asChild>
               <span
@@ -392,19 +392,27 @@ export function SubtaskItem({
                 {status === "IN_PROGRESS" ? "In progress" : "Done"}
               </span>
             </PopoverTrigger>
-            {changedByNameDisplay && (
-              <PopoverContent
-                className="w-auto px-2.5 py-1.5 text-xs"
-                side="top"
-                sideOffset={4}
-              >
-                <span className="text-muted-foreground">Updated by </span>
-                <span className="font-medium text-foreground">
-                  {changedByNameDisplay}
-                </span>
-              </PopoverContent>
-            )}
+            <PopoverContent
+              className="w-auto px-2.5 py-1.5 text-xs"
+              side="top"
+              sideOffset={4}
+            >
+              <span className="text-muted-foreground">Updated by </span>
+              <span className="font-medium text-foreground">
+                {changedByNameDisplay}
+              </span>
+            </PopoverContent>
           </Popover>
+        ) : (
+          <span
+            className={cn(
+              "text-[11px] font-medium whitespace-nowrap select-none",
+              status === "IN_PROGRESS" && "text-warning",
+              status === "COMPLETED" && "text-success",
+            )}
+          >
+            {status === "IN_PROGRESS" ? "In progress" : "Done"}
+          </span>
         )}
 
         {/* Spacer to push vendor chips and actions to the right */}

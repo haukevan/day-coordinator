@@ -65,6 +65,11 @@ export function TimezoneSelect({
         disabled={disabled}
         className={selectClass}
       >
+        {!value && (
+          <option value="" disabled>
+            Detecting timezone…
+          </option>
+        )}
         {groups.map(([region, tzs]) => (
           <optgroup key={region} label={region}>
             {tzs.map((tz) => (

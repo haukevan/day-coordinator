@@ -79,6 +79,8 @@ export function LiveActionButtons({
   }
 
   async function handleDelay(delayMinutes: number) {
+    // Guard against double-submission
+    if (loading) return;
     setLoading("DELAYED");
     // Optimistic update
     onOptimisticUpdate?.(taskId, {

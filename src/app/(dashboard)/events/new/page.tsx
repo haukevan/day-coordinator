@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/popover";
 import { TimezoneSelect } from "@/components/ui/timezone-select";
 import { VenueSelector } from "@/components/ui/venue-selector";
+import { useClientTimeZone } from "@/lib/use-client-timezone";
 import { cn } from "@/lib/utils";
 
 type SubmitEvent = Parameters<
@@ -36,9 +37,9 @@ export default function NewEventPage() {
   const [jobTitle, setJobTitle] = useState("");
   const [eventDate, setEventDate] = useState<Date | undefined>(undefined);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [timezone, setTimezone] = useState(
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
-  );
+  const detectedTimeZone = useClientTimeZone();
+  const [timezoneOverride, setTimezoneOverride] = useState<string | null>(null);
+  const timezone = timezoneOverride ?? detectedTimeZone ?? "";
   const [slug, setSlug] = useState("");
   const [venueId, setVenueId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -197,7 +198,7 @@ export default function NewEventPage() {
             <TimezoneSelect
               id="event-timezone"
               value={timezone}
-              onChange={setTimezone}
+              onChange={setTimezoneOverride}
             />
           </div>
         </div>

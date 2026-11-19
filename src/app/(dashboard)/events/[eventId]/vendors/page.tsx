@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentDbUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { VendorList } from "@/components/event/vendors/vendor-list";
 import type { SerializedVendor } from "@/lib/types";
@@ -10,15 +10,7 @@ export default async function AdminVendorsPage({
   params: Promise<{ eventId: string }>;
 }>) {
   const { eventId } = await params;
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const dbUser = await prisma.user.findUnique({
-    where: { supabaseId: user.id },
-  });
+  const dbUser = await getCurrentDbUser();
   if (!dbUser) redirect("/login");
 
   const event = await prisma.event.findFirst({
@@ -60,6 +52,7 @@ export default async function AdminVendorsPage({
       userRole="admin"
       eventStatus={event.status}
       eventDate={event.eventDate?.toISOString() ?? null}
+      currentUserId={dbUser.id}
     />
   );
 }

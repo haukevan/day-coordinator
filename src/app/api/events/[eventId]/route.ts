@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { emitEventUpdate } from "@/lib/realtime";
 import { z } from "zod";
 import { createEventReminders } from "@/lib/notifications/helpers";
+import { reanchorTasksToEventDate } from "@/lib/scheduler/reanchor";
 
 type Params = { params: Promise<{ eventId: string }> };
 
@@ -199,24 +200,43 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         select: { id: true, scheduledStart: true, scheduledEnd: true },
       });
 
-      for (const t of allTasks) {
-        const taskUpdates: Record<string, Date> = {};
-        if (t.scheduledStart)
-          taskUpdates.scheduledStart = new Date(
-            t.scheduledStart.getTime() + offsetMs,
-          );
-        if (t.scheduledEnd)
-          taskUpdates.scheduledEnd = new Date(
-            t.scheduledEnd.getTime() + offsetMs,
-          );
-        if (Object.keys(taskUpdates).length > 0) {
-          await prisma.task.update({
-            where: { id: t.id },
-            data: taskUpdates,
-          });
-        }
+      const updates = allTasks
+        .map((t) => {
+          const taskUpdates: Record<string, Date> = {};
+          if (t.scheduledStart)
+            taskUpdates.scheduledStart = new Date(
+              t.scheduledStart.getTime() + offsetMs,
+            );
+          if (t.scheduledEnd)
+            taskUpdates.scheduledEnd = new Date(
+              t.scheduledEnd.getTime() + offsetMs,
+            );
+          return { id: t.id, taskUpdates };
+        })
+        .filter(({ taskUpdates }) => Object.keys(taskUpdates).length > 0);
+
+      if (updates.length > 0) {
+        await prisma.$transaction(
+          updates.map(({ id, taskUpdates }) =>
+            prisma.task.update({ where: { id }, data: taskUpdates }),
+          ),
+        );
       }
     }
+  } else if (
+    eventDate !== undefined &&
+    !dateFieldLocked &&
+    eventDate &&
+    !event.eventDate
+  ) {
+    // First date assignment: tasks created without a date were anchored to
+    // their creation day. Re-anchor them to the event date, preserving each
+    // task's local time of day.
+    await reanchorTasksToEventDate(
+      eventId,
+      updated.eventDate!,
+      timezone ?? event.timezone,
+    );
   }
 
   // Recreate event reminders if the event date changed and the event is SCHEDULED

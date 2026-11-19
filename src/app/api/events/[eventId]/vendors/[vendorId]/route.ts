@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { canManageEvent } from "@/lib/db/permissions";
+import { emitEventUpdate } from "@/lib/realtime";
 import { z } from "zod";
 
 type Params = { params: Promise<{ eventId: string; vendorId: string }> };
@@ -32,7 +33,10 @@ async function resolveOwnership(
   if (!allowed) return null;
   const eventVendor = await prisma.eventVendor.findFirst({
     where: { id: vendorId, eventId },
-    include: { vendorContact: true },
+    include: {
+      vendorContact: true,
+      event: { select: { ownerId: true } },
+    },
   });
   return eventVendor ? { dbUser, eventVendor } : null;
 }
@@ -82,6 +86,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       ...(company !== undefined && { company: company ?? null }),
       ...(jobTitle !== undefined && { jobTitle: jobTitle ?? null }),
       ...(role !== undefined && { role }),
+      // If phone is explicitly set to null, disable SMS for this vendor
+      ...(phone === null && { smsEnabled: false }),
     },
   });
 
@@ -105,6 +111,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       metadata: { vendorId, fields: Object.keys(parsed.data) },
     },
   });
+
+  await emitEventUpdate(eventId, "vendor.updated", { eventId, vendorId });
 
   // Return the updated vendor so the UI can update state
   const updated = await prisma.eventVendor.findUnique({
@@ -162,7 +170,14 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       { status: 403 },
     );
 
-  const { dbUser } = resolved;
+  const { dbUser, eventVendor } = resolved;
+
+  if (eventVendor.userId === eventVendor.event.ownerId) {
+    return NextResponse.json(
+      { error: "The event owner cannot be removed from the event." },
+      { status: 422 },
+    );
+  }
 
   await prisma.eventVendor.delete({ where: { id: vendorId } });
 
@@ -174,6 +189,8 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       metadata: { vendorId },
     },
   });
+
+  await emitEventUpdate(eventId, "vendor.removed", { eventId, vendorId });
 
   return NextResponse.json({ ok: true });
 }

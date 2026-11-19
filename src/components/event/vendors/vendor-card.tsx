@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
+import { useToast } from "@/components/ui/toast";
 import { EditVendorDialog } from "./edit-vendor-dialog";
 import type { SerializedVendor } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -18,6 +20,7 @@ interface Props {
   eventStatus?: string;
   onUpdated: (v: SerializedVendor) => void;
   onRemoved: (id: string) => void;
+  currentUserId?: string;
 }
 
 function getVendorStatus(vendor: SerializedVendor): {
@@ -81,10 +84,15 @@ export function VendorCard({
   eventStatus,
   onUpdated,
   onRemoved,
+  currentUserId,
 }: Readonly<Props>) {
   const [showEdit, setShowEdit] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState("");
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState("");
+  const { addToast } = useToast();
 
   const displayName =
     [vendor.firstName, vendor.lastName].filter(Boolean).join(" ") ||
@@ -92,13 +100,56 @@ export function VendorCard({
   const status = getVendorStatus(vendor);
   const resendLabel = getInviteButtonLabel(vendor, resending);
   const isCoordinator = vendor.isEventOwner || vendor.role === "COORDINATOR";
+  const isSelf = currentUserId != null && vendor.userId === currentUserId;
 
   async function handleRemove() {
-    if (!confirm(`Remove ${displayName} from this event?`)) return;
-    const res = await fetch(`/api/events/${eventId}/vendors/${vendor.id}`, {
-      method: "DELETE",
-    });
-    if (res.ok) onRemoved(vendor.id);
+    if (!confirmingRemove) {
+      setConfirmingRemove(true);
+      setRemoveError("");
+      return;
+    }
+
+    setRemoving(true);
+    setRemoveError("");
+
+    try {
+      const res = await fetch(`/api/events/${eventId}/vendors/${vendor.id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        addToast({
+          title: "Vendor removed",
+          body: `${displayName} was removed from this event.`,
+          variant: "success",
+        });
+        onRemoved(vendor.id);
+        return;
+      }
+
+      const data = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      const message = data?.error ?? "Failed to remove vendor.";
+      setRemoveError(message);
+      setConfirmingRemove(false);
+      addToast({
+        title: "Could not remove vendor",
+        body: message,
+        variant: "destructive",
+      });
+    } catch {
+      const message = "Network error. Please try again.";
+      setRemoveError(message);
+      setConfirmingRemove(false);
+      addToast({
+        title: "Could not remove vendor",
+        body: message,
+        variant: "destructive",
+      });
+    } finally {
+      setRemoving(false);
+    }
   }
 
   async function handleResend() {
@@ -161,9 +212,26 @@ export function VendorCard({
         </div>
       </div>
 
-      {userRole === "admin" && !vendor.isEventOwner && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+      {/* Self-edit: always available when viewing your own card (vendor or coordinator) */}
+      {isSelf && !vendor.isEventOwner && (
+        <div className="mt-3 border-t border-border pt-3">
           <Button size="sm" variant="outline" onClick={() => setShowEdit(true)}>
+            Edit my info
+          </Button>
+        </div>
+      )}
+
+      {/* Admin actions: edit, resend, remove — only for other vendors, not self */}
+      {userRole === "admin" && !vendor.isEventOwner && !isSelf && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setConfirmingRemove(false);
+              setShowEdit(true);
+            }}
+          >
             Edit
           </Button>
           {eventStatus !== "DRAFT" && (
@@ -179,14 +247,35 @@ export function VendorCard({
           {resendMsg && (
             <span className="text-xs text-muted-foreground">{resendMsg}</span>
           )}
-          <Button
-            size="sm"
-            variant="destructive"
-            className="ml-auto"
-            onClick={handleRemove}
-          >
-            Remove
-          </Button>
+          <div className="ml-auto flex items-center gap-2">
+            {confirmingRemove && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setConfirmingRemove(false)}
+                disabled={removing}
+              >
+                Cancel
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleRemove}
+              disabled={removing}
+              aria-label={
+                confirmingRemove
+                  ? `Confirm removing ${displayName}`
+                  : `Remove ${displayName}`
+              }
+            >
+              {removing && <Loader2 className="size-4 animate-spin" />}
+              {confirmingRemove ? "Confirm remove" : "Remove"}
+            </Button>
+          </div>
+          {removeError && (
+            <p className="w-full text-xs text-destructive">{removeError}</p>
+          )}
         </div>
       )}
 
@@ -194,6 +283,7 @@ export function VendorCard({
         <EditVendorDialog
           eventId={eventId}
           vendor={vendor}
+          isSelf={isSelf}
           onClose={() => setShowEdit(false)}
           onUpdated={(updated) => {
             onUpdated(updated);

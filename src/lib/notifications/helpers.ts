@@ -14,12 +14,15 @@ import type {
 /**
  * Create a Notification row. Idempotent via idempotencyKey.
  *
- * Safety gates (silently skip):
+ * Safety gate (silently skip):
  * - Event is DRAFT or ARCHIVED
- * - User has disabled the channel (pushEnabled/smsEnabled; null = enabled)
  *
- * The notification will be picked up by the dispatch cron (Phase 3)
- * and sent via the appropriate channel within 1 minute.
+ * Preference gating (pushEnabled/smsEnabled) happens at dispatch time
+ * in sendNotification(), NOT here. This ensures notification rows always
+ * exist for the in-app bell, even when external delivery is disabled.
+ *
+ * Returns the notification ID so callers can immediately dispatch,
+ * or `null` if the notification was gated (not created).
  */
 export async function createNotification(params: {
   eventId: string;
@@ -29,29 +32,21 @@ export async function createNotification(params: {
   payload: Prisma.JsonObject;
   idempotencyKey: string;
   scheduledAt?: Date;
-}): Promise<void> {
+}): Promise<string | null> {
   // Global event state gate — no notifications for DRAFT or ARCHIVED
   const event = await prisma.event.findUnique({
     where: { id: params.eventId },
     select: { status: true },
   });
   if (!event || event.status === "DRAFT" || event.status === "ARCHIVED") {
-    return;
+    return null;
   }
 
-  // Per-event preference gate — check EventVendor for this event+user
-  const vendorPref = await prisma.eventVendor.findFirst({
-    where: { eventId: params.eventId, userId: params.recipient },
-    select: { pushEnabled: true, smsEnabled: true },
-  });
-  // If no EventVendor row (owner), default to enabled.
-  // If row exists, null = enabled (opt-out pattern).
-  if (vendorPref) {
-    if (params.channel === "PUSH" && vendorPref.pushEnabled === false) return;
-    if (params.channel === "SMS" && vendorPref.smsEnabled === false) return;
-  }
+  // Always create the row — preference gating happens at dispatch time.
+  // This ensures in-app notifications (bell) always work, even when
+  // external Push/SMS delivery is disabled by user preferences.
 
-  await prisma.notification.upsert({
+  const result = await prisma.notification.upsert({
     where: { idempotencyKey: params.idempotencyKey },
     update: {}, // no-op — already exists
     create: {
@@ -64,6 +59,8 @@ export async function createNotification(params: {
       scheduledAt: params.scheduledAt ?? null,
     },
   });
+
+  return result.id;
 }
 
 /**
@@ -184,6 +181,19 @@ export async function createEventReminders(
         ),
         scheduledAt: reminder24h,
       });
+      await createNotification({
+        eventId,
+        type: "EVENT_REMINDER_24H",
+        channel: "SMS",
+        recipient: userId,
+        payload: { body: `Reminder: your event is in 24 hours.` },
+        idempotencyKey: buildIdempotencyKey(
+          "EVENT_REMINDER_24H",
+          eventId,
+          `sms-${userId}`,
+        ),
+        scheduledAt: reminder24h,
+      });
     }
 
     if (reminder2h > now) {
@@ -197,6 +207,19 @@ export async function createEventReminders(
           "EVENT_REMINDER_2H",
           eventId,
           userId,
+        ),
+        scheduledAt: reminder2h,
+      });
+      await createNotification({
+        eventId,
+        type: "EVENT_REMINDER_2H",
+        channel: "SMS",
+        recipient: userId,
+        payload: { body: `Reminder: your event is in 2 hours!` },
+        idempotencyKey: buildIdempotencyKey(
+          "EVENT_REMINDER_2H",
+          eventId,
+          `sms-${userId}`,
         ),
         scheduledAt: reminder2h,
       });

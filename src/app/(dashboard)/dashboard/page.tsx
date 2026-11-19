@@ -1,103 +1,96 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getDbUser } from "@/lib/db/user";
+import { getCurrentDbUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
-import { EventCard } from "@/components/dashboard/event-card";
+import { EventsList } from "@/components/dashboard/events-list";
 import { VendorEventCard } from "@/components/dashboard/vendor-event-card";
 import { PendingInviteCard } from "@/components/dashboard/pending-invite-card";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
 export default async function DashboardPage() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const dbUser = await getDbUser(user.id);
+  const dbUser = await getCurrentDbUser();
   if (!dbUser) redirect("/login");
 
-  const events = await prisma.event.findMany({
-    where: { ownerId: dbUser.id },
-    include: {
-      _count: { select: { tasks: true } },
-      venue: {
-        select: {
-          id: true,
-          name: true,
-          address: true,
-          description: true,
-          ownerName: true,
-          ownerPhone: true,
-          ownerEmail: true,
+  const [events, vendorMemberships, pendingInvites] = await Promise.all([
+    prisma.event.findMany({
+      where: { ownerId: dbUser.id },
+      include: {
+        _count: { select: { tasks: true } },
+        venue: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            description: true,
+            ownerName: true,
+            ownerPhone: true,
+            ownerEmail: true,
+          },
         },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const vendorMemberships = await prisma.eventVendor.findMany({
-    where: {
-      userId: dbUser.id,
-      status: "ACCEPTED",
-      event: {
-        ownerId: { not: dbUser.id },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.eventVendor.findMany({
+      where: {
+        userId: dbUser.id,
+        status: "ACCEPTED",
+        event: {
+          ownerId: { not: dbUser.id },
+        },
       },
-    },
-    include: {
-      event: {
-        select: {
-          id: true,
-          title: true,
-          eventDate: true,
-          status: true,
-          owner: {
-            select: {
-              firstName: true,
-              lastName: true,
-              name: true,
-              email: true,
+      include: {
+        event: {
+          select: {
+            id: true,
+            title: true,
+            eventDate: true,
+            status: true,
+            owner: {
+              select: {
+                firstName: true,
+                lastName: true,
+                name: true,
+                email: true,
+              },
             },
           },
         },
       },
-    },
-    orderBy: { joinedAt: "desc" },
-  });
-
-  const pendingInvites = await prisma.eventVendor.findMany({
-    where: {
-      status: "PENDING",
-      inviteToken: { not: null },
-      inviteSentAt: { not: null },
-      vendorContact: {
-        email: { equals: dbUser.email ?? "", mode: "insensitive" },
+      orderBy: { joinedAt: "desc" },
+    }),
+    prisma.eventVendor.findMany({
+      where: {
+        status: "PENDING",
+        inviteToken: { not: null },
+        inviteSentAt: { not: null },
+        vendorContact: {
+          email: { equals: dbUser.email ?? "", mode: "insensitive" },
+        },
       },
-    },
-    include: {
-      invitedBy: {
-        select: { firstName: true, lastName: true, name: true, email: true },
-      },
-      event: {
-        select: {
-          id: true,
-          title: true,
-          eventDate: true,
-          owner: {
-            select: {
-              firstName: true,
-              lastName: true,
-              name: true,
-              email: true,
+      include: {
+        invitedBy: {
+          select: { firstName: true, lastName: true, name: true, email: true },
+        },
+        event: {
+          select: {
+            id: true,
+            title: true,
+            eventDate: true,
+            owner: {
+              select: {
+                firstName: true,
+                lastName: true,
+                name: true,
+                email: true,
+              },
             },
           },
         },
       },
-    },
-    orderBy: { inviteSentAt: "desc" },
-  });
+      orderBy: { inviteSentAt: "desc" },
+    }),
+  ]);
 
   return (
     <div className="px-4 py-5 sm:p-6">
@@ -137,11 +130,7 @@ export default async function DashboardPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
-          {events.map((event) => (
-            <EventCard key={event.id} event={event} />
-          ))}
-        </div>
+        <EventsList events={events} />
       )}
 
       {pendingInvites.length > 0 && (

@@ -81,7 +81,7 @@ async function forwardGeocode(
   signal?: AbortSignal,
 ): Promise<NominatimResult[]> {
   const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
+    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8&addressdetails=1&accept-language=en`,
     {
       headers: { "User-Agent": "DayCoordinator/1.0" },
       signal,
@@ -437,7 +437,7 @@ export function LocationPicker({ value, onChange, className }: Props) {
     try {
       const data = await forwardGeocode(trimmed, controller.signal);
       setSearchResults(data);
-      setShowResults(data.length > 0);
+      setShowResults(true);
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setSearchResults([]);
@@ -636,7 +636,7 @@ export function LocationPicker({ value, onChange, className }: Props) {
 
             {/* Search results dropdown */}
             {showResults && searchResults.length > 0 && (
-              <div className="absolute left-3 right-3 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg z-30 max-h-48 overflow-y-auto">
+              <div className="absolute left-3 right-3 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg z-30 max-h-72 overflow-y-auto">
                 {searchResults.map((r) => {
                   const parts = r.display_name.split(",").map((s) => s.trim());
                   return (
@@ -650,18 +650,29 @@ export function LocationPicker({ value, onChange, className }: Props) {
                     >
                       <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-foreground">
-                          {buildDisplayName(parts)}
+                        <p className="line-clamp-2 font-medium text-foreground">
+                          {r.display_name}
                         </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {buildSubtitle(parts, r)}
-                        </p>
+                        {buildSubtitle(parts, r) && (
+                          <p className="truncate text-xs text-muted-foreground">
+                            {buildSubtitle(parts, r)}
+                          </p>
+                        )}
                       </div>
                     </button>
                   );
                 })}
               </div>
             )}
+
+            {showResults &&
+              searchResults.length === 0 &&
+              !isSearching &&
+              searchQuery.trim().length > 1 && (
+                <div className="absolute left-3 right-3 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg z-30 px-3 py-2.5 text-xs text-muted-foreground">
+                  No locations found. Try a more specific search.
+                </div>
+              )}
           </div>
 
           {/* Map container */}

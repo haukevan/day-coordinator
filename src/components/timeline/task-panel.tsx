@@ -17,7 +17,6 @@ import {
   Sheet,
   SheetContent,
   SheetHeader,
-  SheetDescription,
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -26,9 +25,9 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { vendorDisplayName } from "@/lib/vendors";
 import { DraftVendorWarning } from "@/components/event/draft-vendor-warning";
 import type { SerializedTask, SerializedVendor } from "@/lib/types";
 
@@ -135,6 +134,18 @@ function hhmmToMinutes(hhmm: string): number {
   return h * 60 + m;
 }
 
+/** Split absolute minutes-from-midnight into an HH:mm value and a next-day flag. */
+function splitAbsoluteMinutes(totalMins: number) {
+  const dayOffset = totalMins >= 24 * 60 ? 1 : 0;
+  const withinDay = totalMins - dayOffset * 24 * 60;
+  const h = Math.floor(withinDay / 60);
+  const m = withinDay % 60;
+  return {
+    hhmm: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+    nextDay: dayOffset > 0,
+  };
+}
+
 function TimePickerPopover({
   value,
   onChange,
@@ -175,6 +186,39 @@ function TimePickerPopover({
   function isSelectable(h: number, m: number, p: "AM" | "PM") {
     if (minInclusiveMinutes === null) return true;
     return hhmmToMinutes(to24h(h, m, p)) >= minInclusiveMinutes;
+  }
+
+  /** Advance a selection forward by whole hours until it meets the minimum. */
+  function advanceToMinimum(h: number, m: number, p: "AM" | "PM") {
+    if (minInclusiveMinutes === null) return { h, m, p };
+    let total = hhmmToMinutes(to24h(h, m, p));
+    while (total < minInclusiveMinutes) total += 60;
+    total %= 24 * 60;
+    const period: "AM" | "PM" = total < 12 * 60 ? "AM" : "PM";
+    const h24 = Math.floor(total / 60);
+    return {
+      h: h24 % 12 === 0 ? 12 : h24 % 12,
+      m: total % 60,
+      p: period,
+    };
+  }
+
+  /** Minutes stay selectable: picking one below the minimum advances the hour. */
+  function isMinuteSelectable(m: number) {
+    const candidate = advanceToMinimum(selH, m, selPeriod);
+    if (onlyAM && candidate.p === "PM") return false;
+    return isSelectable(candidate.h, candidate.m, candidate.p);
+  }
+
+  /** Commit a minute, auto-advancing the hour/period when it predates the minimum. */
+  function commitMinute(m: number) {
+    const candidate = advanceToMinimum(selH, m, selPeriod);
+    if (onlyAM && candidate.p === "PM") return;
+    if (!isSelectable(candidate.h, candidate.m, candidate.p)) return;
+    setSelH(candidate.h);
+    setSelM(candidate.m);
+    setSelPeriod(candidate.p);
+    onChange(to24h(candidate.h, candidate.m, candidate.p));
   }
 
   /** Check if *any* minute in the given hour is selectable (uses max minute 55). */
@@ -285,11 +329,6 @@ function TimePickerPopover({
     setOpen(true);
   }
 
-  function commit(h: number, m: number, p: "AM" | "PM") {
-    if (!isSelectable(h, m, p)) return;
-    onChange(to24h(h, m, p));
-  }
-
   /** Commit an hour selection, auto-adjusting minutes up if needed. */
   function commitHour(h: number) {
     setSelH(h);
@@ -398,7 +437,7 @@ function TimePickerPopover({
           >
             {MINUTES_5.map((m) =>
               (() => {
-                const selectable = isSelectable(selH, m, selPeriod);
+                const selectable = isMinuteSelectable(m);
                 return (
                   <button
                     key={m}
@@ -406,8 +445,7 @@ function TimePickerPopover({
                     data-selected={selM === m ? "true" : undefined}
                     disabled={!selectable}
                     onClick={() => {
-                      setSelM(m);
-                      commit(selH, m, selPeriod);
+                      commitMinute(m);
                     }}
                     className={cn(
                       "rounded-md px-3 py-1.5 text-sm transition-colors min-h-[42px]",
@@ -437,15 +475,19 @@ function TimePickerPopover({
                     type="button"
                     disabled={!selectable}
                     onClick={() => {
+                      // Switching period is a draft-only action. Committing here
+                      // would silently jump 10 AM to 10 PM; the user commits by
+                      // picking an hour or minute.
                       setSelPeriod(p);
-                      if (isSelectable(selH, selM, p)) {
-                        commit(selH, selM, p);
-                      } else {
+                      if (
+                        minInclusiveMinutes !== null &&
+                        hhmmToMinutes(to24h(selH, selM, p)) <
+                          minInclusiveMinutes
+                      ) {
                         const first = findFirstValidInPeriod(p);
                         if (first) {
                           setSelH(first.h);
                           setSelM(first.m);
-                          commit(first.h, first.m, p);
                         }
                       }
                     }}
@@ -489,14 +531,16 @@ function VendorChip({
   vendor: SerializedVendor;
   onRemove: () => void;
 }>) {
+  const displayName = vendorDisplayName(vendor);
+
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-      <span className="truncate max-w-[160px]">{vendor.email}</span>
+      <span className="truncate max-w-[160px]">{displayName}</span>
       <button
         type="button"
         onClick={onRemove}
         className="flex size-4 shrink-0 items-center justify-center rounded-full text-primary/70 transition-colors hover:bg-primary/20 hover:text-primary"
-        aria-label={`Remove ${vendor.email}`}
+        aria-label={`Remove ${displayName}`}
       >
         <X className="size-3" />
       </button>
@@ -515,10 +559,7 @@ function AvailableVendorRow({
   selected: boolean;
   onToggle: (id: string) => void;
 }>) {
-  const displayName =
-    vendor.firstName || vendor.lastName
-      ? [vendor.firstName, vendor.lastName].filter(Boolean).join(" ")
-      : vendor.email;
+  const displayName = vendorDisplayName(vendor);
 
   return (
     <button
@@ -533,7 +574,7 @@ function AvailableVendorRow({
       )}
       <div className="flex flex-col min-w-0">
         <span className="truncate text-xs font-medium">{displayName}</span>
-        {vendor.firstName || vendor.lastName ? (
+        {displayName !== vendor.email ? (
           <span className="truncate text-[11px] text-muted-foreground">
             {vendor.email}
           </span>
@@ -600,12 +641,9 @@ export function TaskPanel({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState("");
-  // Brief skeleton state while form initializes (Sheet animation)
-  const [formReady, setFormReady] = useState(false);
 
   // Reset form when the task prop changes (e.g., switching from create → edit)
   useEffect(() => {
-    setFormReady(false);
     setTitle(task?.title ?? "");
     setDescription(task?.description ?? "");
     setStartHHMM(
@@ -633,55 +671,69 @@ export function TaskPanel({
     setError("");
   }, [task, timezone, open]);
 
-  // Mark form ready after first paint so skeleton hides
-  useEffect(() => {
-    if (!open) return;
-    const raf = requestAnimationFrame(() => {
-      requestAnimationFrame(() => setFormReady(true));
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [open]);
-
-  // Auto-fill times from parent's scheduledEnd when blocking task changes.
+  // Auto-fill times from the blocking task's end when it changes. Existing
+  // buffers are preserved when switching blockers.
   function handleParentChange(pid: string) {
+    const previousParent = tasks.find((t) => t.id === parentTaskId);
+    const previousParentEndHHMM = previousParent?.scheduledEnd
+      ? utcToLocalHHMM(previousParent.scheduledEnd, timezone)
+      : null;
+    const previousParentNextDay = previousParent?.scheduledEnd
+      ? getDayOffset(previousParent.scheduledEnd, eventDate, timezone) > 0
+      : false;
+    const existingBufferMins =
+      previousParentEndHHMM && startHHMM
+        ? Math.max(
+            0,
+            hhmmToMinutes(startHHMM) +
+              (startNextDay ? 24 * 60 : 0) -
+              (hhmmToMinutes(previousParentEndHHMM) +
+                (previousParentNextDay ? 24 * 60 : 0)),
+          )
+        : 0;
+
     setParentTaskId(pid);
     if (!pid) return;
 
-    const parent = tasks.find((t) => t.id === pid);
-    if (!parent?.scheduledEnd) return;
+    const nextParent = tasks.find((t) => t.id === pid);
+    if (!nextParent?.scheduledEnd) return;
 
-    const parentEndHHMM = utcToLocalHHMM(parent.scheduledEnd, timezone);
+    const parentEndHHMM = utcToLocalHHMM(nextParent.scheduledEnd, timezone);
     const parentNextDay =
-      getDayOffset(parent.scheduledEnd, eventDate, timezone) > 0;
+      getDayOffset(nextParent.scheduledEnd, eventDate, timezone) > 0;
+    const parentEndAbs =
+      hhmmToMinutes(parentEndHHMM) + (parentNextDay ? 24 * 60 : 0);
 
     if (startHHMM && endHHMM) {
-      // Both start and end are set — preserve duration, shift both
-      const origDuration = hhmmToMinutes(endHHMM) - hhmmToMinutes(startHHMM);
-      setStartHHMM(parentEndHHMM);
-      setStartNextDay(parentNextDay);
-      if (origDuration > 0) {
-        const newEndTotalMins = hhmmToMinutes(parentEndHHMM) + origDuration;
-        const endH = Math.floor(newEndTotalMins / 60) % 24;
-        const endM = newEndTotalMins % 60;
-        setEndHHMM(
-          `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`,
+      // Preserve duration and shift both ends together.
+      const startAbs = hhmmToMinutes(startHHMM) + (startNextDay ? 24 * 60 : 0);
+      const endAbs = hhmmToMinutes(endHHMM) + (endNextDay ? 24 * 60 : 0);
+      const duration = endAbs - startAbs;
+      const newStart = splitAbsoluteMinutes(parentEndAbs + existingBufferMins);
+      setStartHHMM(newStart.hhmm);
+      setStartNextDay(newStart.nextDay);
+      if (duration > 0) {
+        const newEnd = splitAbsoluteMinutes(
+          parentEndAbs + existingBufferMins + duration,
         );
-        // If total end is beyond 24h, set endNextDay
-        if (newEndTotalMins >= 24 * 60) {
-          setEndNextDay(true);
-        }
+        setEndHHMM(newEnd.hhmm);
+        setEndNextDay(newEnd.nextDay);
       }
-    } else if (!startHHMM && endHHMM) {
-      // Only end is set, no start — set both to parent's end
+      return;
+    }
+
+    if (!startHHMM && endHHMM) {
+      // Only an end is set — align both to the parent's end.
       setStartHHMM(parentEndHHMM);
       setStartNextDay(parentNextDay);
       setEndHHMM(parentEndHHMM);
       setEndNextDay(parentNextDay);
-    } else {
-      // Only start set (or neither) — just update start
-      setStartHHMM(parentEndHHMM);
-      setStartNextDay(parentNextDay);
+      return;
     }
+
+    const newStart = splitAbsoluteMinutes(parentEndAbs + existingBufferMins);
+    setStartHHMM(newStart.hhmm);
+    setStartNextDay(newStart.nextDay);
   }
 
   // Computed duration from start and end times (handles cross-midnight)
@@ -1066,12 +1118,7 @@ export function TaskPanel({
                   {selectedVendorIds.map((vid) => {
                     const vendor = vendors.find((v) => v.id === vid);
                     if (!vendor) return null;
-                    const displayName =
-                      vendor.firstName || vendor.lastName
-                        ? [vendor.firstName, vendor.lastName]
-                            .filter(Boolean)
-                            .join(" ")
-                        : vendor.email;
+                    const displayName = vendorDisplayName(vendor);
                     return (
                       <span
                         key={vid}
@@ -1133,57 +1180,46 @@ export function TaskPanel({
                   (optional)
                 </span>
               </label>
-              {formReady ? (
-                <>
-                  <div className="relative">
-                    <select
-                      value={parentTaskId}
-                      onChange={(e) => handleParentChange(e.target.value)}
-                      className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                      <option value="">None</option>
-                      {eligiblePrereqs.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.title}
-                          {(() => {
-                            const displayIso =
-                              t.scheduledEnd ?? t.scheduledStart;
-                            return displayIso
-                              ? ` · ends ${formatEndTime(displayIso, timezone)}`
-                              : "";
-                          })()}
-                          {t.status === "COMPLETED" ? " ✓" : ""}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                  </div>
-                  {!parentTaskId && (
-                    <p className="text-xs text-muted-foreground">
-                      Choose a task that must finish before this one can start.
-                      If that task shifts, this one moves with it automatically.
-                    </p>
-                  )}
-                  {parentTaskId && (
-                    <p className="text-xs text-muted-foreground">
-                      Can&apos;t start until{" "}
-                      <span className="font-medium text-foreground">
-                        {parent?.title ?? "blocking task"}
-                      </span>{" "}
-                      finishes
-                      {hasBuffer
-                        ? ` · ${bufferMins} min buffer after`
-                        : " — starts right after"}
-                      . If that task runs late, this one shifts to stay in
-                      sequence.
-                    </p>
-                  )}
-                </>
-              ) : (
-                <div className="space-y-2">
-                  <Skeleton className="h-10 w-full rounded-lg" />
-                  <Skeleton className="h-4 w-64" />
-                </div>
+              <div className="relative">
+                <select
+                  value={parentTaskId}
+                  onChange={(e) => handleParentChange(e.target.value)}
+                  className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">None</option>
+                  {eligiblePrereqs.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title}
+                      {(() => {
+                        const displayIso = t.scheduledEnd ?? t.scheduledStart;
+                        return displayIso
+                          ? ` · ends ${formatEndTime(displayIso, timezone)}`
+                          : "";
+                      })()}
+                      {t.status === "COMPLETED" ? " ✓" : ""}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              </div>
+              {!parentTaskId && (
+                <p className="text-xs text-muted-foreground">
+                  Choose a task that must finish before this one can start. If
+                  that task shifts, this one moves with it automatically.
+                </p>
+              )}
+              {parentTaskId && (
+                <p className="text-xs text-muted-foreground">
+                  Can&apos;t start until{" "}
+                  <span className="font-medium text-foreground">
+                    {parent?.title ?? "blocking task"}
+                  </span>{" "}
+                  finishes
+                  {hasBuffer
+                    ? ` · ${bufferMins} min buffer after`
+                    : " — starts right after"}
+                  . If that task runs late, this one shifts to stay in sequence.
+                </p>
               )}
             </div>
 

@@ -60,6 +60,12 @@ export async function PATCH(request: NextRequest) {
   }
   if (phone !== undefined) updateData.phone = phone ?? null;
 
+  // Completing the profile (first/last name) finishes onboarding. Without
+  // this the dashboard layout bounces the user straight back to /onboarding.
+  if (firstName !== undefined || lastName !== undefined) {
+    updateData.onboarded = true;
+  }
+
   // Require at least one field
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 422 });

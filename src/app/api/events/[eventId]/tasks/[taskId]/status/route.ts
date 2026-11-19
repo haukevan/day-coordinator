@@ -10,6 +10,7 @@ import {
   resolveCoordinatorUserIds,
   buildIdempotencyKey,
 } from "@/lib/notifications/helpers";
+import { sendNotification } from "@/lib/notifications";
 
 type Params = { params: Promise<{ eventId: string; taskId: string }> };
 
@@ -158,21 +159,21 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     // Notify coordinators that a task started
     const coordinatorIds = await resolveCoordinatorUserIds(eventId);
-    await Promise.all(
-      coordinatorIds.map((cid) =>
-        createNotification({
-          eventId,
-          type: "TASK_STARTED",
-          channel: "PUSH",
-          recipient: cid,
-          payload: {
-            title: "Task Started",
-            body: `"${task.title}" is now in progress.`,
-            data: { url: `/events/${eventId}/timeline` },
-          },
-          idempotencyKey: buildIdempotencyKey("TASK_STARTED", eventId, taskId),
-        }),
-      ),
+    coordinatorIds.forEach((cid) =>
+      createNotification({
+        eventId,
+        type: "TASK_STARTED",
+        channel: "PUSH",
+        recipient: cid,
+        payload: {
+          title: "Task Started",
+          body: `"${task.title}" is now in progress.`,
+          data: { url: `/events/${eventId}/timeline` },
+        },
+        idempotencyKey: buildIdempotencyKey("TASK_STARTED", eventId, `${taskId}:coordinator-${cid}`),
+      }).then((nid) => {
+        if (nid) sendNotification(nid).catch(console.error);
+      }),
     );
 
     return NextResponse.json({
@@ -253,7 +254,6 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     // Notify parent task assignee + coordinators about completion
     const coordinatorIds = await resolveCoordinatorUserIds(eventId);
-    const notifyCompleted: Promise<void>[] = [];
 
     if (task.assignedToId) {
       // Parent assignee (if this task had a parent)
@@ -263,50 +263,50 @@ export async function POST(req: NextRequest, { params }: Params) {
           select: { assignedToId: true, title: true },
         });
         if (parent?.assignedToId) {
-          notifyCompleted.push(
-            createNotification({
+          createNotification({
+            eventId,
+            type: "TASK_COMPLETED",
+            channel: "PUSH",
+            recipient: parent.assignedToId,
+            payload: {
+              title: "Task Completed",
+              body: `"${task.title}" was completed.`,
+              data: { url: `/events/${eventId}/timeline` },
+            },
+            idempotencyKey: buildIdempotencyKey(
+              "TASK_COMPLETED",
               eventId,
-              type: "TASK_COMPLETED",
-              channel: "PUSH",
-              recipient: parent.assignedToId,
-              payload: {
-                title: "Task Completed",
-                body: `"${task.title}" was completed.`,
-                data: { url: `/events/${eventId}/timeline` },
-              },
-              idempotencyKey: buildIdempotencyKey(
-                "TASK_COMPLETED",
-                eventId,
-                taskId,
-                "parent",
-              ),
-            }),
-          );
+              taskId,
+              "parent",
+            ),
+          }).then((nid) => {
+            if (nid) sendNotification(nid).catch(console.error);
+          });
         }
       }
     }
 
     // Coordinators
     for (const cid of coordinatorIds) {
-      notifyCompleted.push(
-        createNotification({
+      createNotification({
+        eventId,
+        type: "TASK_COMPLETED",
+        channel: "PUSH",
+        recipient: cid,
+        payload: {
+          title: "Task Completed",
+          body: `"${task.title}" was completed.`,
+          data: { url: `/events/${eventId}/timeline` },
+        },
+        idempotencyKey: buildIdempotencyKey(
+          "TASK_COMPLETED",
           eventId,
-          type: "TASK_COMPLETED",
-          channel: "PUSH",
-          recipient: cid,
-          payload: {
-            title: "Task Completed",
-            body: `"${task.title}" was completed.`,
-            data: { url: `/events/${eventId}/timeline` },
-          },
-          idempotencyKey: buildIdempotencyKey(
-            "TASK_COMPLETED",
-            eventId,
-            taskId,
-            `coordinator-${cid}`,
-          ),
-        }),
-      );
+          taskId,
+          `coordinator-${cid}`,
+        ),
+      }).then((nid) => {
+        if (nid) sendNotification(nid).catch(console.error);
+      });
     }
 
     // Unblock child tasks — notify their assignees
@@ -317,28 +317,26 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     for (const child of childTasks) {
       if (child.assignedToId) {
-        notifyCompleted.push(
-          createNotification({
+        createNotification({
+          eventId,
+          type: "TASK_UNBLOCKED",
+          channel: "PUSH",
+          recipient: child.assignedToId,
+          payload: {
+            title: "Task Unblocked",
+            body: `"${task.title}" is complete — "${child.title}" is now unblocked.`,
+            data: { url: `/events/${eventId}/timeline` },
+          },
+          idempotencyKey: buildIdempotencyKey(
+            "TASK_UNBLOCKED",
             eventId,
-            type: "TASK_UNBLOCKED",
-            channel: "PUSH",
-            recipient: child.assignedToId,
-            payload: {
-              title: "Task Unblocked",
-              body: `"${task.title}" is complete — "${child.title}" is now unblocked.`,
-              data: { url: `/events/${eventId}/timeline` },
-            },
-            idempotencyKey: buildIdempotencyKey(
-              "TASK_UNBLOCKED",
-              eventId,
-              child.id,
-            ),
-          }),
-        );
+            child.id,
+          ),
+        }).then((nid) => {
+          if (nid) sendNotification(nid).catch(console.error);
+        });
       }
     }
-
-    await Promise.all(notifyCompleted);
 
     return NextResponse.json({
       task: {

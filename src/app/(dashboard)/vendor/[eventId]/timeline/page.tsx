@@ -1,9 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentDbUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { TimelineView } from "@/components/timeline/timeline-view";
-import { NotificationBell } from "@/components/event/notification-bell";
 import type { SerializedTask } from "@/lib/types";
 
 export default async function VendorTimelinePage({
@@ -12,15 +11,7 @@ export default async function VendorTimelinePage({
   params: Promise<{ eventId: string }>;
 }) {
   const { eventId } = await params;
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const dbUser = await prisma.user.findUnique({
-    where: { supabaseId: user.id },
-  });
+  const dbUser = await getCurrentDbUser();
   if (!dbUser) redirect("/login");
 
   // Verify vendor membership (layout also checks, but keep defense-in-depth)
@@ -96,14 +87,6 @@ export default async function VendorTimelinePage({
 
   return (
     <div>
-      <div className="flex items-center justify-end px-4 py-2">
-        <NotificationBell
-          eventId={eventId}
-          eventStatus={eventVendor.event.status}
-          initialPushEnabled={eventVendor.pushEnabled ?? true}
-          initialSmsEnabled={eventVendor.smsEnabled ?? true}
-        />
-      </div>
       <Suspense fallback={null}>
         <TimelineView
           eventId={eventId}

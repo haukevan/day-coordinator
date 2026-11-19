@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentDbUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { EventDateBadge } from "@/components/event/event-date-badge";
 import { EventTabs } from "@/components/dashboard/event-tabs";
@@ -7,6 +7,7 @@ import { VenueChipPopup } from "@/components/event/venue-chip-popup";
 import { TimelineToolbar } from "@/components/timeline/timeline-toolbar";
 import { TimelineViewProvider } from "@/components/timeline/timeline-view-context";
 import { EventHeaderSkeleton } from "@/components/ui/skeletons";
+import { NotificationBell } from "@/components/event/notification-bell";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ChevronLeft, ShieldX } from "lucide-react";
@@ -45,21 +46,18 @@ export default async function VendorEventLayout({
   const { eventId } = await params;
 
   // Auth check — fast, remains blocking
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const dbUser = await prisma.user.findUnique({
-    where: { supabaseId: user.id },
-  });
+  const dbUser = await getCurrentDbUser();
   if (!dbUser) redirect("/login");
 
   // Verify vendor membership early so we can show a friendly message instead of a 404
   const membership = await prisma.eventVendor.findFirst({
     where: { eventId, userId: dbUser.id, status: "ACCEPTED" },
-    select: { role: true },
+    select: {
+      role: true,
+      pushEnabled: true,
+      smsEnabled: true,
+      vendorContact: { select: { phone: true } },
+    },
   });
 
   if (!membership) {
@@ -67,6 +65,8 @@ export default async function VendorEventLayout({
   }
 
   const isCoordinator = membership.role === "COORDINATOR";
+  const pushEnabled = membership.pushEnabled ?? true;
+  const smsEnabled = membership.smsEnabled ?? false;
 
   return (
     <TimelineViewProvider>
@@ -76,6 +76,9 @@ export default async function VendorEventLayout({
             eventId={eventId}
             userId={dbUser.id}
             isCoordinator={isCoordinator}
+            pushEnabled={pushEnabled}
+            smsEnabled={smsEnabled}
+            vendorContactPhone={membership.vendorContact.phone}
           />
         </Suspense>
         <div className="flex-1">{children}</div>
@@ -88,16 +91,23 @@ async function VendorHeaderContent({
   eventId,
   userId,
   isCoordinator,
+  pushEnabled,
+  smsEnabled,
+  vendorContactPhone,
 }: {
   eventId: string;
   userId: string;
   isCoordinator: boolean;
+  pushEnabled: boolean;
+  smsEnabled: boolean;
+  vendorContactPhone: string | null;
 }) {
   const event = await prisma.event.findUnique({
     where: { id: eventId },
     select: {
       id: true,
       title: true,
+      status: true,
       eventDate: true,
       timezone: true,
       venue: {
@@ -129,6 +139,16 @@ async function VendorHeaderContent({
         <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
           {isCoordinator ? "Coordinator" : "Vendor"}
         </span>
+        <div className="ml-auto">
+          <NotificationBell
+            eventId={eventId}
+            eventStatus={event.status}
+            initialPushEnabled={pushEnabled}
+            initialSmsEnabled={smsEnabled}
+            userHasPhone={!!vendorContactPhone}
+            editPhoneHref={`/vendor/${eventId}/vendors`}
+          />
+        </div>
       </div>
 
       {/* Date + Venue row */}

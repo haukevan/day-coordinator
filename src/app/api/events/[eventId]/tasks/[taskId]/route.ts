@@ -192,8 +192,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     await computeScheduledEnd(taskId);
   }
 
-  // Compute how much the task's end shifted and propagate that delta
-  // downstream so every descendant keeps its buffer.
+  // Compute how much the task's end shifted and propagate that exact delta
+  // downstream so every descendant keeps its planned buffer. No delta means
+  // nothing downstream should move.
   const updatedTask = await prisma.task.findUnique({
     where: { id: taskId },
     select: { scheduledEnd: true },
@@ -201,9 +202,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const deltaMs =
     oldScheduledEnd && updatedTask?.scheduledEnd
       ? updatedTask.scheduledEnd.getTime() - oldScheduledEnd.getTime()
-      : undefined;
+      : 0;
 
-  await propagateSchedule(taskId, deltaMs);
+  if (deltaMs !== 0) {
+    await propagateSchedule(taskId, deltaMs);
+  }
 
   await prisma.activityLog.create({
     data: {

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { MapPin, Plus, CalendarDays } from "lucide-react";
+import { useState, useCallback, useMemo } from "react";
+import { MapPin, Plus, CalendarDays, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VenueFormDialog } from "@/components/dashboard/venue-form-dialog";
 import type { SerializedVenue } from "@/lib/types";
@@ -20,6 +20,39 @@ export function VenuesList({ initialVenues }: Props) {
   const [editingVenue, setEditingVenue] = useState<SerializedVenue | null>(
     null,
   );
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<"name-asc" | "updated-desc" | "usage-desc">(
+    "name-asc",
+  );
+
+  const visibleVenues = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const filtered = venues.filter((venue) => {
+      if (!needle) return true;
+      return [
+        venue.name,
+        venue.address,
+        venue.description ?? "",
+        venue.ownerName ?? "",
+        venue.ownerEmail ?? "",
+        venue.ownerPhone ?? "",
+      ].some((value) => value.toLowerCase().includes(needle));
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (sort === "updated-desc") {
+        return (
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+      }
+      if (sort === "usage-desc") {
+        const aCount = a._count?.events ?? 0;
+        const bCount = b._count?.events ?? 0;
+        return bCount - aCount;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [venues, query, sort]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -39,15 +72,42 @@ export function VenuesList({ initialVenues }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Add venue button */}
-      <Button
-        onClick={() => setShowCreate(true)}
-        size="sm"
-        className="w-full sm:w-auto"
-      >
-        <Plus className="size-4" />
-        Add venue
-      </Button>
+      {/* Toolbar */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search venues…"
+            aria-label="Search venues"
+            className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring min-h-[44px]"
+          />
+        </div>
+        <select
+          value={sort}
+          onChange={(e) =>
+            setSort(
+              e.target.value as "name-asc" | "updated-desc" | "usage-desc",
+            )
+          }
+          aria-label="Sort venues"
+          className="w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring min-h-[44px] sm:w-auto"
+        >
+          <option value="name-asc">Name A–Z</option>
+          <option value="updated-desc">Recently updated</option>
+          <option value="usage-desc">Most used</option>
+        </select>
+        <Button
+          onClick={() => setShowCreate(true)}
+          size="sm"
+          className="w-full sm:w-auto"
+        >
+          <Plus className="size-4" />
+          Add venue
+        </Button>
+      </div>
 
       {/* Empty state */}
       {venues.length === 0 && (
@@ -60,10 +120,19 @@ export function VenuesList({ initialVenues }: Props) {
         </div>
       )}
 
+      {venues.length > 0 && visibleVenues.length === 0 && (
+        <div className="rounded-xl border border-dashed border-border py-12 text-center">
+          <p className="text-sm font-medium text-foreground">No venues match</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Try a different search term.
+          </p>
+        </div>
+      )}
+
       {/* Venue cards */}
-      {venues.length > 0 && (
+      {visibleVenues.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {venues.map((venue) => (
+          {visibleVenues.map((venue) => (
             <VenueCard
               key={venue.id}
               venue={venue}
@@ -74,23 +143,27 @@ export function VenuesList({ initialVenues }: Props) {
       )}
 
       {/* Create dialog */}
-      <VenueFormDialog
-        open={showCreate}
-        onOpenChange={setShowCreate}
-        onSaved={handleCreated}
-        onDeleted={handleDeleted}
-      />
+      {showCreate && (
+        <VenueFormDialog
+          open
+          onOpenChange={setShowCreate}
+          onSaved={handleCreated}
+          onDeleted={handleDeleted}
+        />
+      )}
 
       {/* Edit dialog */}
-      <VenueFormDialog
-        open={!!editingVenue}
-        onOpenChange={(open) => {
-          if (!open) setEditingVenue(null);
-        }}
-        venue={editingVenue}
-        onSaved={handleUpdated}
-        onDeleted={handleDeleted}
-      />
+      {editingVenue && (
+        <VenueFormDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditingVenue(null);
+          }}
+          venue={editingVenue}
+          onSaved={handleUpdated}
+          onDeleted={handleDeleted}
+        />
+      )}
     </div>
   );
 }

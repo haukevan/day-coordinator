@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { VenueStaticMap } from "@/components/ui/venue-static-map";
 import { MapPin } from "lucide-react";
 
@@ -66,6 +67,8 @@ export function VendorJoinForm({
   const [phoneDigits, setPhoneDigits] = useState(initialPhoneDigits);
   const [company, setCompany] = useState(initialCompany);
   const [jobTitle, setJobTitle] = useState(initialJobTitle);
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [smsEnabled, setSmsEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
   const [phoneError, setPhoneError] = useState("");
   const [error, setError] = useState("");
@@ -101,6 +104,8 @@ export function VendorJoinForm({
           phone: phoneDigits.length === 10 ? `+1${phoneDigits}` : null,
           company: company.trim() || null,
           jobTitle: jobTitle.trim() || null,
+          pushEnabled,
+          smsEnabled: smsEnabled && phoneDigits.length === 10,
         }),
       });
 
@@ -309,6 +314,44 @@ export function VendorJoinForm({
                   className={inputClass}
                   placeholder="Lead Florist"
                 />
+              </div>
+
+              {/* Notification preferences */}
+              <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  You&apos;ll receive notifications about task updates, schedule
+                  changes, and reminders for this event.
+                </p>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-foreground">
+                    Push notifications
+                  </span>
+                  <Switch
+                    checked={pushEnabled}
+                    onCheckedChange={setPushEnabled}
+                    aria-label="Enable push notifications"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm text-foreground">
+                      SMS notifications
+                    </span>
+                    {phoneDigits.length < 10 && (
+                      <p className="text-xs text-muted-foreground">
+                        Add a phone number above to enable SMS
+                      </p>
+                    )}
+                  </div>
+                  <Switch
+                    checked={smsEnabled}
+                    onCheckedChange={setSmsEnabled}
+                    disabled={phoneDigits.length < 10}
+                    aria-label="Enable SMS notifications"
+                  />
+                </div>
               </div>
 
               {error && (

@@ -32,59 +32,114 @@ export async function propagateDelay(
 
   if (delayMs === 0) return;
 
-  const task = await prisma.task.findUnique({
+  const root = await prisma.task.findUnique({
     where: { id: taskId },
-    select: { scheduledEnd: true, durationMins: true },
+    select: { eventId: true, scheduledEnd: true },
   });
-  if (!task?.scheduledEnd) return;
+  if (!root?.scheduledEnd) return;
 
   // Use pre-delay end time for gap calculation (end may already be extended)
-  const preDelayEndMs = task.scheduledEnd.getTime() - delayMs;
+  const preDelayEndMs = root.scheduledEnd.getTime() - delayMs;
 
-  const children = await prisma.task.findMany({
-    where: { parentTaskId: taskId },
+  const tasks = await prisma.task.findMany({
+    where: { eventId: root.eventId },
     select: {
       id: true,
+      parentTaskId: true,
       scheduledStart: true,
       scheduledEnd: true,
       durationMins: true,
+      manualOverride: true,
     },
   });
 
-  for (const child of children) {
-    // Calculate the gap between original parent end and child start
-    const gapMs = child.scheduledStart
-      ? child.scheduledStart.getTime() - preDelayEndMs
-      : 0;
-
-    if (gapMs >= delayMs) {
-      // Gap fully absorbs the delay — child doesn't move, nothing to propagate
-      continue;
-    }
-
-    // Gap partially absorbs; remaining delay pushes the child
-    const remainingMs = delayMs - gapMs;
-
-    const newStart = child.scheduledStart
-      ? new Date(child.scheduledStart.getTime() + remainingMs)
-      : task.scheduledEnd; // already extended, no extra offset needed
-
-    const newEnd =
-      child.durationMins != null
-        ? new Date(newStart.getTime() + child.durationMins * 60 * 1000)
-        : null;
-
-    await prisma.task.update({
-      where: { id: child.id },
-      data: {
-        scheduledStart: newStart,
-        ...(newEnd ? { scheduledEnd: newEnd } : {}),
-      },
-    });
-
-    // Recurse with the remaining delay (only what actually pushed this child)
-    await propagateDelay(child.id, remainingMs);
+  const childrenByParent = new Map<string, Array<(typeof tasks)[number]>>();
+  for (const task of tasks) {
+    if (!task.parentTaskId) continue;
+    const siblings = childrenByParent.get(task.parentTaskId) ?? [];
+    siblings.push(task);
+    childrenByParent.set(task.parentTaskId, siblings);
   }
+
+  const updates: Array<{
+    id: string;
+    scheduledStart: Date;
+    scheduledEnd: Date | null;
+  }> = [];
+
+  const queue: Array<{
+    parentId: string;
+    preDelayParentEndMs: number;
+    remainingMs: number;
+  }> = [
+    {
+      parentId: taskId,
+      preDelayParentEndMs: preDelayEndMs,
+      remainingMs: delayMs,
+    },
+  ];
+
+  while (queue.length > 0) {
+    const node = queue.shift();
+    if (!node) continue;
+
+    for (const child of childrenByParent.get(node.parentId) ?? []) {
+      // Manual overrides break the propagation chain, including its subtree.
+      if (child.manualOverride) continue;
+      if (!child.scheduledStart) continue;
+
+      // Calculate the gap between original parent end and child start
+      const gapMs = child.scheduledStart.getTime() - node.preDelayParentEndMs;
+
+      if (gapMs >= node.remainingMs) {
+        // Gap fully absorbs the delay — child doesn't move, nothing propagates
+        continue;
+      }
+
+      // Gap partially absorbs; remaining delay pushes the child
+      const overflowMs = node.remainingMs - gapMs;
+      const newStart = new Date(child.scheduledStart.getTime() + overflowMs);
+      let newEnd: Date | null = null;
+      if (child.scheduledEnd) {
+        newEnd = new Date(child.scheduledEnd.getTime() + overflowMs);
+      } else if (child.durationMins != null) {
+        newEnd = new Date(newStart.getTime() + child.durationMins * 60_000);
+      }
+
+      updates.push({
+        id: child.id,
+        scheduledStart: newStart,
+        scheduledEnd: newEnd,
+      });
+
+      // Grandchildren are measured against the child's pre-delay end.
+      const childPreDelayEndMs =
+        child.scheduledEnd?.getTime() ??
+        (child.durationMins != null
+          ? child.scheduledStart.getTime() + child.durationMins * 60_000
+          : child.scheduledStart.getTime());
+
+      queue.push({
+        parentId: child.id,
+        preDelayParentEndMs: childPreDelayEndMs,
+        remainingMs: overflowMs,
+      });
+    }
+  }
+
+  if (updates.length === 0) return;
+
+  await prisma.$transaction(
+    updates.map((update) =>
+      prisma.task.update({
+        where: { id: update.id },
+        data: {
+          scheduledStart: update.scheduledStart,
+          ...(update.scheduledEnd ? { scheduledEnd: update.scheduledEnd } : {}),
+        },
+      }),
+    ),
+  );
 }
 
 /**
@@ -127,39 +182,88 @@ export async function reconcileDelay(
 /**
  * Pull back unstarted descendants to tight scheduling (child start = parent end).
  * Used when a delay is removed — resets the chain to its natural position.
- * Only affects tasks where actualStart IS NULL (not yet started).
+ * Only affects tasks where actualStart IS NULL (not yet started); manual
+ * overrides and subtrees beneath them are left alone.
  */
 async function pullBackUnstartedDescendants(taskId: string): Promise<void> {
-  const task = await prisma.task.findUnique({
+  const root = await prisma.task.findUnique({
     where: { id: taskId },
-    select: { scheduledEnd: true },
+    select: { eventId: true, scheduledEnd: true },
   });
-  if (!task?.scheduledEnd) return;
+  if (!root?.scheduledEnd) return;
 
-  const children = await prisma.task.findMany({
-    where: { parentTaskId: taskId },
-    select: { id: true, actualStart: true, durationMins: true },
+  const tasks = await prisma.task.findMany({
+    where: { eventId: root.eventId },
+    select: {
+      id: true,
+      parentTaskId: true,
+      scheduledStart: true,
+      scheduledEnd: true,
+      durationMins: true,
+      manualOverride: true,
+      actualStart: true,
+    },
   });
 
-  for (const child of children) {
-    if (child.actualStart) continue;
-
-    const newStart = task.scheduledEnd;
-    const newEnd =
-      child.durationMins != null
-        ? new Date(newStart.getTime() + child.durationMins * 60 * 1000)
-        : null;
-
-    await prisma.task.update({
-      where: { id: child.id },
-      data: {
-        scheduledStart: newStart,
-        ...(newEnd ? { scheduledEnd: newEnd } : {}),
-      },
-    });
-
-    await pullBackUnstartedDescendants(child.id);
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const childrenByParent = new Map<string, Array<(typeof tasks)[number]>>();
+  for (const task of tasks) {
+    if (!task.parentTaskId) continue;
+    const siblings = childrenByParent.get(task.parentTaskId) ?? [];
+    siblings.push(task);
+    childrenByParent.set(task.parentTaskId, siblings);
   }
+
+  const updates: Array<{
+    id: string;
+    scheduledStart: Date;
+    scheduledEnd: Date | null;
+  }> = [];
+  const queue: string[] = [taskId];
+
+  while (queue.length > 0) {
+    const parentId = queue.shift();
+    if (!parentId) continue;
+
+    const parentEnd = taskById.get(parentId)?.scheduledEnd ?? null;
+    if (!parentEnd) continue;
+
+    for (const child of childrenByParent.get(parentId) ?? []) {
+      if (child.manualOverride) continue;
+      if (child.actualStart) continue;
+
+      const newStart = parentEnd;
+      const newEnd =
+        child.durationMins != null
+          ? new Date(newStart.getTime() + child.durationMins * 60_000)
+          : null;
+
+      updates.push({
+        id: child.id,
+        scheduledStart: newStart,
+        scheduledEnd: newEnd,
+      });
+
+      // Keep the in-memory graph in sync so grandchildren use the new end.
+      child.scheduledStart = newStart;
+      child.scheduledEnd = newEnd;
+      queue.push(child.id);
+    }
+  }
+
+  if (updates.length === 0) return;
+
+  await prisma.$transaction(
+    updates.map((update) =>
+      prisma.task.update({
+        where: { id: update.id },
+        data: {
+          scheduledStart: update.scheduledStart,
+          ...(update.scheduledEnd ? { scheduledEnd: update.scheduledEnd } : {}),
+        },
+      }),
+    ),
+  );
 }
 
 /**

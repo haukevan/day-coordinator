@@ -8,6 +8,7 @@ import {
   resolveCoordinatorUserIds,
   buildIdempotencyKey,
 } from "@/lib/notifications/helpers";
+import { sendNotification } from "@/lib/notifications";
 
 type Params = { params: Promise<{ token: string }> };
 
@@ -21,6 +22,8 @@ const joinSchema = z.object({
     .nullable(),
   company: z.string().max(128).optional().nullable(),
   jobTitle: z.string().max(128).optional().nullable(),
+  pushEnabled: z.boolean().optional(),
+  smsEnabled: z.boolean().optional(),
 });
 
 export async function POST(req: NextRequest, { params }: Params) {
@@ -110,6 +113,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const { firstName, lastName, phone, company, jobTitle } = parsed.data;
+  const pushEnabled = parsed.data.pushEnabled ?? true;
+  // SMS: only allow enabling if a valid phone number was provided
+  const smsEnabled = parsed.data.smsEnabled === true && phone != null;
 
   // Update user profile if not yet onboarded
   if (!dbUser.onboarded) {
@@ -134,6 +140,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       joinedAt: new Date(),
       company: company ?? null,
       jobTitle: jobTitle ?? null,
+      pushEnabled,
+      smsEnabled: smsEnabled || null,
     },
   });
 
@@ -158,32 +166,33 @@ export async function POST(req: NextRequest, { params }: Params) {
     },
   });
 
-  // Notify all coordinators that a vendor accepted
+  // Notify all coordinators that a vendor accepted (except the vendor themselves)
   const coordinatorIds = await resolveCoordinatorUserIds(eventVendor.eventId);
   const vendorName =
     [eventVendor.vendorContact.firstName, eventVendor.vendorContact.lastName]
       .filter(Boolean)
       .join(" ") || eventVendor.vendorContact.email;
 
-  await Promise.all(
-    coordinatorIds.map((userId) =>
-      createNotification({
-        eventId: eventVendor.eventId,
-        type: "VENDOR_ACCEPTED",
-        channel: "PUSH",
-        recipient: userId,
-        payload: {
-          title: "Vendor Accepted",
-          body: `${vendorName} has accepted your invite.`,
-          data: { url: `/events/${eventVendor.eventId}/vendors` },
-        },
-        idempotencyKey: buildIdempotencyKey(
-          "VENDOR_ACCEPTED",
-          eventVendor.eventId,
-          eventVendor.id,
-        ),
-      }),
-    ),
+  coordinatorIds
+    .filter((userId) => userId !== dbUser.id).forEach((userId) =>
+    createNotification({
+      eventId: eventVendor.eventId,
+      type: "VENDOR_ACCEPTED",
+      channel: "PUSH",
+      recipient: userId,
+      payload: {
+        title: "Vendor Accepted",
+        body: `${vendorName} has accepted your invite.`,
+        data: { url: `/events/${eventVendor.eventId}/vendors` },
+      },
+      idempotencyKey: buildIdempotencyKey(
+        "VENDOR_ACCEPTED",
+        eventVendor.eventId,
+        `${eventVendor.id}:coordinator-${userId}`,
+      ),
+    }).then((nid) => {
+      if (nid) sendNotification(nid).catch(console.error);
+    }),
   );
 
   return NextResponse.json({ eventId: eventVendor.eventId });

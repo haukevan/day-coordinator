@@ -137,6 +137,7 @@ model Notification {
   idempotencyKey String              @unique
   scheduledAt    DateTime?
   sentAt         DateTime?
+  dismissedAt    DateTime?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 

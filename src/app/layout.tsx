@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { ToastProvider } from "@/components/ui/toast";
 import { PwaInstall } from "@/components/ui/pwa-install";
+import { ServiceWorkerRegister } from "@/components/providers/service-worker-register";
 
 const APP_NAME = "Day Coordinator";
 const APP_DESCRIPTION =
@@ -76,8 +78,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <ToastProvider>{children}</ToastProvider>
           <PwaInstall />
+          <ServiceWorkerRegister />
         </ThemeProvider>
       </body>
     </html>

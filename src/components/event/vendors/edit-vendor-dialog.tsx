@@ -23,6 +23,7 @@ const inputClass =
 interface Props {
   eventId: string;
   vendor: SerializedVendor;
+  isSelf?: boolean;
   onClose: () => void;
   onUpdated: (v: SerializedVendor) => void;
 }
@@ -30,6 +31,7 @@ interface Props {
 export function EditVendorDialog({
   eventId,
   vendor,
+  isSelf,
   onClose,
   onUpdated,
 }: Props) {
@@ -83,8 +85,15 @@ export function EditVendorDialog({
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>Edit vendor</DialogTitle>
+          <DialogTitle>{isSelf ? "Edit your info" : "Edit vendor"}</DialogTitle>
         </DialogHeader>
+
+        {isSelf && (
+          <p className="text-xs text-muted-foreground rounded-lg bg-muted/50 px-3 py-2">
+            These changes only apply to your contact info for this event.
+            They won&apos;t affect your profile in other events.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -175,7 +184,8 @@ export function EditVendorDialog({
             />
           </div>
 
-          {/* Coordinator toggle */}
+          {/* Coordinator toggle — only shown to admins, not for self-editing */}
+          {!isSelf && (
           <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5">
             <label className="flex items-start gap-2.5 cursor-pointer">
               <input
@@ -195,6 +205,7 @@ export function EditVendorDialog({
               </div>
             </label>
           </div>
+          )}
 
           {error && (
             <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">

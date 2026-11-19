@@ -4,11 +4,12 @@
  * Rules:
  * - scheduledStart of a task = scheduledEnd of its parent (if parent exists)
  * - scheduledEnd = scheduledStart + durationMins
- * - Propagation is delta-based and gap-aware: when a parent's end shifts,
- *   gaps between parent end and child start absorb the change first.
- *   Only the overflow beyond the gap pushes the child.
- * - When deltaMs is omitted (new task / parent change), children are
- *   set to start at the parent's end (tight scheduling, no gaps).
+ * - Propagation is delta-preserving: when a task's end shifts, every
+ *   descendant shifts by the same delta so planned buffers are kept.
+ *   Negative deltas pull descendants back.
+ * - Subtrees rooted at a task with manualOverride = true are skipped.
+ * - There is no implicit propagation: creating a task or changing its
+ *   parent never repositions existing tasks.
  */
 
 import { prisma } from "@/lib/db/prisma";
@@ -45,66 +46,93 @@ export async function detectCycle(
 /**
  * Propagate a schedule change from a given task downward through the DAG.
  *
- * When deltaMs is provided (parent's end shifted), gaps between parent end
- * and child start absorb the change. Only overflow beyond the gap pushes
- * the child and recurses downstream.
+ * Every descendant moves by the same `deltaMs` the task itself moved, so
+ * planned gaps (“buffers”) between tasks are preserved. Negative deltas pull
+ * descendants back. Subtrees rooted at a `manualOverride` task are skipped,
+ * and unscheduled tasks (no scheduledStart) are left untouched.
  *
- * When deltaMs is omitted (new task, parent change), children are set to
- * start at the parent's end.
+ * Without a delta there is nothing to propagate.
  */
 export async function propagateSchedule(
   taskId: string,
   deltaMs?: number,
 ): Promise<void> {
-  const task = await prisma.task.findUnique({ where: { id: taskId } });
-  if (!task || !task.scheduledEnd) return;
+  if (!deltaMs) return;
 
-  const children = await prisma.task.findMany({
-    where: { parentTaskId: taskId },
+  const root = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { eventId: true },
+  });
+  if (!root) return;
+
+  // Load the event's tasks once, then walk the DAG in memory.
+  const tasks = await prisma.task.findMany({
+    where: { eventId: root.eventId },
+    select: {
+      id: true,
+      parentTaskId: true,
+      scheduledStart: true,
+      scheduledEnd: true,
+      durationMins: true,
+      manualOverride: true,
+    },
   });
 
-  for (const child of children) {
-    let newStart: Date;
-    let overflowMs: number | undefined; // amount to propagate further
+  const childrenByParent = new Map<string, Array<(typeof tasks)[number]>>();
+  for (const task of tasks) {
+    if (!task.parentTaskId) continue;
+    const siblings = childrenByParent.get(task.parentTaskId) ?? [];
+    siblings.push(task);
+    childrenByParent.set(task.parentTaskId, siblings);
+  }
 
-    if (deltaMs !== undefined) {
-      // Parent's end shifted by deltaMs. Calculate gap and absorb.
-      const oldParentEnd = task.scheduledEnd.getTime() - deltaMs;
-      const gapMs = child.scheduledStart
-        ? child.scheduledStart.getTime() - oldParentEnd
-        : 0;
+  const updates: Array<{
+    id: string;
+    scheduledStart: Date;
+    scheduledEnd: Date | null;
+  }> = [];
+  const queue: string[] = [taskId];
 
-      if (deltaMs <= gapMs) {
-        // Gap fully absorbs the change — child stays put, nothing propagates
-        continue;
+  while (queue.length > 0) {
+    const parentId = queue.shift();
+    if (!parentId) continue;
+
+    for (const child of childrenByParent.get(parentId) ?? []) {
+      // Manual overrides break the propagation chain, including its subtree.
+      if (child.manualOverride) continue;
+      // Unscheduled tasks have no anchor to shift.
+      if (!child.scheduledStart) continue;
+
+      const newStart = new Date(child.scheduledStart.getTime() + deltaMs);
+      let newEnd: Date | null = null;
+      if (child.scheduledEnd) {
+        newEnd = new Date(child.scheduledEnd.getTime() + deltaMs);
+      } else if (child.durationMins != null) {
+        newEnd = new Date(newStart.getTime() + child.durationMins * 60_000);
       }
 
-      // Only the overflow beyond the gap pushes the child
-      overflowMs = deltaMs - gapMs;
-      newStart = child.scheduledStart
-        ? new Date(child.scheduledStart.getTime() + overflowMs)
-        : task.scheduledEnd;
-    } else {
-      // No delta: tight scheduling — child starts at parent end
-      newStart = task.scheduledEnd;
-    }
-
-    const newEnd =
-      child.durationMins != null
-        ? new Date(newStart.getTime() + child.durationMins * 60 * 1000)
-        : null;
-
-    await prisma.task.update({
-      where: { id: child.id },
-      data: {
+      updates.push({
+        id: child.id,
         scheduledStart: newStart,
-        ...(newEnd ? { scheduledEnd: newEnd } : {}),
-      },
-    });
-
-    // Recurse with the overflow (or undefined for tight scheduling)
-    await propagateSchedule(child.id, overflowMs);
+        scheduledEnd: newEnd,
+      });
+      queue.push(child.id);
+    }
   }
+
+  if (updates.length === 0) return;
+
+  await prisma.$transaction(
+    updates.map((update) =>
+      prisma.task.update({
+        where: { id: update.id },
+        data: {
+          scheduledStart: update.scheduledStart,
+          ...(update.scheduledEnd ? { scheduledEnd: update.scheduledEnd } : {}),
+        },
+      }),
+    ),
+  );
 }
 
 /**

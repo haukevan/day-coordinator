@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,8 +10,17 @@ import {
   DialogHeader,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { LocationPicker, type LocationValue } from "./location-picker";
+import type { LocationValue } from "./location-picker";
 import type { SerializedVenue } from "@/lib/types";
+
+// Load the map picker (and maplibre) only when a venue dialog opens.
+const LocationPicker = dynamic(
+  () =>
+    import("./location-picker").then((mod) => ({
+      default: mod.LocationPicker,
+    })),
+  { ssr: false },
+);
 
 interface Props {
   readonly open: boolean;

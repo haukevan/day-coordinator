@@ -11,6 +11,7 @@ import {
   resolveCoordinatorUserIds,
   buildIdempotencyKey,
 } from "@/lib/notifications/helpers";
+import { sendNotification } from "@/lib/notifications";
 
 type Params = { params: Promise<{ eventId: string; taskId: string }> };
 
@@ -142,57 +143,70 @@ export async function POST(req: NextRequest, { params }: Params) {
   const coordinatorIds = await resolveCoordinatorUserIds(eventId);
   const delayBucket = Math.floor(Date.now() / 60000).toString();
 
-  const notifications: Promise<void>[] = [];
-
   // PUSH for each child task assignee
   for (const child of childTasks) {
     if (child.assignedToId) {
-      notifications.push(
-        createNotification({
-          eventId,
-          type: "TASK_DELAYED",
-          channel: "PUSH",
-          recipient: child.assignedToId,
-          payload: {
-            title: "Task Delayed",
-            body: `"${task.title}" was delayed by ${roundedDelay} min. "${child.title}" is affected.`,
-            data: { url: `/events/${eventId}/timeline` },
-          },
-          idempotencyKey: buildIdempotencyKey(
-            "TASK_DELAYED",
-            eventId,
-            child.id,
-            delayBucket,
-          ),
-        }),
-      );
-    }
-  }
-
-  // PUSH for coordinators (summary)
-  for (const cid of coordinatorIds) {
-    notifications.push(
       createNotification({
         eventId,
         type: "TASK_DELAYED",
         channel: "PUSH",
-        recipient: cid,
+        recipient: child.assignedToId,
         payload: {
           title: "Task Delayed",
-          body: `"${task.title}" was delayed by ${roundedDelay} min. ${childTasks.length} downstream task(s) affected.`,
+          body: `"${task.title}" was delayed by ${roundedDelay} min. "${child.title}" is affected.`,
           data: { url: `/events/${eventId}/timeline` },
         },
         idempotencyKey: buildIdempotencyKey(
           "TASK_DELAYED",
           eventId,
-          `coordinator-${cid}`,
+          child.id,
           delayBucket,
         ),
-      }),
-    );
+      }).then((nid) => {
+        if (nid) sendNotification(nid).catch(console.error);
+      });
+    }
   }
 
-  await Promise.all(notifications);
+  // PUSH + SMS for coordinators (summary)
+  for (const cid of coordinatorIds) {
+    createNotification({
+      eventId,
+      type: "TASK_DELAYED",
+      channel: "PUSH",
+      recipient: cid,
+      payload: {
+        title: "Task Delayed",
+        body: `"${task.title}" was delayed by ${roundedDelay} min. ${childTasks.length} downstream task(s) affected.`,
+        data: { url: `/events/${eventId}/timeline` },
+      },
+      idempotencyKey: buildIdempotencyKey(
+        "TASK_DELAYED",
+        eventId,
+        `coordinator-${cid}`,
+        delayBucket,
+      ),
+    }).then((nid) => {
+      if (nid) sendNotification(nid).catch(console.error);
+    });
+    createNotification({
+      eventId,
+      type: "TASK_DELAYED",
+      channel: "SMS",
+      recipient: cid,
+      payload: {
+        body: `"${task.title}" was delayed by ${roundedDelay} min. ${childTasks.length} downstream task(s) affected.`,
+      },
+      idempotencyKey: buildIdempotencyKey(
+        "TASK_DELAYED",
+        eventId,
+        `coordinator-sms-${cid}`,
+        delayBucket,
+      ),
+    }).then((nid) => {
+      if (nid) sendNotification(nid).catch(console.error);
+    });
+  }
 
   // Fetch fresh task to return
   const fresh = await prisma.task.findUnique({
@@ -302,6 +316,82 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     adjusted: true,
   });
 
+  // Notify coordinators + child assignees about the delay adjustment (only if delta ≠ 0)
+  if (delta !== 0) {
+    const taskTitle = task.title;
+    const childTasks = await prisma.task.findMany({
+      where: { parentTaskId: taskId },
+      select: { id: true, title: true, assignedToId: true },
+    });
+    const coordinatorIds = await resolveCoordinatorUserIds(eventId);
+    const delayBucket = Math.floor(Date.now() / 60000).toString();
+
+    // PUSH for each child task assignee
+    for (const child of childTasks) {
+      if (child.assignedToId) {
+        createNotification({
+          eventId,
+          type: "TASK_DELAYED",
+          channel: "PUSH",
+          recipient: child.assignedToId,
+          payload: {
+            title: "Task Delay Adjusted",
+            body: `"${taskTitle}" delay was changed to ${roundedDelay} min. "${child.title}" is affected.`,
+            data: { url: `/events/${eventId}/timeline` },
+          },
+          idempotencyKey: buildIdempotencyKey(
+            "TASK_DELAYED",
+            eventId,
+            `adj-${child.id}`,
+            delayBucket,
+          ),
+        }).then((nid) => {
+          if (nid) sendNotification(nid).catch(console.error);
+        });
+      }
+    }
+
+    // PUSH + SMS for coordinators
+    for (const cid of coordinatorIds) {
+      createNotification({
+        eventId,
+        type: "TASK_DELAYED",
+        channel: "PUSH",
+        recipient: cid,
+        payload: {
+          title: "Task Delay Adjusted",
+          body: `"${taskTitle}" delay was changed from ${oldDelay} min to ${roundedDelay} min.`,
+          data: { url: `/events/${eventId}/timeline` },
+        },
+        idempotencyKey: buildIdempotencyKey(
+          "TASK_DELAYED",
+          eventId,
+          `adj-coordinator-${cid}`,
+          delayBucket,
+        ),
+      }).then((nid) => {
+        if (nid) sendNotification(nid).catch(console.error);
+      });
+      createNotification({
+        eventId,
+        type: "TASK_DELAYED",
+        channel: "SMS",
+        recipient: cid,
+        payload: {
+          body: `"${taskTitle}" delay was changed from ${oldDelay} min to ${roundedDelay} min.`,
+        },
+        idempotencyKey: buildIdempotencyKey(
+          "TASK_DELAYED",
+          eventId,
+          `adj-coordinator-sms-${cid}`,
+          delayBucket,
+        ),
+      }).then((nid) => {
+        if (nid) sendNotification(nid).catch(console.error);
+      });
+    }
+  }
+
   return NextResponse.json({
     task: { id: taskId, delayAmountMins: roundedDelay },
   });
@@ -384,6 +474,80 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     taskId,
     delayRemoved: true,
   });
+
+  // Notify coordinators + child assignees about the delay removal
+  const taskTitle = task.title;
+  const childTasks = await prisma.task.findMany({
+    where: { parentTaskId: taskId },
+    select: { id: true, title: true, assignedToId: true },
+  });
+  const coordinatorIds = await resolveCoordinatorUserIds(eventId);
+  const delayBucket = Math.floor(Date.now() / 60000).toString();
+
+  // PUSH for each child task assignee
+  for (const child of childTasks) {
+    if (child.assignedToId) {
+      createNotification({
+        eventId,
+        type: "TASK_DELAYED",
+        channel: "PUSH",
+        recipient: child.assignedToId,
+        payload: {
+          title: "Task Delay Removed",
+          body: `The delay on "${taskTitle}" was removed. "${child.title}" is back on schedule.`,
+          data: { url: `/events/${eventId}/timeline` },
+        },
+        idempotencyKey: buildIdempotencyKey(
+          "TASK_DELAYED",
+          eventId,
+          `rm-${child.id}`,
+          delayBucket,
+        ),
+      }).then((nid) => {
+        if (nid) sendNotification(nid).catch(console.error);
+      });
+    }
+  }
+
+  // PUSH + SMS for coordinators
+  for (const cid of coordinatorIds) {
+    createNotification({
+      eventId,
+      type: "TASK_DELAYED",
+      channel: "PUSH",
+      recipient: cid,
+      payload: {
+        title: "Task Delay Removed",
+        body: `The ${delayAmount} min delay on "${taskTitle}" was removed — back on schedule.`,
+        data: { url: `/events/${eventId}/timeline` },
+      },
+      idempotencyKey: buildIdempotencyKey(
+        "TASK_DELAYED",
+        eventId,
+        `rm-coordinator-${cid}`,
+        delayBucket,
+      ),
+    }).then((nid) => {
+      if (nid) sendNotification(nid).catch(console.error);
+    });
+    createNotification({
+      eventId,
+      type: "TASK_DELAYED",
+      channel: "SMS",
+      recipient: cid,
+      payload: {
+        body: `The ${delayAmount} min delay on "${taskTitle}" was removed — back on schedule.`,
+      },
+      idempotencyKey: buildIdempotencyKey(
+        "TASK_DELAYED",
+        eventId,
+        `rm-coordinator-sms-${cid}`,
+        delayBucket,
+      ),
+    }).then((nid) => {
+      if (nid) sendNotification(nid).catch(console.error);
+    });
+  }
 
   return NextResponse.json({
     task: { id: taskId, status: "IN_PROGRESS", delayAmountMins: null },

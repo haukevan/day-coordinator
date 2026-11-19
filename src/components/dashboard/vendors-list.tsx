@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { BriefcaseBusiness, Plus, CalendarDays } from "lucide-react";
+import { useState, useCallback, useMemo } from "react";
+import { BriefcaseBusiness, Plus, CalendarDays, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VendorFormDialog } from "@/components/dashboard/vendor-form-dialog";
 import type { SerializedVendorContactWithEvents } from "@/lib/types";
@@ -30,6 +30,35 @@ export function VendorsList({ initialVendors, userEmail }: Props) {
   const [showCreate, setShowCreate] = useState(false);
   const [editingVendor, setEditingVendor] =
     useState<SerializedVendorContactWithEvents | null>(null);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<"name-asc" | "name-desc" | "linked-desc">(
+    "name-asc",
+  );
+
+  const visibleVendors = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const filtered = vendors.filter((vendor) => {
+      if (!needle) return true;
+      return [
+        displayName(vendor),
+        vendor.email,
+        vendor.company ?? "",
+        vendor.jobTitle ?? "",
+      ].some((value) => value.toLowerCase().includes(needle));
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (sort === "name-desc") {
+        return displayName(b).localeCompare(displayName(a));
+      }
+      if (sort === "linked-desc") {
+        const aCount = a._count?.eventVendors ?? 0;
+        const bCount = b._count?.eventVendors ?? 0;
+        return bCount - aCount;
+      }
+      return displayName(a).localeCompare(displayName(b));
+    });
+  }, [vendors, query, sort]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -57,15 +86,40 @@ export function VendorsList({ initialVendors, userEmail }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Add vendor button */}
-      <Button
-        onClick={() => setShowCreate(true)}
-        size="sm"
-        className="w-full sm:w-auto"
-      >
-        <Plus className="size-4" />
-        Add vendor
-      </Button>
+      {/* Toolbar */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search vendors…"
+            aria-label="Search vendors"
+            className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring min-h-[44px]"
+          />
+        </div>
+        <select
+          value={sort}
+          onChange={(e) =>
+            setSort(e.target.value as "name-asc" | "name-desc" | "linked-desc")
+          }
+          aria-label="Sort vendors"
+          className="w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring min-h-[44px] sm:w-auto"
+        >
+          <option value="name-asc">Name A–Z</option>
+          <option value="name-desc">Name Z–A</option>
+          <option value="linked-desc">Most linked events</option>
+        </select>
+        <Button
+          onClick={() => setShowCreate(true)}
+          size="sm"
+          className="w-full sm:w-auto"
+        >
+          <Plus className="size-4" />
+          Add vendor
+        </Button>
+      </div>
 
       {/* Empty state */}
       {vendors.length === 0 && (
@@ -78,10 +132,21 @@ export function VendorsList({ initialVendors, userEmail }: Props) {
         </div>
       )}
 
+      {vendors.length > 0 && visibleVendors.length === 0 && (
+        <div className="rounded-xl border border-dashed border-border py-12 text-center">
+          <p className="text-sm font-medium text-foreground">
+            No vendors match
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Try a different search term.
+          </p>
+        </div>
+      )}
+
       {/* Vendor cards */}
-      {vendors.length > 0 && (
+      {visibleVendors.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {vendors.map((vendor) => (
+          {visibleVendors.map((vendor) => (
             <VendorCard
               key={vendor.id}
               vendor={vendor}

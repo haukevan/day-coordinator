@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentDbUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { VendorList } from "@/components/event/vendors/vendor-list";
 import type { SerializedVendor } from "@/lib/types";
@@ -10,15 +10,7 @@ export default async function VendorVendorsPage({
   params: Promise<{ eventId: string }>;
 }) {
   const { eventId } = await params;
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const dbUser = await prisma.user.findUnique({
-    where: { supabaseId: user.id },
-  });
+  const dbUser = await getCurrentDbUser();
   if (!dbUser) redirect("/login");
 
   const membership = await prisma.eventVendor.findFirst({
@@ -28,16 +20,17 @@ export default async function VendorVendorsPage({
 
   const isCoordinator = membership.role === "COORDINATOR";
 
-  const eventVendors = await prisma.eventVendor.findMany({
-    where: { eventId },
-    include: { vendorContact: true },
-    orderBy: { createdAt: "asc" },
-  });
-
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-    select: { ownerId: true },
-  });
+  const [eventVendors, event] = await Promise.all([
+    prisma.eventVendor.findMany({
+      where: { eventId },
+      include: { vendorContact: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.event.findUnique({
+      where: { id: eventId },
+      select: { ownerId: true },
+    }),
+  ]);
   if (!event) notFound();
 
   const vendors: SerializedVendor[] = eventVendors.map((ev) => ({
@@ -65,6 +58,7 @@ export default async function VendorVendorsPage({
       eventId={eventId}
       vendors={vendors}
       userRole={isCoordinator ? "admin" : "vendor"}
+      currentUserId={dbUser.id}
     />
   );
 }

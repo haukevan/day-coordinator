@@ -1,10 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentDbUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { TimelineView } from "@/components/timeline/timeline-view";
 import { TaskRowSkeletonList } from "@/components/ui/skeletons";
-import { NotificationBell } from "@/components/event/notification-bell";
 import type { SerializedTask } from "@/lib/types";
 
 export default async function TimelinePage({
@@ -13,15 +12,7 @@ export default async function TimelinePage({
   params: Promise<{ eventId: string }>;
 }) {
   const { eventId } = await params;
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const dbUser = await prisma.user.findUnique({
-    where: { supabaseId: user.id },
-  });
+  const dbUser = await getCurrentDbUser();
   if (!dbUser) redirect("/login");
 
   const event = await prisma.event.findFirst({
@@ -30,12 +21,6 @@ export default async function TimelinePage({
   });
 
   if (!event) notFound();
-
-  // Fetch per-event notification prefs for the current user
-  const vendorPref = await prisma.eventVendor.findFirst({
-    where: { eventId, userId: dbUser.id },
-    select: { pushEnabled: true, smsEnabled: true },
-  });
 
   const tasks = await prisma.task.findMany({
     where: { eventId },
@@ -91,14 +76,6 @@ export default async function TimelinePage({
 
   return (
     <div>
-      <div className="flex items-center justify-end px-4 py-2">
-        <NotificationBell
-          eventId={eventId}
-          eventStatus={event.status}
-          initialPushEnabled={vendorPref?.pushEnabled ?? true}
-          initialSmsEnabled={vendorPref?.smsEnabled ?? true}
-        />
-      </div>
       <Suspense fallback={<TimelineSkeleton />}>
         <TimelineView
           eventId={eventId}

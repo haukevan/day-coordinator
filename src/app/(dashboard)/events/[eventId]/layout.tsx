@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentDbUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { reconcileEventStatus } from "@/lib/scheduler";
 import { EventStatusButton } from "@/components/event/event-status-button";
@@ -11,6 +11,8 @@ import { EventTabs } from "@/components/dashboard/event-tabs";
 import { TimelineToolbar } from "@/components/timeline/timeline-toolbar";
 import { TimelineViewProvider } from "@/components/timeline/timeline-view-context";
 import { EventHeaderSkeleton } from "@/components/ui/skeletons";
+import { NotificationBell } from "@/components/event/notification-bell";
+import { NotificationSetupModal } from "@/components/event/notification-setup-modal";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ChevronLeft } from "lucide-react";
@@ -26,16 +28,8 @@ export default async function EventLayout({
 }) {
   const { eventId } = await params;
 
-  // Auth check — fast (cookie read), remains blocking so redirects work
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const dbUser = await prisma.user.findUnique({
-    where: { supabaseId: user.id },
-  });
+  // Auth check — fast (cached per request), remains blocking so redirects work
+  const dbUser = await getCurrentDbUser();
   if (!dbUser) redirect("/login");
 
   return (
@@ -43,7 +37,11 @@ export default async function EventLayout({
       <div className="flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden sm:h-dvh">
         {/* Event header — data fetched async inside Suspense so layout shell renders instantly */}
         <Suspense fallback={<EventHeaderSkeleton />}>
-          <EventHeaderContent eventId={eventId} userId={dbUser.id} />
+          <EventHeaderContent
+            eventId={eventId}
+            userId={dbUser.id}
+            userPhone={dbUser.phone ?? null}
+          />
         </Suspense>
 
         <div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
@@ -57,30 +55,40 @@ export default async function EventLayout({
 async function EventHeaderContent({
   eventId,
   userId,
+  userPhone,
 }: {
   eventId: string;
   userId: string;
+  userPhone: string | null;
 }) {
-  const event = await prisma.event.findFirst({
-    where: { id: eventId, ownerId: userId },
-    select: {
-      id: true,
-      title: true,
-      status: true,
-      eventDate: true,
-      timezone: true,
-      venue: {
-        select: {
-          name: true,
-          address: true,
-          description: true,
-          ownerName: true,
-          ownerPhone: true,
-          ownerEmail: true,
+  // Fetch independent data in parallel
+  const [event, vendorPref] = await Promise.all([
+    prisma.event.findFirst({
+      where: { id: eventId, ownerId: userId },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        eventDate: true,
+        timezone: true,
+        venue: {
+          select: {
+            name: true,
+            address: true,
+            description: true,
+            ownerName: true,
+            ownerPhone: true,
+            ownerEmail: true,
+          },
         },
       },
-    },
-  });
+    }),
+    // Per-event notification prefs for the current user (owner may not have a row)
+    prisma.eventVendor.findFirst({
+      where: { eventId, userId },
+      select: { pushEnabled: true, smsEnabled: true },
+    }),
+  ]);
 
   if (!event) notFound();
 
@@ -105,6 +113,16 @@ async function EventHeaderContent({
           <h1 className="text-base sm:text-lg font-semibold text-foreground truncate">
             {event.title}
           </h1>
+          <div className="ml-auto">
+            <NotificationBell
+              eventId={event.id}
+              eventStatus={status}
+              initialPushEnabled={vendorPref?.pushEnabled ?? true}
+              initialSmsEnabled={vendorPref?.smsEnabled ?? false}
+              userHasPhone={!!userPhone}
+              editPhoneHref="/onboarding"
+            />
+          </div>
         </div>
 
         {/* Metadata row — status, date, venue */}
@@ -148,6 +166,17 @@ async function EventHeaderContent({
         />
       )}
       <ArchiveCountdownBanner eventId={event.id} eventStatus={status} />
+
+      {/* One-time notification setup prompt for owners after scheduling */}
+      {status === "SCHEDULED" && (
+        <NotificationSetupModal
+          eventId={event.id}
+          initialPhone={userPhone?.replace(/\+1/, "") ?? ""}
+          prefsAlreadySet={
+            vendorPref?.pushEnabled != null || vendorPref?.smsEnabled != null
+          }
+        />
+      )}
     </>
   );
 }

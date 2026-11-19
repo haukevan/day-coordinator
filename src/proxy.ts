@@ -25,9 +25,10 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Verify the session JWT. getClaims() verifies locally when the project
+  // uses asymmetric signing keys, avoiding an Auth round-trip per request.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const isAuthenticated = Boolean(claimsData?.claims);
 
   const { pathname } = request.nextUrl;
 
@@ -40,14 +41,14 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/invite") ||
     pathname === "/onboarding";
 
-  if (!user && isProtected) {
+  if (!isAuthenticated && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
   // Redirect authenticated users away from auth pages
-  if (user && (pathname === "/login" || pathname === "/")) {
+  if (isAuthenticated && (pathname === "/login" || pathname === "/")) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

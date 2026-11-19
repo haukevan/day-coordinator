@@ -1,10 +1,18 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { MapPin, Plus, ChevronsUpDown, Check, X } from "lucide-react";
+import dynamic from "next/dynamic";
+import { MapPin, Plus, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CreateVenueDialog } from "./create-venue-dialog";
 import type { SerializedVenue } from "@/lib/types";
+
+const CreateVenueDialog = dynamic(
+  () =>
+    import("./create-venue-dialog").then((mod) => ({
+      default: mod.CreateVenueDialog,
+    })),
+  { ssr: false },
+);
 
 interface Props {
   readonly venueId: string | null;
@@ -36,7 +44,7 @@ export function VenueSelector({ venueId, onChange, disabled = false }: Props) {
         if (!cancelled) setLoading(false);
       }
     }
-    load();
+    void load();
     return () => {
       cancelled = true;
     };
@@ -189,11 +197,13 @@ export function VenueSelector({ venueId, onChange, disabled = false }: Props) {
       )}
 
       {/* Create venue dialog (reusable popup) */}
-      <CreateVenueDialog
-        open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
-        onCreated={handleVenueCreated}
-      />
+      {showCreateDialog && (
+        <CreateVenueDialog
+          open
+          onOpenChange={setShowCreateDialog}
+          onCreated={handleVenueCreated}
+        />
+      )}
     </div>
   );
 }

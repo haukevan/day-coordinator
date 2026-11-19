@@ -71,11 +71,23 @@ export function usePushSubscription() {
     try {
       const registration = await navigator.serviceWorker.ready;
 
+      // Check notification permission — if blocked, subscribe will fail
+      if (Notification.permission === "denied") {
+        setError(
+          "Notifications are blocked for this site. Go to browser settings → Privacy → Notifications and allow localhost:3000.",
+        );
+        setIsLoading(false);
+        return;
+      }
+
       // Check for existing subscription first
       let subscription = await registration.pushManager.getSubscription();
 
       if (!subscription) {
         const convertedKey = urlBase64ToUint8Array(publicKey);
+        console.log("[push] VAPID public key:", publicKey);
+        console.log("[push] Converted key bytes:", convertedKey.byteLength);
+        console.log("[push] Notification permission:", Notification.permission);
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: convertedKey,

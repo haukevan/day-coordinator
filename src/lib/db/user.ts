@@ -35,6 +35,7 @@ export const getDbUser = cache(async (supabaseId: string) => {
       firstName: true,
       lastName: true,
       email: true,
+      phone: true,
       onboarded: true,
     },
   });

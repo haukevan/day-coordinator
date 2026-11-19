@@ -2,6 +2,7 @@
 
 import { CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useClientTimeZone } from "@/lib/use-client-timezone";
 import {
   type DateStatus,
   formatShortDateInZone,
@@ -12,6 +13,9 @@ import {
  * Displays the event date with a relative "today / upcoming / past"
  * indicator, computed in the browser's local timezone so that the
  * comparison matches what the user actually experiences as "today".
+ *
+ * The timezone is resolved after mount; the first render uses a stable
+ * fallback so SSR and hydration agree.
  */
 export function EventDateBadge({
   eventDate,
@@ -20,9 +24,11 @@ export function EventDateBadge({
   eventDate: Date;
   className?: string;
 }>) {
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const status: DateStatus = getDateStatus(eventDate, timezone);
-  const formatted = formatShortDateInZone(eventDate, timezone);
+  const clientTimeZone = useClientTimeZone();
+  const formatted = formatShortDateInZone(eventDate, clientTimeZone ?? "UTC");
+  const status: DateStatus | null = clientTimeZone
+    ? getDateStatus(eventDate, clientTimeZone)
+    : null;
 
   return (
     <span
@@ -31,6 +37,7 @@ export function EventDateBadge({
         status === "today" && "bg-warning/15 text-warning",
         status === "upcoming" && "bg-info/15 text-info",
         status === "past" && "bg-muted text-muted-foreground",
+        status === null && "bg-muted text-muted-foreground",
         className,
       )}
     >

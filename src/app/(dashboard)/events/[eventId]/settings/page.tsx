@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentDbUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { EventSettingsForm } from "@/components/dashboard/event-settings-form";
 
@@ -9,15 +9,7 @@ export default async function EventSettingsPage({
   params: Promise<{ eventId: string }>;
 }) {
   const { eventId } = await params;
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const dbUser = await prisma.user.findUnique({
-    where: { supabaseId: user.id },
-  });
+  const dbUser = await getCurrentDbUser();
   if (!dbUser) redirect("/login");
 
   const event = await prisma.event.findFirst({
