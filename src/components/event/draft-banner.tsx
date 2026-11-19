@@ -72,7 +72,7 @@ export function DraftBanner({ eventId, status, eventDate }: Props) {
               onClick={() => setUpgradeOpen(true)}
               className="text-xs hover:text-warning transition-colors"
             >
-              Upgrade to go Live
+              Upgrade to Scheduled
             </button>
           </span>
           <button

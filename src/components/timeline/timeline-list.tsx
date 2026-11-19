@@ -3,95 +3,55 @@ import { buildDependencyGroupMeta } from "./dependency-groups";
 import type { SerializedTask } from "@/lib/types";
 import type { LiveStatus } from "@/lib/scheduler/live-status";
 
-/** Build an ordered list that places children immediately after their parent,
- *  indented. Tasks without parents (roots) are sorted by scheduledStart then
- *  createdAt. Children are sorted the same way within each parent group. */
+/**
+ * Sort every task chronologically by scheduled start (unscheduled tasks last),
+ * then by creation time. Depth is derived from the parent chain so dependent
+ * tasks stay indented without breaking global time order.
+ */
 function buildSortedList(
   tasks: SerializedTask[],
 ): { task: SerializedTask; depth: number }[] {
   const taskById = new Map(tasks.map((task) => [task.id, task]));
-  const byParent = new Map<string | null, SerializedTask[]>();
-  for (const task of tasks) {
-    const key = task.parentTaskId ?? null;
-    if (!byParent.has(key)) byParent.set(key, []);
-    byParent.get(key)!.push(task);
-  }
 
-  function sortGroup(group: SerializedTask[]): SerializedTask[] {
-    return [...group].sort((a, b) => {
-      if (a.scheduledStart && b.scheduledStart)
-        return (
-          new Date(a.scheduledStart).getTime() -
-          new Date(b.scheduledStart).getTime()
-        );
-      if (a.scheduledStart) return -1;
-      if (b.scheduledStart) return 1;
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    });
-  }
+  const startMs = (task: SerializedTask) =>
+    task.scheduledStart ? new Date(task.scheduledStart).getTime() : null;
 
-  // Sort dependency chains by their first scheduled task (root or descendant).
-  const chainStartMemo = new Map<string, number>();
-  function getChainStartMs(taskId: string, seen = new Set<string>()): number {
-    const memo = chainStartMemo.get(taskId);
-    if (memo !== undefined) return memo;
-    if (seen.has(taskId)) return Number.POSITIVE_INFINITY;
+  const sorted = [...tasks].sort((a, b) => {
+    const aStart = startMs(a);
+    const bStart = startMs(b);
 
-    seen.add(taskId);
-
-    const task = taskById.get(taskId);
-    let earliest = task?.scheduledStart
-      ? new Date(task.scheduledStart).getTime()
-      : Number.POSITIVE_INFINITY;
-
-    const children = byParent.get(taskId) ?? [];
-    for (const child of children) {
-      const childEarliest = getChainStartMs(child.id, seen);
-      if (childEarliest < earliest) earliest = childEarliest;
+    if (aStart !== null && bStart !== null && aStart !== bStart) {
+      return aStart - bStart;
     }
-
-    seen.delete(taskId);
-    chainStartMemo.set(taskId, earliest);
-    return earliest;
-  }
-
-  const result: { task: SerializedTask; depth: number }[] = [];
-
-  function walk(parentId: string | null, depth: number) {
-    const group = byParent.get(parentId) ?? [];
-    for (const task of sortGroup(group)) {
-      result.push({ task, depth });
-      walk(task.id, depth + 1);
-    }
-  }
-
-  const rootTasks = tasks.filter(
-    (task) => !task.parentTaskId || !taskById.has(task.parentTaskId),
-  );
-
-  const sortedRoots = [...rootTasks].sort((a, b) => {
-    const aStart = getChainStartMs(a.id);
-    const bStart = getChainStartMs(b.id);
-
-    if (aStart !== bStart) return aStart - bStart;
+    if (aStart !== null && bStart === null) return -1;
+    if (aStart === null && bStart !== null) return 1;
 
     const aCreated = new Date(a.createdAt).getTime();
     const bCreated = new Date(b.createdAt).getTime();
-    return aCreated - bCreated;
+    if (aCreated !== bCreated) return aCreated - bCreated;
+
+    return a.title.localeCompare(b.title);
   });
 
-  for (const root of sortedRoots) {
-    result.push({ task: root, depth: 0 });
-    walk(root.id, 1);
+  function depthOf(task: SerializedTask): number {
+    let depth = 0;
+    let current: SerializedTask | undefined = task;
+    const seen = new Set<string>();
+
+    while (
+      current?.parentTaskId &&
+      taskById.has(current.parentTaskId) &&
+      !seen.has(current.id)
+    ) {
+      seen.add(current.id);
+      depth += 1;
+      current = taskById.get(current.parentTaskId);
+    }
+
+    return depth;
   }
 
-  // Append any tasks not reached (should not happen, but guard against cycles)
-  const seen = new Set(result.map((r) => r.task.id));
-  for (const task of sortGroup(tasks)) {
-    if (!seen.has(task.id)) result.push({ task, depth: 0 });
-  }
-
-  return result;
+  return sorted.map((task) => ({ task, depth: depthOf(task) }));
 }
 
 export function TimelineList({

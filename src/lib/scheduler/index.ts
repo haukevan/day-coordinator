@@ -160,11 +160,16 @@ export async function computeScheduledEnd(taskId: string): Promise<void> {
  *   LIVE → ARCHIVED    when all tasks are terminal and 24h have elapsed
  *                       since the latest task's end time.
  */
-export async function reconcileEventStatus(eventId: string): Promise<string> {
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-    select: { id: true, status: true, eventDate: true },
-  });
+export async function reconcileEventStatus(
+  eventId: string,
+  known?: { status: string; eventDate: Date | null },
+): Promise<string> {
+  const event = known
+    ? { id: eventId, status: known.status, eventDate: known.eventDate }
+    : await prisma.event.findUnique({
+        where: { id: eventId },
+        select: { id: true, status: true, eventDate: true },
+      });
 
   if (!event) return "DRAFT";
 

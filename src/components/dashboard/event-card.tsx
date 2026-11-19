@@ -46,7 +46,7 @@ export function EventCard({ event }: Readonly<{ event: DashboardEvent }>) {
 
       <div className="pointer-events-none relative z-10 flex flex-1 flex-col p-5">
         <div className="mb-3 flex items-start justify-between gap-2 pr-10">
-          <h3 className="line-clamp-1 font-semibold text-foreground transition-colors group-hover:text-primary">
+          <h3 className="min-w-0 flex-1 line-clamp-2 font-semibold text-foreground transition-colors group-hover:text-primary">
             {event.title}
           </h3>
           <EventStatusBadge status={event.status} />

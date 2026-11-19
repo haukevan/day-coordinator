@@ -281,6 +281,7 @@ export function VendorCard({
 
       {showEdit && (
         <EditVendorDialog
+          key={vendor.updatedAt}
           eventId={eventId}
           vendor={vendor}
           isSelf={isSelf}

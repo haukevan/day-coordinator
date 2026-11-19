@@ -121,6 +121,12 @@ export function EventsList({ events }: Readonly<{ events: DashboardEvent[] }>) {
         </div>
       </div>
 
+      {/* Count reflects the active search/filter */}
+      <p className="text-xs text-muted-foreground" aria-live="polite">
+        Showing {visible.length} of {events.length}{" "}
+        {events.length === 1 ? "event" : "events"}
+      </p>
+
       {visible.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border py-12 text-center">
           <p className="text-sm font-medium text-foreground">

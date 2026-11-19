@@ -15,44 +15,46 @@ export default async function VendorTimelinePage({
   if (!dbUser) redirect("/login");
 
   // Verify vendor membership (layout also checks, but keep defense-in-depth)
-  const eventVendor = await prisma.eventVendor.findFirst({
-    where: { eventId, userId: dbUser.id, status: "ACCEPTED" },
-    include: {
-      event: {
-        select: { id: true, timezone: true, eventDate: true, status: true },
+  // and load tasks in parallel.
+  const [eventVendor, tasks] = await Promise.all([
+    prisma.eventVendor.findFirst({
+      where: { eventId, userId: dbUser.id, status: "ACCEPTED" },
+      include: {
+        event: {
+          select: { id: true, timezone: true, eventDate: true, status: true },
+        },
       },
-    },
-  });
-  if (!eventVendor) notFound();
-
-  const isCoordinator = eventVendor.role === "COORDINATOR";
-
-  const tasks = await prisma.task.findMany({
-    where: { eventId },
-    orderBy: [{ scheduledStart: "asc" }, { createdAt: "asc" }],
-    include: {
-      parentTask: { select: { id: true, title: true } },
-      taskVendors: {
-        include: {
-          eventVendor: {
-            select: {
-              id: true,
-              company: true,
-              jobTitle: true,
-              userId: true,
-              vendorContact: {
-                select: {
-                  email: true,
-                  firstName: true,
-                  lastName: true,
+    }),
+    prisma.task.findMany({
+      where: { eventId },
+      orderBy: [{ scheduledStart: "asc" }, { createdAt: "asc" }],
+      include: {
+        parentTask: { select: { id: true, title: true } },
+        taskVendors: {
+          include: {
+            eventVendor: {
+              select: {
+                id: true,
+                company: true,
+                jobTitle: true,
+                userId: true,
+                vendorContact: {
+                  select: {
+                    email: true,
+                    firstName: true,
+                    lastName: true,
+                  },
                 },
               },
             },
           },
         },
       },
-    },
-  });
+    }),
+  ]);
+  if (!eventVendor) notFound();
+
+  const isCoordinator = eventVendor.role === "COORDINATOR";
 
   const serializedTasks: SerializedTask[] = tasks.map((t) => ({
     id: t.id,

@@ -2,6 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getCurrentDbUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import {
+  reanchorTasksToEventDate,
+  tasksNeedReanchor,
+} from "@/lib/scheduler/reanchor";
 import { TimelineView } from "@/components/timeline/timeline-view";
 import { TaskRowSkeletonList } from "@/components/ui/skeletons";
 import type { SerializedTask } from "@/lib/types";
@@ -15,38 +19,53 @@ export default async function TimelinePage({
   const dbUser = await getCurrentDbUser();
   if (!dbUser) redirect("/login");
 
-  const event = await prisma.event.findFirst({
-    where: { id: eventId, ownerId: dbUser.id },
-    select: { id: true, timezone: true, eventDate: true, status: true },
-  });
-
-  if (!event) notFound();
-
-  const tasks = await prisma.task.findMany({
-    where: { eventId },
-    orderBy: [{ scheduledStart: "asc" }, { createdAt: "asc" }],
-    include: {
-      parentTask: { select: { id: true, title: true } },
-      taskVendors: {
-        include: {
-          eventVendor: {
-            select: {
-              id: true,
-              company: true,
-              jobTitle: true,
-              vendorContact: {
-                select: {
-                  email: true,
-                  firstName: true,
-                  lastName: true,
+  const loadTasks = () =>
+    prisma.task.findMany({
+      where: { eventId },
+      orderBy: [{ scheduledStart: "asc" }, { createdAt: "asc" }],
+      include: {
+        parentTask: { select: { id: true, title: true } },
+        taskVendors: {
+          include: {
+            eventVendor: {
+              select: {
+                id: true,
+                company: true,
+                jobTitle: true,
+                vendorContact: {
+                  select: {
+                    email: true,
+                    firstName: true,
+                    lastName: true,
+                  },
                 },
               },
             },
           },
         },
       },
-    },
-  });
+    });
+
+  const [event, initialTasks] = await Promise.all([
+    prisma.event.findFirst({
+      where: { id: eventId, ownerId: dbUser.id },
+      select: { id: true, timezone: true, eventDate: true, status: true },
+    }),
+    loadTasks(),
+  ]);
+
+  if (!event) notFound();
+
+  // Self-heal legacy tasks that were anchored to a different day (for example
+  // tasks created before the event date was set). Anchored events skip this.
+  let tasks = initialTasks;
+  if (
+    event.eventDate &&
+    tasksNeedReanchor(tasks, event.eventDate, event.timezone)
+  ) {
+    await reanchorTasksToEventDate(eventId, event.eventDate, event.timezone);
+    tasks = await loadTasks();
+  }
 
   const serializedTasks: SerializedTask[] = tasks.map((t) => ({
     id: t.id,

@@ -73,6 +73,7 @@ export function EditVendorDialog({
 
     if (res.ok) {
       onUpdated(data.vendor);
+      onClose();
     } else {
       setError(data.error ?? "Failed to update vendor.");
     }
@@ -90,8 +91,8 @@ export function EditVendorDialog({
 
         {isSelf && (
           <p className="text-xs text-muted-foreground rounded-lg bg-muted/50 px-3 py-2">
-            These changes only apply to your contact info for this event.
-            They won&apos;t affect your profile in other events.
+            These changes only apply to your contact info for this event. They
+            won&apos;t affect your profile in other events.
           </p>
         )}
 
@@ -186,25 +187,25 @@ export function EditVendorDialog({
 
           {/* Coordinator toggle — only shown to admins, not for self-editing */}
           {!isSelf && (
-          <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5">
-            <label className="flex items-start gap-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isCoordinator}
-                onChange={(e) => setIsCoordinator(e.target.checked)}
-                className="mt-0.5 size-4 rounded border-border accent-primary"
-              />
-              <div className="min-w-0">
-                <span className="text-sm font-medium text-foreground">
-                  Coordinator
-                </span>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Coordinators can add, edit, and delete tasks and vendors for
-                  this event. They cannot access event settings.
-                </p>
-              </div>
-            </label>
-          </div>
+            <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isCoordinator}
+                  onChange={(e) => setIsCoordinator(e.target.checked)}
+                  className="mt-0.5 size-4 rounded border-border accent-primary"
+                />
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-foreground">
+                    Coordinator
+                  </span>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Coordinators can add, edit, and delete tasks and vendors for
+                    this event. They cannot access event settings.
+                  </p>
+                </div>
+              </label>
+            </div>
           )}
 
           {error && (

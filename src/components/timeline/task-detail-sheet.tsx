@@ -9,6 +9,7 @@ import {
   Clock,
   ClockAlert,
   Link2,
+  Loader2,
   Pencil,
   User,
   AlertTriangle,
@@ -21,7 +22,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { SubtaskList } from "./subtask-list";
 import { TaskStatusBadge } from "./task-status-badge";
 import { LiveActionButtons } from "./live-action-buttons";
@@ -436,19 +436,11 @@ export function TaskDetailSheet({
               Checklist items are visible to assigned vendors.
             </p>
           ) : loadingSubTasks ? (
-            <div className="flex flex-col gap-0.5 pt-1">
-              {[70, 45, 60, 50].map((w, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 min-h-[44px]"
-                >
-                  <Skeleton className="size-5 rounded-full shrink-0" />
-                  <Skeleton
-                    className="h-4 rounded"
-                    style={{ width: `${w}%` }}
-                  />
-                </div>
-              ))}
+            <div className="flex items-center justify-center gap-2 py-6">
+              <Loader2 className="size-4 animate-spin text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">
+                Loading checklist…
+              </span>
             </div>
           ) : (
             <SubtaskList

@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 
 /**
- * Duplicate an event and navigate to the new draft's settings so the
- * coordinator can adjust the date/venue.
+ * Duplicate an event. The current page is refreshed so the new card and the
+ * filtered count update immediately; the toast links to the copy.
  */
 export function useDuplicateEvent() {
   const router = useRouter();
@@ -27,13 +27,15 @@ export function useDuplicateEvent() {
           error?: string;
         } | null;
 
-        if (res.ok && data?.event?.id) {
+        const newEvent = data?.event;
+        if (res.ok && newEvent?.id) {
           addToast({
             title: "Event duplicated",
-            body: `"${data.event.title}" is ready to edit.`,
+            body: `"${newEvent.title}" is ready — click to open.`,
             variant: "success",
+            onClick: () => router.push(`/events/${newEvent.id}/settings`),
           });
-          router.push(`/events/${data.event.id}/settings`);
+          router.refresh();
           return;
         }
 

@@ -94,7 +94,11 @@ async function EventHeaderContent({
 
   // Reconcile event status on page load — handles transitions that would
   // normally be triggered by cron, so things still work without a scheduler.
-  const currentStatus = await reconcileEventStatus(event.id);
+  // Reuse the already-fetched event instead of querying it again.
+  const currentStatus = await reconcileEventStatus(event.id, {
+    status: event.status,
+    eventDate: event.eventDate,
+  });
 
   const status = currentStatus as EventStatus;
 

@@ -102,7 +102,7 @@ export default async function DashboardPage() {
           <p className="text-xs text-muted-foreground sm:text-sm">
             {events.length === 0
               ? "Create your first event to get started."
-              : `${events.length} ${events.length === 1 ? "event" : "events"}`}
+              : "Search, filter, and open your events."}
           </p>
         </div>
         <Button asChild className="shrink-0">

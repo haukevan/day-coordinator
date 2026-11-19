@@ -24,6 +24,7 @@ export default async function EventSettingsPage({
       status: true,
       publicTimeline: true,
       venueId: true,
+      updatedAt: true,
     },
   });
 
@@ -46,5 +47,7 @@ export default async function EventSettingsPage({
     venueId: event.venueId,
   };
 
-  return <EventSettingsForm event={serialized} />;
+  return (
+    <EventSettingsForm key={event.updatedAt.toISOString()} event={serialized} />
+  );
 }

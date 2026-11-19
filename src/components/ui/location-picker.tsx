@@ -111,13 +111,17 @@ function buildDisplayName(parts: string[]): string {
   return parts.slice(0, 3).join(", ").trim();
 }
 
-function buildSubtitle(parts: string[], r: NominatimResult): string {
-  const city = parts[2]?.trim() ?? "";
-  const state = parts[3]?.trim() ?? "";
-  const type = r.type ? r.type.replaceAll("_", " ") : "";
-  const segments = [city, state].filter(Boolean);
-  if (type) segments.push(`· ${type}`);
-  return segments.join(", ");
+function buildSubtitle(r: NominatimResult): string {
+  const address = r.address;
+  if (!address) return "";
+  const city =
+    address.city ??
+    address.town ??
+    address.village ??
+    address.hamlet ??
+    address.county ??
+    "";
+  return [city, address.state].filter(Boolean).join(", ");
 }
 
 function buildCleanAddress(r: NominatimResult): string {
@@ -638,7 +642,6 @@ export function LocationPicker({ value, onChange, className }: Props) {
             {showResults && searchResults.length > 0 && (
               <div className="absolute left-3 right-3 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg z-30 max-h-72 overflow-y-auto">
                 {searchResults.map((r) => {
-                  const parts = r.display_name.split(",").map((s) => s.trim());
                   return (
                     <button
                       key={r.place_id}
@@ -653,9 +656,9 @@ export function LocationPicker({ value, onChange, className }: Props) {
                         <p className="line-clamp-2 font-medium text-foreground">
                           {r.display_name}
                         </p>
-                        {buildSubtitle(parts, r) && (
+                        {buildSubtitle(r) && (
                           <p className="truncate text-xs text-muted-foreground">
-                            {buildSubtitle(parts, r)}
+                            {buildSubtitle(r)}
                           </p>
                         )}
                       </div>
