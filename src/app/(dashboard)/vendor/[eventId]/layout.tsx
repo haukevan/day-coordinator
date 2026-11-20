@@ -74,7 +74,6 @@ export default async function VendorEventLayout({
         <Suspense fallback={<EventHeaderSkeleton />}>
           <VendorHeaderContent
             eventId={eventId}
-            userId={dbUser.id}
             isCoordinator={isCoordinator}
             pushEnabled={pushEnabled}
             smsEnabled={smsEnabled}
@@ -89,14 +88,12 @@ export default async function VendorEventLayout({
 
 async function VendorHeaderContent({
   eventId,
-  userId,
   isCoordinator,
   pushEnabled,
   smsEnabled,
   vendorContactPhone,
 }: {
   eventId: string;
-  userId: string;
   isCoordinator: boolean;
   pushEnabled: boolean;
   smsEnabled: boolean;

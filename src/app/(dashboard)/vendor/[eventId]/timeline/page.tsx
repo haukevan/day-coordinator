@@ -1,5 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import { Suspense } from "react";
 import { getCurrentDbUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { TimelineView } from "@/components/timeline/timeline-view";
@@ -89,22 +88,20 @@ export default async function VendorTimelinePage({
 
   return (
     <div>
-      <Suspense fallback={null}>
-        <TimelineView
-          eventId={eventId}
-          tasks={serializedTasks}
-          timezone={eventVendor.event.timezone}
-          eventDate={
-            eventVendor.event.eventDate
-              ? eventVendor.event.eventDate.toISOString()
-              : null
-          }
-          userRole={isCoordinator ? "admin" : "vendor"}
-          currentUserId={dbUser.id}
-          eventStatus={eventVendor.event.status}
-          vendorEventVendorId={isCoordinator ? undefined : eventVendor.id}
-        />
-      </Suspense>
+      <TimelineView
+        eventId={eventId}
+        tasks={serializedTasks}
+        timezone={eventVendor.event.timezone}
+        eventDate={
+          eventVendor.event.eventDate
+            ? eventVendor.event.eventDate.toISOString()
+            : null
+        }
+        userRole={isCoordinator ? "admin" : "vendor"}
+        currentUserId={dbUser.id}
+        eventStatus={eventVendor.event.status}
+        vendorEventVendorId={isCoordinator ? undefined : eventVendor.id}
+      />
     </div>
   );
 }

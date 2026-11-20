@@ -35,7 +35,8 @@ export default async function EventLayout({
   return (
     <TimelineViewProvider>
       <div className="flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden sm:h-dvh">
-        {/* Event header — data fetched async inside Suspense so layout shell renders instantly */}
+        {/* Header is its own Suspense boundary so it only loads on first entry
+            into the event; tab switches reuse the mounted layout. */}
         <Suspense fallback={<EventHeaderSkeleton />}>
           <EventHeaderContent
             eventId={eventId}
@@ -50,8 +51,7 @@ export default async function EventLayout({
   );
 }
 
-/** Async component that fetches event data and renders the header.
- *  Wrapped in Suspense by the parent layout so navigation is instant. */
+/** Async component that fetches event data and renders the header. */
 async function EventHeaderContent({
   eventId,
   userId,

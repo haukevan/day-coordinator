@@ -1,9 +1,7 @@
 import { notFound, redirect } from "next/navigation";
-import { Suspense } from "react";
 import { getCurrentDbUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { TimelineView } from "@/components/timeline/timeline-view";
-import { TaskRowSkeletonList } from "@/components/ui/skeletons";
 import type { SerializedTask } from "@/lib/types";
 
 export default async function TimelinePage({
@@ -80,25 +78,15 @@ export default async function TimelinePage({
 
   return (
     <div>
-      <Suspense fallback={<TimelineSkeleton />}>
-        <TimelineView
-          eventId={eventId}
-          tasks={serializedTasks}
-          timezone={event.timezone}
-          eventDate={event.eventDate ? event.eventDate.toISOString() : null}
-          eventStatus={event.status}
-          userRole="admin"
-          currentUserId={dbUser.id}
-        />
-      </Suspense>
-    </div>
-  );
-}
-
-function TimelineSkeleton() {
-  return (
-    <div className="px-3 py-2 sm:p-6">
-      <TaskRowSkeletonList count={6} />
+      <TimelineView
+        eventId={eventId}
+        tasks={serializedTasks}
+        timezone={event.timezone}
+        eventDate={event.eventDate ? event.eventDate.toISOString() : null}
+        eventStatus={event.status}
+        userRole="admin"
+        currentUserId={dbUser.id}
+      />
     </div>
   );
 }

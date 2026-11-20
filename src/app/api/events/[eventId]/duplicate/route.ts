@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
@@ -44,6 +45,17 @@ export async function POST(_req: NextRequest, { params }: Params) {
     where: { id: eventId, ownerId: dbUser.id },
     include: {
       eventVendors: true,
+      venue: {
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          description: true,
+          ownerName: true,
+          ownerPhone: true,
+          ownerEmail: true,
+        },
+      },
       tasks: {
         include: {
           taskVendors: true,
@@ -81,7 +93,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     ? null
     : source.eventDate;
 
-  const newEventId = await prisma.$transaction(async (tx) => {
+  const createdEvent = await prisma.$transaction(async (tx) => {
     const created = await tx.event.create({
       data: {
         title,
@@ -197,16 +209,28 @@ export async function POST(_req: NextRequest, { params }: Params) {
       },
     });
 
-    return created.id;
+    return created;
   });
 
-  await emitEventUpdate(newEventId, "event.created", {
-    eventId: newEventId,
+  revalidatePath("/dashboard");
+
+  await emitEventUpdate(createdEvent.id, "event.created", {
+    eventId: createdEvent.id,
     title,
   });
 
   return NextResponse.json(
-    { event: { id: newEventId, title } },
+    {
+      event: {
+        id: createdEvent.id,
+        title,
+        eventDate: createdEvent.eventDate,
+        status: createdEvent.status,
+        createdAt: createdEvent.createdAt,
+        _count: { tasks: source.tasks.length },
+        venue: source.venue,
+      },
+    },
     { status: 201 },
   );
 }

@@ -3,10 +3,13 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
+import { emitEventDuplicated } from "@/lib/client-events";
+import type { DashboardEvent } from "./event-card";
 
 /**
- * Duplicate an event. The current page is refreshed so the new card and the
- * filtered count update immediately; the toast links to the copy.
+ * Duplicate an event. The new card is inserted optimistically via the client
+ * event bus (so filtered lists and counts update immediately) and the current
+ * route is refreshed so the server data catches up.
  */
 export function useDuplicateEvent() {
   const router = useRouter();
@@ -23,12 +26,13 @@ export function useDuplicateEvent() {
           method: "POST",
         });
         const data = (await res.json().catch(() => null)) as {
-          event?: { id: string; title: string };
+          event?: DashboardEvent;
           error?: string;
         } | null;
 
         const newEvent = data?.event;
         if (res.ok && newEvent?.id) {
+          emitEventDuplicated<DashboardEvent>(newEvent);
           addToast({
             title: "Event duplicated",
             body: `"${newEvent.title}" is ready — click to open.`,

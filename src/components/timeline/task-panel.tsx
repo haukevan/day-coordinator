@@ -329,6 +329,29 @@ function TimePickerPopover({
     setOpen(true);
   }
 
+  /** Commit a period change immediately with the currently selected hour/minute. */
+  function commitPeriod(p: "AM" | "PM") {
+    if (!isPeriodSelectable(p)) return;
+
+    let nextH = selH;
+    let nextM = selM;
+
+    if (
+      minInclusiveMinutes !== null &&
+      hhmmToMinutes(to24h(nextH, nextM, p)) < minInclusiveMinutes
+    ) {
+      const first = findFirstValidInPeriod(p);
+      if (!first) return;
+      nextH = first.h;
+      nextM = first.m;
+    }
+
+    setSelH(nextH);
+    setSelM(nextM);
+    setSelPeriod(p);
+    onChange(to24h(nextH, nextM, p));
+  }
+
   /** Commit an hour selection, auto-adjusting minutes up if needed. */
   function commitHour(h: number) {
     setSelH(h);
@@ -475,21 +498,7 @@ function TimePickerPopover({
                     type="button"
                     disabled={!selectable}
                     onClick={() => {
-                      // Switching period is a draft-only action. Committing here
-                      // would silently jump 10 AM to 10 PM; the user commits by
-                      // picking an hour or minute.
-                      setSelPeriod(p);
-                      if (
-                        minInclusiveMinutes !== null &&
-                        hhmmToMinutes(to24h(selH, selM, p)) <
-                          minInclusiveMinutes
-                      ) {
-                        const first = findFirstValidInPeriod(p);
-                        if (first) {
-                          setSelH(first.h);
-                          setSelM(first.m);
-                        }
-                      }
+                      commitPeriod(p);
                     }}
                     className={cn(
                       "rounded-md px-3 py-1.5 text-sm transition-colors min-h-[42px]",
