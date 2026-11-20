@@ -12,9 +12,7 @@ export function emitEventDuplicated<T>(event: T): void {
   window.dispatchEvent(new CustomEvent<T>(EVENT_DUPLICATED, { detail: event }));
 }
 
-export function onEventDuplicated<T>(
-  handler: (event: T) => void,
-): () => void {
+export function onEventDuplicated<T>(handler: (event: T) => void): () => void {
   if (typeof window === "undefined") return () => {};
 
   const listener = (e: Event) => {
