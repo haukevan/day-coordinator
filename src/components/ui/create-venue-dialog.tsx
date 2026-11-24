@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +11,7 @@ import {
   DialogHeader,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { queryKeys } from "@/lib/query/keys";
 import type { LocationValue } from "./location-picker";
 import type { SerializedVenue } from "@/lib/types";
 
@@ -32,6 +34,7 @@ const inputClass =
   "w-full rounded-md border border-input bg-background px-3 py-2 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50";
 
 export function CreateVenueDialog({ open, onOpenChange, onCreated }: Props) {
+  const queryClient = useQueryClient();
   const [location, setLocation] = useState<LocationValue | null>(null);
   const [venueName, setVenueName] = useState("");
   const [venueDescription, setVenueDescription] = useState("");
@@ -83,6 +86,9 @@ export function CreateVenueDialog({ open, onOpenChange, onCreated }: Props) {
 
       const data = await res.json();
       if (res.ok) {
+        queryClient.setQueryData<SerializedVenue[]>(queryKeys.venues, (prev) =>
+          prev ? [data.venue, ...prev] : [data.venue],
+        );
         onCreated(data.venue);
         handleOpenChange(false);
       } else {
@@ -102,6 +108,7 @@ export function CreateVenueDialog({ open, onOpenChange, onCreated }: Props) {
     venueOwnerEmail,
     onCreated,
     handleOpenChange,
+    queryClient,
   ]);
 
   return (

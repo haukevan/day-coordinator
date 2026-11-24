@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { QueryProvider } from "@/components/providers/query-provider";
 import { ToastProvider } from "@/components/ui/toast";
 import { PwaInstall } from "@/components/ui/pwa-install";
 import { ServiceWorkerRegister } from "@/components/providers/service-worker-register";
@@ -78,9 +79,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ToastProvider>{children}</ToastProvider>
-          <PwaInstall />
-          <ServiceWorkerRegister />
+          <QueryProvider>
+            <ToastProvider>{children}</ToastProvider>
+            <PwaInstall />
+            <ServiceWorkerRegister />
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -1,30 +1,11 @@
 import Link from "next/link";
-
-interface EventOwner {
-  firstName: string | null;
-  lastName: string | null;
-  name: string | null;
-  email: string;
-}
-
-interface VendorEvent {
-  id: string;
-  title: string;
-  eventDate: Date | null;
-  status: string;
-  owner: EventOwner;
-}
-
-interface VendorMembership {
-  id: string;
-  event: VendorEvent;
-}
+import type { DashboardVendorMembership } from "@/lib/types";
 
 export function VendorEventCard({
   membership,
-}: {
-  membership: VendorMembership;
-}) {
+}: Readonly<{
+  membership: DashboardVendorMembership;
+}>) {
   const { event } = membership;
   const ownerName =
     [event.owner.firstName, event.owner.lastName].filter(Boolean).join(" ") ||

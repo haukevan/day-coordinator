@@ -11,26 +11,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EventStatusBadge } from "./event-status-badge";
 import { useDuplicateEvent } from "./use-duplicate-event";
+import type { DashboardEvent } from "@/lib/types";
 
-type VenueChip = {
-  id: string;
-  name: string;
-  address: string;
-  description: string | null;
-  ownerName: string | null;
-  ownerPhone: string | null;
-  ownerEmail: string | null;
-};
-
-export type DashboardEvent = {
-  id: string;
-  title: string;
-  eventDate: Date | string | null;
-  status: "DRAFT" | "SCHEDULED" | "LIVE" | "COMPLETED" | "ARCHIVED";
-  createdAt?: Date | string;
-  _count: { tasks: number };
-  venue: VenueChip | null;
-};
+export type { DashboardEvent } from "@/lib/types";
 
 export function EventCard({ event }: Readonly<{ event: DashboardEvent }>) {
   const { duplicateEvent, duplicating } = useDuplicateEvent();

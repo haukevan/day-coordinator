@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -8,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { queryKeys } from "@/lib/query/keys";
 import type { SerializedVendor } from "@/lib/types";
 
 function formatPhone(digits: string): string {
@@ -35,6 +37,7 @@ export function EditVendorDialog({
   onClose,
   onUpdated,
 }: Props) {
+  const queryClient = useQueryClient();
   const [firstName, setFirstName] = useState(vendor.firstName ?? "");
   const [lastName, setLastName] = useState(vendor.lastName ?? "");
   const existingDigits = vendor.phone?.startsWith("+1")
@@ -74,6 +77,7 @@ export function EditVendorDialog({
     if (res.ok) {
       onUpdated(data.vendor);
       onClose();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.vendors });
     } else {
       setError(data.error ?? "Failed to update vendor.");
     }

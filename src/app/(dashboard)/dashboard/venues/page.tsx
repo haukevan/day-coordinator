@@ -1,27 +1,12 @@
-import { redirect } from "next/navigation";
-import { getCurrentDbUser } from "@/lib/auth/session";
-import { prisma } from "@/lib/db/prisma";
+"use client";
+
 import { VenuesList } from "@/components/dashboard/venues-list";
 
-export default async function VenuesPage() {
-  const dbUser = await getCurrentDbUser();
-  if (!dbUser) redirect("/login");
-  if (!dbUser.onboarded) redirect("/onboarding");
-
-  const venues = await prisma.venue.findMany({
-    where: { creatorId: dbUser.id },
-    include: {
-      events: {
-        select: { id: true, title: true, status: true },
-        orderBy: { eventDate: "desc" },
-      },
-      _count: { select: { events: true } },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
-
-  const serialized = JSON.parse(JSON.stringify(venues));
-
+/**
+ * Cache-first venues page: the list renders from the shared query cache on
+ * repeat navigation; the dashboard warms it on first load.
+ */
+export default function VenuesPage() {
   return (
     <div className="flex min-h-full flex-col">
       {/* Page header */}
@@ -34,7 +19,7 @@ export default async function VenuesPage() {
 
       {/* Venue list (client component) */}
       <div className="flex-1 px-4 py-4 pb-20 sm:px-6 sm:pb-6">
-        <VenuesList initialVenues={serialized} />
+        <VenuesList />
       </div>
     </div>
   );

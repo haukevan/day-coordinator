@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -8,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { queryKeys } from "@/lib/query/keys";
 import type { SerializedVendor, SerializedVendorContact } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Check, Search, Shield } from "lucide-react";
@@ -30,6 +32,7 @@ export function AddExistingVendorDialog({
   onClose,
   onAdded,
 }: Props) {
+  const queryClient = useQueryClient();
   const [contacts, setContacts] = useState<SerializedVendorContact[]>([]);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set()); // Set of contact ids
@@ -120,6 +123,7 @@ export function AddExistingVendorDialog({
 
     if (results.length > 0) {
       onAdded(results);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.vendors });
     }
     if (errors.length > 0) {
       setError(errors.join("\n"));

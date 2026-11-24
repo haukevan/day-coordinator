@@ -1,65 +1,86 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/toast";
-import { emitEventDuplicated } from "@/lib/client-events";
-import type { DashboardEvent } from "./event-card";
+import { queryKeys } from "@/lib/query/keys";
+import type { DashboardEvent, DashboardPayload } from "@/lib/types";
+
+type DuplicateResponse = {
+  event?: DashboardEvent;
+  error?: string;
+};
 
 /**
- * Duplicate an event. The new card is inserted optimistically via the client
- * event bus (so filtered lists and counts update immediately) and the current
- * route is refreshed so the server data catches up.
+ * Duplicate an event.
+ *
+ * The copy is inserted into the shared `events` cache as soon as the server
+ * responds, so an active search/status filter and the "Showing X of Y events"
+ * count update in the same render. A targeted background refetch then
+ * reconciles the list with the server.
  */
 export function useDuplicateEvent() {
   const router = useRouter();
   const { addToast } = useToast();
-  const [duplicating, setDuplicating] = useState(false);
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (eventId: string) => {
+      const res = await fetch(`/api/events/${eventId}/duplicate`, {
+        method: "POST",
+      });
+      const data = (await res
+        .json()
+        .catch(() => null)) as DuplicateResponse | null;
+
+      if (!res.ok || !data?.event?.id) {
+        throw new Error(data?.error ?? "Please try again.");
+      }
+
+      return data.event;
+    },
+    onSuccess: (newEvent) => {
+      queryClient.setQueryData<DashboardPayload>(
+        queryKeys.events,
+        (previous) => {
+          if (!previous) return previous;
+          if (previous.events.some((event) => event.id === newEvent.id)) {
+            return previous;
+          }
+          return { ...previous, events: [newEvent, ...previous.events] };
+        },
+      );
+
+      // Reconcile with the server in the background. Only affected keys are
+      // touched: the event list, plus venue usage counts (the copy keeps the
+      // source event's venue).
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.events,
+        exact: true,
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.venues });
+
+      addToast({
+        title: "Event duplicated",
+        body: `"${newEvent.title}" is ready — click to open.`,
+        variant: "success",
+        onClick: () => router.push(`/events/${newEvent.id}/settings`),
+      });
+    },
+    onError: (error: Error) => {
+      addToast({
+        title: "Could not duplicate event",
+        body: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const duplicateEvent = useCallback(
-    async (eventId: string) => {
-      if (duplicating) return;
-      setDuplicating(true);
-
-      try {
-        const res = await fetch(`/api/events/${eventId}/duplicate`, {
-          method: "POST",
-        });
-        const data = (await res.json().catch(() => null)) as {
-          event?: DashboardEvent;
-          error?: string;
-        } | null;
-
-        const newEvent = data?.event;
-        if (res.ok && newEvent?.id) {
-          emitEventDuplicated<DashboardEvent>(newEvent);
-          addToast({
-            title: "Event duplicated",
-            body: `"${newEvent.title}" is ready — click to open.`,
-            variant: "success",
-            onClick: () => router.push(`/events/${newEvent.id}/settings`),
-          });
-          router.refresh();
-          return;
-        }
-
-        addToast({
-          title: "Could not duplicate event",
-          body: data?.error ?? "Please try again.",
-          variant: "destructive",
-        });
-      } catch {
-        addToast({
-          title: "Could not duplicate event",
-          body: "Network error. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setDuplicating(false);
-      }
-    },
-    [addToast, duplicating, router],
+    (eventId: string) => mutation.mutate(eventId),
+    [mutation],
   );
 
-  return { duplicateEvent, duplicating };
+  return { duplicateEvent, duplicating: mutation.isPending };
 }

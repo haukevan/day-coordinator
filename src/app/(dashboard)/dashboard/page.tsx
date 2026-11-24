@@ -1,96 +1,32 @@
-import { redirect } from "next/navigation";
+"use client";
+
 import Link from "next/link";
-import { getCurrentDbUser } from "@/lib/auth/session";
-import { prisma } from "@/lib/db/prisma";
+import { Plus } from "lucide-react";
+import { useDashboardQuery, useSessionPrefetch } from "@/lib/query/hooks";
+import { DashboardPageSkeleton } from "@/components/ui/skeletons";
 import { EventsList } from "@/components/dashboard/events-list";
 import { VendorEventCard } from "@/components/dashboard/vendor-event-card";
 import { PendingInviteCard } from "@/components/dashboard/pending-invite-card";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 
-export default async function DashboardPage() {
-  const dbUser = await getCurrentDbUser();
-  if (!dbUser) redirect("/login");
+/**
+ * Dashboard is cache-first: the events list renders from the shared React
+ * Query cache on repeat navigation, then refreshes silently in the
+ * background. A skeleton only appears when there is no cached data at all.
+ */
+export default function DashboardPage() {
+  // Warm vendors, venues, and profile on the first dashboard load.
+  useSessionPrefetch();
 
-  const [events, vendorMemberships, pendingInvites] = await Promise.all([
-    prisma.event.findMany({
-      where: { ownerId: dbUser.id },
-      include: {
-        _count: { select: { tasks: true } },
-        venue: {
-          select: {
-            id: true,
-            name: true,
-            address: true,
-            description: true,
-            ownerName: true,
-            ownerPhone: true,
-            ownerEmail: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.eventVendor.findMany({
-      where: {
-        userId: dbUser.id,
-        status: "ACCEPTED",
-        event: {
-          ownerId: { not: dbUser.id },
-        },
-      },
-      include: {
-        event: {
-          select: {
-            id: true,
-            title: true,
-            eventDate: true,
-            status: true,
-            owner: {
-              select: {
-                firstName: true,
-                lastName: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: { joinedAt: "desc" },
-    }),
-    prisma.eventVendor.findMany({
-      where: {
-        status: "PENDING",
-        inviteToken: { not: null },
-        inviteSentAt: { not: null },
-        vendorContact: {
-          email: { equals: dbUser.email ?? "", mode: "insensitive" },
-        },
-      },
-      include: {
-        invitedBy: {
-          select: { firstName: true, lastName: true, name: true, email: true },
-        },
-        event: {
-          select: {
-            id: true,
-            title: true,
-            eventDate: true,
-            owner: {
-              select: {
-                firstName: true,
-                lastName: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: { inviteSentAt: "desc" },
-    }),
-  ]);
+  const { data, isPending } = useDashboardQuery();
+
+  if (isPending) {
+    return <DashboardPageSkeleton />;
+  }
+
+  const events = data?.events ?? [];
+  const pendingInvites = data?.pendingInvites ?? [];
+  const vendorMemberships = data?.vendorMemberships ?? [];
 
   return (
     <div className="px-4 py-5 sm:p-6">

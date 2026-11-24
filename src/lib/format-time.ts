@@ -144,14 +144,66 @@ const DAYLIGHT_OFFSET_ABBREVIATIONS: Record<number, string> = {
 };
 
 /**
+ * ICU's short zone name for an instant, e.g. "PST" / "PDT".
+ *
+ * Also reports whether the name is specific enough to show on its own.
+ * Offset-style labels ("GMT+5:30") and ambiguous North American generics
+ * ("PT", "MT", …) are not, so callers can fall back to an explicit
+ * standard/daylight mapping. Plain "GMT"/"UTC" stay usable.
+ */
+function getIcuShortZoneName(
+  date: Date,
+  timeZone: string,
+): { name: string; specific: boolean } | null {
+  try {
+    const raw =
+      new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        timeZoneName: "short",
+      })
+        .formatToParts(date)
+        .find((part) => part.type === "timeZoneName")?.value ?? "";
+
+    if (!raw) return null;
+
+    const isOffsetStyle = /^GMT[+-]/i.test(raw);
+    const isGeneric = /^[PECMAN]T$/.test(raw);
+    return { name: raw, specific: !isOffsetStyle && !isGeneric };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Abbreviation for a timestamp in a zone, e.g. "PST" for a December instant
- * in America/Vancouver even if ICU would otherwise return a generic label.
+ * in America/Vancouver.
+ *
+ * The label is always derived from `iso` — the exact instant whose wall clock
+ * is being displayed — never from the current date, the event date, or a
+ * hardcoded daylight-time string. That guarantee is what keeps a November
+ * task reading PST even when the surrounding event was created in summer.
  */
 export function getTimeZoneAbbreviation(
   iso: string | Date,
   timeZone: string,
 ): string {
   const date = typeof iso === "string" ? new Date(iso) : iso;
+  if (Number.isNaN(date.getTime())) return "";
+
+  // ICU resolves the zone's actual offset for this instant and reports the
+  // specific standard/daylight name (PST vs PDT).
+  const icuName = getIcuShortZoneName(date, timeZone);
+  if (icuName?.specific) return icuName.name;
+
+  // Offset fallback for zones/engines without specific abbreviations.
+  const offsets = getZoneOffsetInfo(date, timeZone);
+  if (offsets) {
+    const daylight = offsets.current > offsets.standard;
+    const label = (
+      daylight ? DAYLIGHT_OFFSET_ABBREVIATIONS : STANDARD_OFFSET_ABBREVIATIONS
+    )[offsets.current];
+    if (label) return label;
+  }
 
   const knownZone = NORTH_AMERICAN_ABBREVIATIONS.find((zone) =>
     zone.test(timeZone),
@@ -162,39 +214,17 @@ export function getTimeZoneAbbreviation(
       : knownZone.standard;
   }
 
-  const offsets = getZoneOffsetInfo(date, timeZone);
-  if (offsets) {
-    const daylight = offsets.current > offsets.standard;
-    const label = (
-      daylight ? DAYLIGHT_OFFSET_ABBREVIATIONS : STANDARD_OFFSET_ABBREVIATIONS
-    )[offsets.current];
-    if (label) return label;
-  }
-
-  return (
-    new Intl.DateTimeFormat("en-US", {
-      timeZone,
-      timeZoneName: "short",
-    })
-      .formatToParts(date)
-      .find((p) => p.type === "timeZoneName")?.value ?? ""
-  );
+  return icuName?.name ?? "";
 }
 
 /**
  * Format a UTC ISO string as a local time string in the given IANA timezone.
  * Output: "3:00 PM EDT"
  *
- * `labelIso` controls which instant determines the timezone abbreviation. Pass
- * the event date here so a winter event always reads PST/EST even when a task
- * timestamp happens to have been anchored in summer. The clock time itself is
- * always derived from `iso`.
+ * Both the wall clock and the abbreviation are derived from `iso`, so the
+ * label always describes the offset of the timestamp being shown.
  */
-export function formatTimeInZone(
-  iso: string,
-  timezone: string,
-  labelIso?: string | Date | null,
-): string {
+export function formatTimeInZone(iso: string, timezone: string): string {
   const date = new Date(iso);
   const time = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
@@ -202,7 +232,7 @@ export function formatTimeInZone(
     hour12: true,
     timeZone: timezone,
   }).format(date);
-  const abbr = getTimeZoneAbbreviation(labelIso ?? date, timezone);
+  const abbr = getTimeZoneAbbreviation(date, timezone);
   return abbr ? `${time} ${abbr}` : time;
 }
 
@@ -222,9 +252,9 @@ export function formatTimeInZoneWithDay(
   timezone: string,
   eventDateIso: string | null,
 ): string {
-  // Use the event date for the abbreviation so the label matches the season
-  // of the event, not the stored task timestamp.
-  const time = formatTimeInZone(iso, timezone, eventDateIso);
+  // The abbreviation comes from the task timestamp itself — the event date is
+  // only used to decide whether the "+1d" marker applies.
+  const time = formatTimeInZone(iso, timezone);
   if (!eventDateIso) return time;
 
   const taskZoned = toZonedTime(new Date(iso), timezone);

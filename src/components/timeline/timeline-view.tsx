@@ -6,6 +6,7 @@ import { TimelineGantt } from "./timeline-gantt";
 import { TaskPanel } from "./task-panel";
 import { TaskDetailSheet } from "./task-detail-sheet";
 import { useTimelineView } from "./timeline-view-context";
+import { useEventTaskUpdates } from "@/lib/realtime/use-event-updates";
 import {
   computeLiveStatuses,
   isTaskBlocked,
@@ -78,7 +79,9 @@ export function TimelineView({
         // non-critical
       }
     }
-    fetchVendors();
+    fetchVendors().catch(() => {
+      // non-critical
+    });
   }, [eventId]);
 
   // Reload all tasks silently from the API (used after status changes)
@@ -137,8 +140,7 @@ export function TimelineView({
 
   function handleSaved(saved: SerializedTask) {
     setTasks((prev) => {
-      const existing = prev.find((t) => t.id === saved.id);
-      if (existing) {
+      if (prev.some((t) => t.id === saved.id)) {
         return prev.map((t) => (t.id === saved.id ? saved : t));
       }
       return [...prev, saved];
@@ -168,6 +170,13 @@ export function TimelineView({
 
   // ── Live mode computations ───────────────────────────────────────────
   const isLive = eventStatus === "LIVE";
+
+  // Keep the timeline current without relying on navigation: listen for
+  // Realtime broadcasts from other devices, and in LIVE mode also poll as a
+  // websocket fallback.
+  useEventTaskUpdates(eventId, refreshTasks, {
+    pollMs: isLive ? 20_000 : undefined,
+  });
 
   const tasksWithLiveStatus = useMemo(
     () => (isLive ? computeLiveStatuses(tasks) : []),

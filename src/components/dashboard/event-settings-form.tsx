@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { CalendarIcon, ExternalLink, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,9 @@ import { TimezoneSelect } from "@/components/ui/timezone-select";
 import { VenueSelector } from "@/components/ui/venue-selector";
 import { useToast } from "@/components/ui/toast";
 import { useDuplicateEvent } from "@/components/dashboard/use-duplicate-event";
+import { queryKeys } from "@/lib/query/keys";
+import { useEventQuery } from "@/lib/query/hooks";
+import type { DashboardPayload, EventDetail } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type EventStatus = "DRAFT" | "SCHEDULED" | "LIVE" | "COMPLETED" | "ARCHIVED";
@@ -34,8 +38,13 @@ type EventData = {
 
 export function EventSettingsForm({ event }: { event: EventData }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { addToast } = useToast();
   const { duplicateEvent, duplicating } = useDuplicateEvent();
+  // Seed the shared event-by-id cache from the server render so repeat visits
+  // and cross-screen updates use the same entry.
+  const { data: cachedEvent } = useEventQuery(event.id, event as EventDetail);
+  const currentEvent = cachedEvent ?? event;
   const [title, setTitle] = useState(event.title);
   const [description, setDescription] = useState(event.description ?? "");
   // Parse event date as local noon so it survives timezone round-trips.
@@ -67,12 +76,12 @@ export function EventSettingsForm({ event }: { event: EventData }) {
 
   // Only ARCHIVED events are fully locked. LIVE and COMPLETED remain
   // editable — last-minute changes during an event are expected.
-  const isArchived = event.status === "ARCHIVED";
-  const isLive = event.status === "LIVE";
+  const isArchived = currentEvent.status === "ARCHIVED";
+  const isLive = currentEvent.status === "LIVE";
 
   // Lock the date field only when the event date has passed.
   const isDatePassed = !!(
-    event.eventDate && new Date(event.eventDate) < new Date()
+    currentEvent.eventDate && new Date(currentEvent.eventDate) < new Date()
   );
 
   // Compare form state with original event to detect unsaved changes
@@ -92,11 +101,20 @@ export function EventSettingsForm({ event }: { event: EventData }) {
 
   async function handlePublicToggle(checked: boolean) {
     setPublicTimeline(checked);
-    await fetch(`/api/events/${event.id}`, {
+    const res = await fetch(`/api/events/${event.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ publicTimeline: checked }),
     });
+    if (res.ok) {
+      const data = (await res.json().catch(() => null)) as {
+        event?: EventDetail;
+      } | null;
+      if (data?.event) {
+        queryClient.setQueryData(queryKeys.event(event.id), data.event);
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.events });
+    }
   }
 
   async function handleDelete() {
@@ -105,6 +123,17 @@ export function EventSettingsForm({ event }: { event: EventData }) {
     const res = await fetch(`/api/events/${event.id}`, { method: "DELETE" });
     setDeleting(false);
     if (res.ok) {
+      // Drop the event from the shared list before navigating so the
+      // dashboard (and its filtered counts) reflect the delete immediately.
+      queryClient.setQueryData<DashboardPayload>(queryKeys.events, (prev) =>
+        prev
+          ? {
+              ...prev,
+              events: prev.events.filter((item) => item.id !== event.id),
+            }
+          : prev,
+      );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.venues });
       router.push("/dashboard");
     } else {
       const text = await res.text();
@@ -140,6 +169,37 @@ export function EventSettingsForm({ event }: { event: EventData }) {
     setSaving(false);
 
     if (res.ok) {
+      const data = (await res.json().catch(() => null)) as {
+        event?: EventDetail;
+      } | null;
+      if (data?.event) {
+        queryClient.setQueryData(queryKeys.event(event.id), data.event);
+        // Reflect the edited card immediately; the invalidation below fills in
+        // venue details and any server-side changes.
+        const updatedEvent = data.event;
+        queryClient.setQueryData<DashboardPayload>(queryKeys.events, (prev) =>
+          prev
+            ? {
+                ...prev,
+                events: prev.events.map((item) =>
+                  item.id === event.id
+                    ? {
+                        ...item,
+                        title: updatedEvent.title,
+                        eventDate: updatedEvent.eventDate,
+                        status: updatedEvent.status,
+                      }
+                    : item,
+                ),
+              }
+            : prev,
+        );
+      }
+      // The card list (title/date/status/venue) and venue usage counts may
+      // have changed — refresh just those keys.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.events });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.venues });
+
       addToast({
         title: "Event updated",
         body: "Your changes have been saved.",

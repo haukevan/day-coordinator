@@ -1,21 +1,21 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { MapPin, Plus, CalendarDays, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { VenueCardSkeletonGrid } from "@/components/ui/skeletons";
 import { VenueFormDialog } from "@/components/dashboard/venue-form-dialog";
+import { queryKeys } from "@/lib/query/keys";
+import { useVenuesQuery } from "@/lib/query/hooks";
 import type { SerializedVenue } from "@/lib/types";
-
-// ─── Props ───────────────────────────────────────────────────────────────────
-
-interface Props {
-  readonly initialVenues: SerializedVenue[];
-}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function VenuesList({ initialVenues }: Props) {
-  const [venues, setVenues] = useState<SerializedVenue[]>(initialVenues);
+export function VenuesList() {
+  const queryClient = useQueryClient();
+  const { data, isPending } = useVenuesQuery();
+  const venues = useMemo(() => data ?? [], [data]);
   const [showCreate, setShowCreate] = useState(false);
   const [editingVenue, setEditingVenue] = useState<SerializedVenue | null>(
     null,
@@ -56,19 +56,51 @@ export function VenuesList({ initialVenues }: Props) {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const handleCreated = useCallback((venue: SerializedVenue) => {
-    setVenues((prev) => [venue, ...prev]);
-  }, []);
+  const handleCreated = useCallback(
+    (venue: SerializedVenue) => {
+      queryClient.setQueryData<SerializedVenue[]>(queryKeys.venues, (prev) =>
+        prev ? [venue, ...prev] : [venue],
+      );
+    },
+    [queryClient],
+  );
 
-  const handleUpdated = useCallback((updated: SerializedVenue) => {
-    setVenues((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
-  }, []);
+  const handleUpdated = useCallback(
+    (updated: SerializedVenue) => {
+      queryClient.setQueryData<SerializedVenue[]>(queryKeys.venues, (prev) =>
+        prev
+          ? prev.map((v) =>
+              v.id === updated.id
+                ? {
+                    ...v,
+                    ...updated,
+                    events: updated.events ?? v.events,
+                    _count: updated._count ?? v._count,
+                  }
+                : v,
+            )
+          : prev,
+      );
+    },
+    [queryClient],
+  );
 
-  const handleDeleted = useCallback((id: string) => {
-    setVenues((prev) => prev.filter((v) => v.id !== id));
-  }, []);
+  const handleDeleted = useCallback(
+    (id: string) => {
+      queryClient.setQueryData<SerializedVenue[]>(queryKeys.venues, (prev) =>
+        prev?.filter((v) => v.id !== id),
+      );
+    },
+    [queryClient],
+  );
 
   // ── Render ────────────────────────────────────────────────────────────────
+
+  // Skeleton only while the first request is in flight — navigations render
+  // the cached list instantly.
+  if (isPending) {
+    return <VenueCardSkeletonGrid count={6} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -173,10 +205,10 @@ export function VenuesList({ initialVenues }: Props) {
 function VenueCard({
   venue,
   onClick,
-}: {
+}: Readonly<{
   venue: SerializedVenue;
   onClick: () => void;
-}) {
+}>) {
   const linkedCount = venue._count?.events ?? 0;
 
   return (

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
-import type { SerializedVendorContact } from "@/lib/types";
+import type {
+  SerializedVendorContact,
+  SerializedVendorContactWithEvents,
+} from "@/lib/types";
 import { checkVendorContactLimit } from "@/lib/db/limits";
 
 const createVendorContactSchema = z.object({
@@ -50,19 +53,26 @@ export async function GET(_req: NextRequest) {
 
   const contacts = await prisma.vendorContact.findMany({
     where: { ownerId: dbUser.id },
-    orderBy: [{ firstName: "asc" }, { email: "asc" }],
-    select: {
-      id: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      phone: true,
-      company: true,
-      jobTitle: true,
+    include: {
+      eventVendors: {
+        include: {
+          event: { select: { id: true, title: true, status: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      },
+      _count: { select: { eventVendors: true } },
     },
+    orderBy: { updatedAt: "desc" },
   });
 
-  const serialized: SerializedVendorContact[] = contacts.map(serialize);
+  // Vendors page shape: contact fields plus linked events and usage count.
+  const serialized: SerializedVendorContactWithEvents[] = contacts.map(
+    (contact) => ({
+      ...serialize(contact),
+      events: contact.eventVendors.map((eventVendor) => eventVendor.event),
+      _count: contact._count,
+    }),
+  );
 
   return NextResponse.json({ contacts: serialized });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +10,7 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
+import { queryKeys } from "@/lib/query/keys";
 import { EditVendorDialog } from "./edit-vendor-dialog";
 import type { SerializedVendor } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -93,6 +95,7 @@ export function VendorCard({
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState("");
   const { addToast } = useToast();
+  const queryClient = useQueryClient();
 
   const displayName =
     [vendor.firstName, vendor.lastName].filter(Boolean).join(" ") ||
@@ -124,6 +127,7 @@ export function VendorCard({
           variant: "success",
         });
         onRemoved(vendor.id);
+        void queryClient.invalidateQueries({ queryKey: queryKeys.vendors });
         return;
       }
 

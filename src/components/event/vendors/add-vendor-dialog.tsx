@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -8,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { queryKeys } from "@/lib/query/keys";
 import type { SerializedVendor } from "@/lib/types";
 
 import { DraftVendorWarning } from "@/components/event/draft-vendor-warning";
@@ -37,6 +39,7 @@ export function AddVendorDialog({
   onClose,
   onAdded,
 }: Props) {
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -73,6 +76,8 @@ export function AddVendorDialog({
 
     if (res.ok) {
       onAdded(data.vendor);
+      // Adding a vendor creates/links a contact in the shared vendor list.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.vendors });
     } else {
       setError(data.error ?? "Failed to add vendor.");
     }

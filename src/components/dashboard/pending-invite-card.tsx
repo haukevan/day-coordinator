@@ -1,34 +1,15 @@
 import Link from "next/link";
 import { Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-interface PendingInvite {
-  id: string;
-  inviteToken: string | null;
-  invitedBy: {
-    firstName: string | null;
-    lastName: string | null;
-    name: string | null;
-    email: string;
-  } | null;
-  event: {
-    id: string;
-    title: string;
-    eventDate: Date | null;
-    owner: {
-      firstName: string | null;
-      lastName: string | null;
-      name: string | null;
-      email: string | null;
-    };
-  };
-}
+import type { DashboardPendingInvite } from "@/lib/types";
 
 interface Props {
-  invite: PendingInvite;
+  invite: DashboardPendingInvite;
 }
 
-function ownerDisplayName(owner: PendingInvite["event"]["owner"]): string {
+function ownerDisplayName(
+  owner: DashboardPendingInvite["event"]["owner"],
+): string {
   if (owner.firstName || owner.lastName) {
     return [owner.firstName, owner.lastName].filter(Boolean).join(" ");
   }
@@ -36,15 +17,15 @@ function ownerDisplayName(owner: PendingInvite["event"]["owner"]): string {
 }
 
 function inviterDisplayName(
-  invitedBy: NonNullable<PendingInvite["invitedBy"]>,
+  invitedBy: NonNullable<DashboardPendingInvite["invitedBy"]>,
 ): string {
   if (invitedBy.firstName || invitedBy.lastName) {
     return [invitedBy.firstName, invitedBy.lastName].filter(Boolean).join(" ");
   }
-  return invitedBy.name ?? invitedBy.email;
+  return invitedBy.name ?? invitedBy.email ?? "Unknown";
 }
 
-export function PendingInviteCard({ invite }: Props) {
+export function PendingInviteCard({ invite }: Readonly<Props>) {
   const ownerName = ownerDisplayName(invite.event.owner);
   const inviterName = invite.invitedBy
     ? inviterDisplayName(invite.invitedBy)

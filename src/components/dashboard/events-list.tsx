@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import { onEventDuplicated } from "@/lib/client-events";
 import { EventCard, type DashboardEvent } from "./event-card";
 
 type StatusFilter = "ALL" | DashboardEvent["status"];
@@ -48,30 +47,11 @@ export function EventsList({ events }: Readonly<{ events: DashboardEvent[] }>) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [sort, setSort] = useState<SortKey>("date-asc");
-  const [duplicated, setDuplicated] = useState<DashboardEvent[]>([]);
-
-  // Show a duplicated card immediately, even before router.refresh() lands.
-  useEffect(() => {
-    return onEventDuplicated<DashboardEvent>((event) => {
-      setDuplicated((prev) =>
-        prev.some((item) => item.id === event.id) ? prev : [event, ...prev],
-      );
-    });
-  }, []);
-
-  // Drop optimistic entries once the refreshed server list includes them.
-  const allEvents = useMemo(() => {
-    if (duplicated.length === 0) return events;
-
-    const serverIds = new Set(events.map((event) => event.id));
-    const pending = duplicated.filter((event) => !serverIds.has(event.id));
-    return pending.length === 0 ? events : [...pending, ...events];
-  }, [duplicated, events]);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
 
-    const filtered = allEvents.filter((event) => {
+    const filtered = events.filter((event) => {
       const matchesQuery =
         needle.length === 0 || event.title.toLowerCase().includes(needle);
       const matchesStatus = status === "ALL" || event.status === status;
@@ -94,7 +74,7 @@ export function EventsList({ events }: Readonly<{ events: DashboardEvent[] }>) {
           return compareDates(a, b, 1);
       }
     });
-  }, [allEvents, query, status, sort]);
+  }, [events, query, status, sort]);
 
   const controlClass =
     "w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring min-h-[44px] sm:w-auto";
@@ -143,8 +123,8 @@ export function EventsList({ events }: Readonly<{ events: DashboardEvent[] }>) {
 
       {/* Count reflects the active search/filter */}
       <p className="text-xs text-muted-foreground" aria-live="polite">
-        Showing {visible.length} of {allEvents.length}{" "}
-        {allEvents.length === 1 ? "event" : "events"}
+        Showing {visible.length} of {events.length}{" "}
+        {events.length === 1 ? "event" : "events"}
       </p>
 
       {visible.length === 0 ? (

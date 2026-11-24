@@ -35,6 +35,110 @@ async function uniqueSlug(base: string): Promise<string> {
   return `${candidate}-${nanoid(6)}`;
 }
 
+/**
+ * Dashboard payload for the shared client cache.
+ *
+ * Returns the owned-event list (with task counts + venue chip), pending
+ * invitations, and accepted vendor memberships in one request so the
+ * dashboard renders from cache on repeat navigation.
+ */
+export async function GET() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const dbUser = await prisma.user.findUnique({
+    where: { supabaseId: user.id },
+  });
+  if (!dbUser)
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  const [events, vendorMemberships, pendingInvites] = await Promise.all([
+    prisma.event.findMany({
+      where: { ownerId: dbUser.id },
+      include: {
+        _count: { select: { tasks: true } },
+        venue: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            description: true,
+            ownerName: true,
+            ownerPhone: true,
+            ownerEmail: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.eventVendor.findMany({
+      where: {
+        userId: dbUser.id,
+        status: "ACCEPTED",
+        event: {
+          ownerId: { not: dbUser.id },
+        },
+      },
+      include: {
+        event: {
+          select: {
+            id: true,
+            title: true,
+            eventDate: true,
+            status: true,
+            owner: {
+              select: {
+                firstName: true,
+                lastName: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { joinedAt: "desc" },
+    }),
+    prisma.eventVendor.findMany({
+      where: {
+        status: "PENDING",
+        inviteToken: { not: null },
+        inviteSentAt: { not: null },
+        vendorContact: {
+          email: { equals: dbUser.email ?? "", mode: "insensitive" },
+        },
+      },
+      include: {
+        invitedBy: {
+          select: { firstName: true, lastName: true, name: true, email: true },
+        },
+        event: {
+          select: {
+            id: true,
+            title: true,
+            eventDate: true,
+            owner: {
+              select: {
+                firstName: true,
+                lastName: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { inviteSentAt: "desc" },
+    }),
+  ]);
+
+  return NextResponse.json({ events, vendorMemberships, pendingInvites });
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createSupabaseServerClient();
   const {

@@ -1,44 +1,14 @@
-import { redirect } from "next/navigation";
-import { getCurrentDbUser } from "@/lib/auth/session";
-import { prisma } from "@/lib/db/prisma";
+"use client";
+
+import { useProfileQuery } from "@/lib/query/hooks";
 import { VendorsList } from "@/components/dashboard/vendors-list";
 
-export default async function VendorsPage() {
-  const dbUser = await getCurrentDbUser();
-  if (!dbUser) redirect("/login");
-  if (!dbUser.onboarded) redirect("/onboarding");
-
-  const vendors = await prisma.vendorContact.findMany({
-    where: { ownerId: dbUser.id },
-    include: {
-      eventVendors: {
-        include: {
-          event: { select: { id: true, title: true, status: true } },
-        },
-        orderBy: { createdAt: "desc" },
-      },
-      _count: { select: { eventVendors: true } },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
-
-  const serialized = JSON.parse(JSON.stringify(vendors)).map(
-    (v: Record<string, unknown>) => ({
-      id: v.id,
-      email: v.email,
-      firstName: v.firstName,
-      lastName: v.lastName,
-      phone: v.phone,
-      company: v.company,
-      jobTitle: v.jobTitle,
-      events: (
-        v.eventVendors as
-          | Array<{ event: { id: string; title: string; status: string } }>
-          | undefined
-      )?.map((ev) => ev.event),
-      _count: v._count,
-    }),
-  );
+/**
+ * Cache-first vendors page: the list renders from the shared query cache on
+ * repeat navigation; the dashboard warms it on first load.
+ */
+export default function VendorsPage() {
+  const { data: profile } = useProfileQuery();
 
   return (
     <div className="flex min-h-full flex-col">
@@ -52,7 +22,7 @@ export default async function VendorsPage() {
 
       {/* Vendor list (client component) */}
       <div className="flex-1 px-4 py-4 pb-20 sm:px-6 sm:pb-6">
-        <VendorsList initialVendors={serialized} userEmail={dbUser.email} />
+        <VendorsList userEmail={profile?.email ?? ""} />
       </div>
     </div>
   );

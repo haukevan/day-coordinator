@@ -128,3 +128,84 @@ export type SerializedSubTask = {
   createdAt: string;
   updatedAt: string;
 };
+
+// ─── Dashboard / Shared Query Types ──────────────────────────────────────────
+
+export type DashboardVenueChip = {
+  id: string;
+  name: string;
+  address: string;
+  description: string | null;
+  ownerName: string | null;
+  ownerPhone: string | null;
+  ownerEmail: string | null;
+};
+
+export type DashboardEvent = {
+  id: string;
+  title: string;
+  eventDate: string | null;
+  status: "DRAFT" | "SCHEDULED" | "LIVE" | "COMPLETED" | "ARCHIVED";
+  createdAt?: string;
+  _count: { tasks: number };
+  venue: DashboardVenueChip | null;
+};
+
+export type DashboardPerson = {
+  firstName: string | null;
+  lastName: string | null;
+  name: string | null;
+  email: string | null;
+};
+
+export type DashboardPendingInvite = {
+  id: string;
+  inviteToken: string | null;
+  invitedBy: DashboardPerson | null;
+  event: {
+    id: string;
+    title: string;
+    eventDate: string | null;
+    owner: DashboardPerson;
+  };
+};
+
+export type DashboardVendorMembership = {
+  id: string;
+  event: {
+    id: string;
+    title: string;
+    eventDate: string | null;
+    status: string;
+    owner: DashboardPerson;
+  };
+};
+
+export type DashboardPayload = {
+  events: DashboardEvent[];
+  pendingInvites: DashboardPendingInvite[];
+  vendorMemberships: DashboardVendorMembership[];
+};
+
+export type Profile = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  name: string | null;
+  phone: string | null;
+  onboarded: boolean;
+};
+
+export type EventDetail = {
+  id: string;
+  title: string;
+  description: string | null;
+  eventDate: string | null;
+  timezone: string;
+  slug: string | null;
+  status: "DRAFT" | "SCHEDULED" | "LIVE" | "COMPLETED" | "ARCHIVED";
+  publicTimeline: boolean;
+  venueId: string | null;
+  updatedAt?: string;
+};

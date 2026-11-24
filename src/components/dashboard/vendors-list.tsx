@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { BriefcaseBusiness, Plus, CalendarDays, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { VendorCardSkeletonGrid } from "@/components/ui/skeletons";
 import { VendorFormDialog } from "@/components/dashboard/vendor-form-dialog";
+import { queryKeys } from "@/lib/query/keys";
+import { useVendorsQuery } from "@/lib/query/hooks";
 import type { SerializedVendorContactWithEvents } from "@/lib/types";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface Props {
-  readonly initialVendors: SerializedVendorContactWithEvents[];
   readonly userEmail: string;
 }
 
@@ -24,9 +27,10 @@ function displayName(v: SerializedVendorContactWithEvents): string {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function VendorsList({ initialVendors, userEmail }: Props) {
-  const [vendors, setVendors] =
-    useState<SerializedVendorContactWithEvents[]>(initialVendors);
+export function VendorsList({ userEmail }: Props) {
+  const queryClient = useQueryClient();
+  const { data, isPending } = useVendorsQuery();
+  const vendors = useMemo(() => data ?? [], [data]);
   const [showCreate, setShowCreate] = useState(false);
   const [editingVendor, setEditingVendor] =
     useState<SerializedVendorContactWithEvents | null>(null);
@@ -64,24 +68,53 @@ export function VendorsList({ initialVendors, userEmail }: Props) {
 
   const handleCreated = useCallback(
     (vendor: SerializedVendorContactWithEvents) => {
-      setVendors((prev) => [vendor, ...prev]);
+      queryClient.setQueryData<SerializedVendorContactWithEvents[]>(
+        queryKeys.vendors,
+        (prev) => (prev ? [vendor, ...prev] : [vendor]),
+      );
     },
-    [],
+    [queryClient],
   );
 
   const handleUpdated = useCallback(
     (updated: SerializedVendorContactWithEvents) => {
-      setVendors((prev) =>
-        prev.map((v) => (v.id === updated.id ? updated : v)),
+      queryClient.setQueryData<SerializedVendorContactWithEvents[]>(
+        queryKeys.vendors,
+        (prev) =>
+          prev
+            ? prev.map((v) =>
+                v.id === updated.id
+                  ? {
+                      ...v,
+                      ...updated,
+                      events: updated.events ?? v.events,
+                      _count: updated._count ?? v._count,
+                    }
+                  : v,
+              )
+            : prev,
       );
     },
-    [],
+    [queryClient],
   );
 
-  const handleDeleted = useCallback((id: string) => {
-    setVendors((prev) => prev.filter((v) => v.id !== id));
-  }, []);
+  const handleDeleted = useCallback(
+    (id: string) => {
+      queryClient.setQueryData<SerializedVendorContactWithEvents[]>(
+        queryKeys.vendors,
+        (prev) => prev?.filter((v) => v.id !== id),
+      );
+    },
+    [queryClient],
+  );
 
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  // Skeleton only while the first request is in flight — navigations render
+  // the cached list instantly.
+  if (isPending) {
+    return <VendorCardSkeletonGrid count={6} />;
+  }
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (

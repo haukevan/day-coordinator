@@ -13,6 +13,36 @@ const profileSchema = z.object({
     .nullable(),
 });
 
+export async function GET() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const profile = await prisma.user.findUnique({
+    where: { supabaseId: user.id },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      name: true,
+      phone: true,
+      onboarded: true,
+    },
+  });
+
+  if (!profile) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ profile });
+}
+
 export async function PATCH(request: NextRequest) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -76,6 +106,7 @@ export async function PATCH(request: NextRequest) {
     data: updateData,
     select: {
       id: true,
+      email: true,
       firstName: true,
       lastName: true,
       name: true,

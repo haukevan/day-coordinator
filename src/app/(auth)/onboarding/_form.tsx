@@ -2,10 +2,13 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { queryKeys } from "@/lib/query/keys";
+import type { Profile } from "@/lib/types";
 import { ArrowLeft } from "lucide-react";
 
 function formatPhone(digits: string): string {
@@ -29,6 +32,7 @@ export function OnboardingForm({
   initialPhoneDigits,
 }: Props) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { addToast } = useToast();
 
   const [firstName, setFirstName] = useState(initialFirstName);
@@ -70,6 +74,12 @@ export function OnboardingForm({
       });
 
       if (res.ok) {
+        const updated = (await res.json().catch(() => null)) as Profile | null;
+        if (updated?.id) {
+          queryClient.setQueryData<Profile>(queryKeys.profile, (previous) =>
+            previous ? { ...previous, ...updated } : updated,
+          );
+        }
         addToast({
           title: onboarded ? "Profile saved" : "You're all set",
           body: onboarded

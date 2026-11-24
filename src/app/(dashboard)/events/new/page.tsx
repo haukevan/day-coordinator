@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ import {
 import { TimezoneSelect } from "@/components/ui/timezone-select";
 import { VenueSelector } from "@/components/ui/venue-selector";
 import { useClientTimeZone } from "@/lib/use-client-timezone";
+import { queryKeys } from "@/lib/query/keys";
+import type { DashboardPayload } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type SubmitEvent = Parameters<
@@ -31,6 +34,7 @@ function slugify(text: string): string {
 
 export default function NewEventPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [company, setCompany] = useState("");
@@ -74,6 +78,32 @@ export default function NewEventPage() {
     setSubmitting(false);
 
     if (res.ok) {
+      // Insert the new card before navigating so the dashboard list and its
+      // counts are correct the moment the user returns.
+      if (data?.event?.id) {
+        queryClient.setQueryData<DashboardPayload>(queryKeys.events, (prev) =>
+          prev
+            ? {
+                ...prev,
+                events: [
+                  {
+                    id: data.event.id,
+                    title: data.event.title,
+                    eventDate: data.event.eventDate ?? null,
+                    status: data.event.status,
+                    createdAt: data.event.createdAt,
+                    _count: { tasks: 0 },
+                    venue: null,
+                  },
+                  ...prev.events,
+                ],
+              }
+            : prev,
+        );
+      }
+      // The event list and venue usage counts both changed.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.events });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.venues });
       router.push(`/events/${data.event.id}/timeline`);
     } else {
       setError(data.error ?? "Failed to create event.");
