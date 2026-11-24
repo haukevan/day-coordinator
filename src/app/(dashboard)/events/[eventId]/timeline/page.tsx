@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentDbUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { alignTaskDatesToEvent } from "@/lib/scheduler/reanchor";
 import { TimelineView } from "@/components/timeline/timeline-view";
 import type { SerializedTask } from "@/lib/types";
 
@@ -40,7 +41,7 @@ export default async function TimelinePage({
       },
     });
 
-  const [event, tasks] = await Promise.all([
+  const [event, initialTasks] = await Promise.all([
     prisma.event.findFirst({
       where: { id: eventId, ownerId: dbUser.id },
       select: { id: true, timezone: true, eventDate: true, status: true },
@@ -49,6 +50,20 @@ export default async function TimelinePage({
   ]);
 
   if (!event) notFound();
+
+  // Repair task instants that are still anchored far from the event date
+  // (e.g. a duplicated event that kept a summer anchor). This keeps the
+  // displayed clock times identical while making the timezone label correct.
+  let tasks = initialTasks;
+  if (event.eventDate) {
+    const aligned = await alignTaskDatesToEvent(
+      eventId,
+      event.eventDate,
+      event.timezone,
+      tasks,
+    );
+    if (aligned > 0) tasks = await loadTasks();
+  }
 
   const serializedTasks: SerializedTask[] = tasks.map((t) => ({
     id: t.id,

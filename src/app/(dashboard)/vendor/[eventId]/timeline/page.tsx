@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentDbUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { alignTaskDatesToEvent } from "@/lib/scheduler/reanchor";
 import { TimelineView } from "@/components/timeline/timeline-view";
 import type { SerializedTask } from "@/lib/types";
 
@@ -13,17 +14,7 @@ export default async function VendorTimelinePage({
   const dbUser = await getCurrentDbUser();
   if (!dbUser) redirect("/login");
 
-  // Verify vendor membership (layout also checks, but keep defense-in-depth)
-  // and load tasks in parallel.
-  const [eventVendor, tasks] = await Promise.all([
-    prisma.eventVendor.findFirst({
-      where: { eventId, userId: dbUser.id, status: "ACCEPTED" },
-      include: {
-        event: {
-          select: { id: true, timezone: true, eventDate: true, status: true },
-        },
-      },
-    }),
+  const loadTasks = () =>
     prisma.task.findMany({
       where: { eventId },
       orderBy: [{ scheduledStart: "asc" }, { createdAt: "asc" }],
@@ -49,9 +40,33 @@ export default async function VendorTimelinePage({
           },
         },
       },
+    });
+
+  // Verify vendor membership (layout also checks, but keep defense-in-depth)
+  // and load tasks in parallel.
+  const [eventVendor, initialTasks] = await Promise.all([
+    prisma.eventVendor.findFirst({
+      where: { eventId, userId: dbUser.id, status: "ACCEPTED" },
+      include: {
+        event: {
+          select: { id: true, timezone: true, eventDate: true, status: true },
+        },
+      },
     }),
+    loadTasks(),
   ]);
   if (!eventVendor) notFound();
+
+  let tasks = initialTasks;
+  if (eventVendor.event.eventDate) {
+    const aligned = await alignTaskDatesToEvent(
+      eventId,
+      eventVendor.event.eventDate,
+      eventVendor.event.timezone,
+      tasks,
+    );
+    if (aligned > 0) tasks = await loadTasks();
+  }
 
   const isCoordinator = eventVendor.role === "COORDINATOR";
 

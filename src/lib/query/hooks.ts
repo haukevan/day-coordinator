@@ -1,6 +1,10 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { PROFILE_STALE_TIME, queryKeys } from "./keys";
 import type {
   DashboardPayload,
@@ -35,6 +39,42 @@ export function clearSessionSnapshots(): void {
   dashboardSnapshot = undefined;
   vendorsSnapshot = undefined;
   venuesSnapshot = undefined;
+}
+
+/**
+ * Keep the dashboard's task count correct the moment a task is created or
+ * deleted. The cached list is adjusted synchronously (so an immediate return
+ * to the dashboard shows the right number), then refetched in the background
+ * to reconcile with the server.
+ */
+export function applyTaskCountDelta(
+  client: QueryClient,
+  eventId: string,
+  delta: number,
+): void {
+  client.setQueryData<DashboardPayload>(queryKeys.events, (previous) => {
+    if (!previous) return previous;
+    return {
+      ...previous,
+      events: previous.events.map((event) =>
+        event.id === eventId
+          ? {
+              ...event,
+              _count: {
+                tasks: Math.max(0, event._count.tasks + delta),
+              },
+            }
+          : event,
+      ),
+    };
+  });
+
+  // The events query is mounted in the dashboard layout, so this refetches
+  // while the user is still on the timeline.
+  void client.invalidateQueries({
+    queryKey: queryKeys.events,
+    exact: true,
+  });
 }
 
 /** Dashboard payload: owned events, pending invites, vendor memberships. */

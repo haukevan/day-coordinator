@@ -119,3 +119,45 @@ export async function reanchorTasksToEventDate(
 
   return updates.length;
 }
+
+/** Tasks further than this from the event date are treated as misanchored. */
+const MAX_ALIGNED_DAY_OFFSET = 7;
+
+/**
+ * Repair tasks whose event-local calendar dates sit far outside the event's
+ * scheduling window.
+ *
+ * A duplicated event can keep task instants that were anchored to a different
+ * date. Those instants are genuinely in daylight time, so a November or
+ * December event renders them with a summer abbreviation (PDT) even though the
+ * clock time looks right. Re-anchoring preserves every task's local clock time
+ * and relative day offsets, so no displayed time changes — only the calendar
+ * date (and therefore the timezone label) becomes correct for the event.
+ *
+ * Returns the number of tasks updated (0 when the set is already aligned).
+ */
+export async function alignTaskDatesToEvent(
+  eventId: string,
+  eventDate: Date,
+  timeZone: string,
+  tasks: Array<{ scheduledStart: Date | null }>,
+): Promise<number> {
+  const scheduled = tasks.filter((task) => task.scheduledStart);
+  if (scheduled.length === 0) return 0;
+
+  const eventDay = eventCalendarDate(eventDate);
+  let farthest = 0;
+
+  for (const task of scheduled) {
+    const offset = Math.abs(
+      dayOffsetBetween(eventDay, localDate(task.scheduledStart!, timeZone)),
+    );
+    farthest = Math.max(farthest, offset);
+  }
+
+  // Multi-day event windows stay untouched; only clearly stale anchors (for
+  // example a set still sitting on a summer date) are repaired.
+  if (farthest <= MAX_ALIGNED_DAY_OFFSET) return 0;
+
+  return reanchorTasksToEventDate(eventId, eventDate, timeZone);
+}

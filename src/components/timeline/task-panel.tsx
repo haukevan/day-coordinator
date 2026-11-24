@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { format, addDays } from "date-fns";
 import {
@@ -27,6 +29,7 @@ import {
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { applyTaskCountDelta } from "@/lib/query/hooks";
 import { vendorDisplayName } from "@/lib/vendors";
 import { DraftVendorWarning } from "@/components/event/draft-vendor-warning";
 import type { SerializedTask, SerializedVendor } from "@/lib/types";
@@ -623,6 +626,8 @@ export function TaskPanel({
   eventStatus?: string;
 }) {
   const isEdit = Boolean(task);
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
@@ -997,6 +1002,12 @@ export function TaskPanel({
       // Refresh all tasks to pick up propagated schedule changes
       if (isEdit) onRefresh();
       onClose();
+      if (!isEdit) {
+        // Keep the dashboard's task count correct on an immediate return;
+        // the events query is active in the dashboard layout, so this also
+        // reconciles with the server in the background.
+        applyTaskCountDelta(queryClient, eventId, 1);
+      }
     } else {
       setError(data.error ?? "Failed to save task.");
     }
@@ -1034,8 +1045,10 @@ export function TaskPanel({
 
     onRefresh();
     onClose();
-    // Full navigation to ensure all sheets/state are reset after delete
-    window.location.href = `/events/${eventId}/timeline`;
+    applyTaskCountDelta(queryClient, eventId, -1);
+    // Refresh server-rendered header data without a hard reload (a full
+    // reload would wipe the session cache).
+    router.refresh();
   }
 
   return (
