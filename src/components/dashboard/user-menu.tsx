@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useProfileQuery } from "@/lib/query/hooks";
+import { useProfileQuery, clearSessionSnapshots } from "@/lib/query/hooks";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -59,6 +59,7 @@ export function UserMenu({
     await fetch("/api/auth/signout", { method: "POST" });
     // Session cache must not leak into the next signed-in user.
     queryClient.clear();
+    clearSessionSnapshots();
     router.push("/login");
   }
 

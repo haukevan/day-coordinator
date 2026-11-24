@@ -14,7 +14,11 @@ export function createQueryClient(): QueryClient {
     defaultOptions: {
       queries: {
         staleTime: LIST_STALE_TIME,
-        gcTime: 10 * 60_000,
+        // Keep every list in memory for the whole page session. A mutation
+        // followed by a long editing session must never let the Dashboard's
+        // cached list be garbage-collected, which would show a cold skeleton
+        // on the next navigation. A full page reload still starts fresh.
+        gcTime: Infinity,
         refetchOnWindowFocus: true,
         refetchOnReconnect: true,
         retry: 1,

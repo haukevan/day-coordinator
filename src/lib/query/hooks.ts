@@ -18,9 +18,30 @@ async function fetchJson<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+/**
+ * Session-level snapshots of each list.
+ *
+ * The React Query cache is the source of truth; these snapshots are only a
+ * render fallback. If the query cache is ever emptied (garbage collection,
+ * an explicit reset, a provider remount), the last list still renders
+ * instantly instead of flashing a cold skeleton. A full page reload starts
+ * fresh, and sign-out clears them.
+ */
+let dashboardSnapshot: DashboardPayload | undefined;
+let vendorsSnapshot: SerializedVendorContactWithEvents[] | undefined;
+let venuesSnapshot: SerializedVenue[] | undefined;
+
+export function clearSessionSnapshots(): void {
+  dashboardSnapshot = undefined;
+  vendorsSnapshot = undefined;
+  venuesSnapshot = undefined;
+}
+
 /** Dashboard payload: owned events, pending invites, vendor memberships. */
 export async function fetchDashboardPayload(): Promise<DashboardPayload> {
-  return fetchJson<DashboardPayload>("/api/events");
+  const payload = await fetchJson<DashboardPayload>("/api/events");
+  dashboardSnapshot = payload;
+  return payload;
 }
 
 /**
@@ -31,7 +52,7 @@ export function useDashboardQuery() {
   return useQuery({
     queryKey: queryKeys.events,
     queryFn: fetchDashboardPayload,
-    placeholderData: keepPreviousData,
+    placeholderData: () => dashboardSnapshot,
   });
 }
 
@@ -41,27 +62,31 @@ export async function fetchVendors(): Promise<
   const data = await fetchJson<{
     contacts: SerializedVendorContactWithEvents[];
   }>("/api/user/vendor-contacts");
-  return data.contacts ?? [];
+  const vendors = data.contacts ?? [];
+  vendorsSnapshot = vendors;
+  return vendors;
 }
 
 export function useVendorsQuery() {
   return useQuery({
     queryKey: queryKeys.vendors,
     queryFn: fetchVendors,
-    placeholderData: keepPreviousData,
+    placeholderData: () => vendorsSnapshot,
   });
 }
 
 export async function fetchVenues(): Promise<SerializedVenue[]> {
   const data = await fetchJson<{ venues: SerializedVenue[] }>("/api/venues");
-  return data.venues ?? [];
+  const venues = data.venues ?? [];
+  venuesSnapshot = venues;
+  return venues;
 }
 
 export function useVenuesQuery() {
   return useQuery({
     queryKey: queryKeys.venues,
     queryFn: fetchVenues,
-    placeholderData: keepPreviousData,
+    placeholderData: () => venuesSnapshot,
   });
 }
 

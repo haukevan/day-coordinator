@@ -76,11 +76,53 @@ function getOffsetMinutes(date: Date, timeZone: string): number | null {
 
     if (raw === "GMT" || raw === "UTC") return 0;
 
-    const match = /^GMT([+-])(\d{2}):?(\d{2})?$/.exec(raw);
-    if (!match) return null;
+    // Accept both "GMT-08:00" (longOffset) and "GMT-8" (shortOffset).
+    const match = /^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/.exec(raw);
+    if (!match) return getOffsetMinutesFromParts(date, timeZone);
 
     const sign = match[1] === "-" ? -1 : 1;
     return sign * (Number(match[2]) * 60 + Number(match[3] ?? "0"));
+  } catch {
+    return getOffsetMinutesFromParts(date, timeZone);
+  }
+}
+
+/**
+ * Offset for an instant derived from the zone's formatted wall clock.
+ * Used only when `longOffset` is unavailable in the runtime.
+ */
+function getOffsetMinutesFromParts(
+  date: Date,
+  timeZone: string,
+): number | null {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).formatToParts(date);
+
+    const part = (type: string) =>
+      Number(parts.find((p) => p.type === type)?.value ?? Number.NaN);
+
+    const year = part("year");
+    const month = part("month");
+    const day = part("day");
+    const hour = part("hour") % 24;
+    const minute = part("minute");
+    const second = part("second");
+
+    if ([year, month, day, hour, minute, second].some(Number.isNaN)) {
+      return null;
+    }
+
+    const asUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+    return Math.round((asUtc - date.getTime()) / 60_000);
   } catch {
     return null;
   }
@@ -190,12 +232,10 @@ export function getTimeZoneAbbreviation(
   const date = typeof iso === "string" ? new Date(iso) : iso;
   if (Number.isNaN(date.getTime())) return "";
 
-  // ICU resolves the zone's actual offset for this instant and reports the
-  // specific standard/daylight name (PST vs PDT).
-  const icuName = getIcuShortZoneName(date, timeZone);
-  if (icuName?.specific) return icuName.name;
-
-  // Offset fallback for zones/engines without specific abbreviations.
+  // Numeric offset for THIS instant first. Offsets are far more reliable than
+  // zone names across engines/locales, and they decide standard vs daylight
+  // directly (e.g. -08:00 → PST, -07:00 → PDT). This is what guarantees a
+  // November task reads PST.
   const offsets = getZoneOffsetInfo(date, timeZone);
   if (offsets) {
     const daylight = offsets.current > offsets.standard;
@@ -205,6 +245,7 @@ export function getTimeZoneAbbreviation(
     if (label) return label;
   }
 
+  // Known North American zone table (evaluated at the same instant).
   const knownZone = NORTH_AMERICAN_ABBREVIATIONS.find((zone) =>
     zone.test(timeZone),
   );
@@ -214,7 +255,9 @@ export function getTimeZoneAbbreviation(
       : knownZone.standard;
   }
 
-  return icuName?.name ?? "";
+  // Everything else (e.g. +05:30 zones): use the runtime's short name for
+  // this instant, which is still date-accurate.
+  return getIcuShortZoneName(date, timeZone)?.name ?? "";
 }
 
 /**
